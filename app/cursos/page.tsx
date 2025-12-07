@@ -115,9 +115,6 @@ export default function CursosPage() {
             >
               + Nuevo curso
             </button>
-            <span className="text-[11px] md:text-xs text-[#fffef9]/60">
-              Los datos se manejan en memoria por ahora (sin backend).
-            </span>
           </div>
         </header>
 

@@ -9,7 +9,7 @@ const NAV_ITEMS = [
   { href: "/clientes", label: "Clientes" },
   { href: "/tareas", label: "Tareas" },
   { href: "/cursos", label: "Cursos" },
-  { href: "/finanzas", label: "Finanzas" },
+  { href: "/facturacion", label: "Facturación" },
   { href: "/colaboradores", label: "Colaboradores" },
   { href: "/configuracion", label: "Configuración" },
 ];
