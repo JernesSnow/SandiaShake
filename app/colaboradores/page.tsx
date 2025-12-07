@@ -1,16 +1,11 @@
+// app/colaboradores/page.tsx
 import { Shell } from "../../components/Shell";
-import { SectionCard } from "../../components/SectionCard";
+import { ColaboradoresPage } from "../../components/colaboradores/ColaboradoresPage";
 
-export default function ColaboradoresPage() {
+export default function Colaboradores() {
   return (
     <Shell>
-      <h1 className="text-xl font-semibold mb-2">Colaboradores y Admins</h1>
-      <div className="grid gap-4 md:grid-cols-2">
-        <SectionCard title="Administradores (CRUD)" />
-        <SectionCard title="Colaboradores (CRUD y asignación a clientes)" />
-        <SectionCard title="Chilli Points y premios" />
-        <SectionCard title="Salud mental (detalle colaborador)" />
-      </div>
+      <ColaboradoresPage />
     </Shell>
   );
 }
