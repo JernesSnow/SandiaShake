@@ -39,7 +39,7 @@ export default function DashboardPage() {
           Reporte mensual consolidado de clientes y rendimiento.
         </p>
 
-        <button className="px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-sm">
+        <button className="px-4 py-2 rounded-md bg-[#ee2346] text-white text-sm">
           Descargar reporte mensual
         </button>
       </div>

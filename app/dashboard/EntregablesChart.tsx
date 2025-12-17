@@ -20,7 +20,7 @@ export default function EntregablesChart() {
             <XAxis dataKey="name" stroke="#aaa" />
             <YAxis stroke="#aaa" />
             <Tooltip />
-            <Bar dataKey="value" fill="#00c67a" radius={[6, 6, 0, 0]} />
+            <Bar dataKey="value" fill="#6cbe45" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

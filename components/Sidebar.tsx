@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import clsx from "clsx";
+import Image from "next/image";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Dashboard" },
@@ -18,31 +19,17 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside
-      className="
-        hidden md:flex md:flex-col
-        w-64 min-h-screen
-        bg-gradient-to-b from-[#333132] via-[#2e2c2d] to-[#252324]
-        text-[#fffef9]
-        border-r border-[#444242]
-      "
-    >
-      {/* Top brand bar */}
-      <div className="px-5 pt-5 pb-3 border-b border-[#444242]">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-xs tracking-[0.2em] uppercase text-[#fffef9]/60">
-              Sandía con Chile
-            </div>
-            <div className="text-xl font-bold tracking-wide">
-              SandíaShake CRM
-            </div>
-          </div>
-          {/* Small accent pill using brand red */}
-          <span className="inline-flex items-center rounded-full bg-[#ee2346] text-[#fffef9] px-2 py-0.5 text-[10px] font-semibold">
-            Admin
-          </span>
-        </div>
+    <aside className="hidden md:flex md:flex-col w-64 min-h-screen bg-gradient-to-b from-[#333132] via-[#2e2c2d] to-[#252324] text-[#fffef9] border-r border-[#444242]">
+      {/* Top logo */}
+      <div className="px-5 pt-6 pb-4 border-b border-[#444242] flex justify-center">
+        <Image
+          src="/mock-logo-sandia-con-chole.png"
+          alt="SandiaShake"
+          width={160}
+          height={40}
+          className="object-contain"
+          priority
+        />
       </div>
 
       {/* Section label */}
@@ -72,13 +59,22 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Footer status using brand green */}
+      {/* Footer status + role */}
       <div className="px-4 pb-5 pt-3 border-t border-[#444242] text-xs">
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between gap-2">
           <span className="text-[#fffef9]/60">Estado del sistema</span>
-          <span className="inline-flex items-center gap-1 rounded-full border border-[#6cbe45]/40 bg-[#6cbe45]/15 px-2 py-0.5 text-[10px] font-semibold text-[#6cbe45]">
-            ● Online
-          </span>
+
+          <div className="flex items-center gap-2">
+            {/* Admin tag */}
+            <span className="inline-flex items-center rounded-full bg-[#ee2346] text-[#fffef9] px-2 py-0.5 text-[10px] font-semibold">
+              Admin
+            </span>
+
+            {/* Online tag */}
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#6cbe45]/40 bg-[#6cbe45]/15 px-2 py-0.5 text-[10px] font-semibold text-[#6cbe45]">
+              ● Online
+            </span>
+          </div>
         </div>
       </div>
     </aside>
