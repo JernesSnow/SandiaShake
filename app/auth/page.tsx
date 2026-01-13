@@ -4,29 +4,76 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Eye, EyeOff } from "react-feather";
+import { createSupabaseClient } from "@/lib/supabase/client";
 
 export default function AuthPage() {
   const router = useRouter();
+
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [keepLoggedIn, setKeepLoggedIn] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  //Login con Supabase
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
+    setLoading(true);
 
-    // 🔐 TEMPORARY DEV LOGIN
-    if (email === "admin@sandia.com" && password === "admin123") {
-      if (keepLoggedIn) {
-        localStorage.setItem("role", "admin");
+    try {
+      const supabase = createSupabaseClient(keepLoggedIn);
+
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        console.error("SIGNIN ERROR:", signInError);
+        setError(signInError.message);
+        return;
       }
-      router.push("/dashboard");
-      return;
-    }
 
-    setError("Credenciales inválidas (usa admin@sandia.com / admin123 en dev).");
+      const authUserId = data.user?.id;
+      if (!authUserId) {
+        setError("No se pudo validar el usuario.");
+        return;
+      }
+
+      const { data: perfil, error: perfilError } = await supabase
+        .from("usuarios")
+        .select("rol, estado")
+        .eq("auth_user_id", authUserId)
+        .maybeSingle();
+
+      if (perfilError) {
+        console.error("PERFIL ERROR:", perfilError);
+        setError(perfilError.message);
+        return;
+      }
+
+      if (!perfil) {
+        setError("Tu perfil no está configurado en el sistema.");
+        return;
+      }
+
+      if (perfil.estado !== "ACTIVO") {
+        setError("Tu usuario está inactivo o bloqueado.");
+        return;
+      }
+
+      localStorage.setItem("rol", perfil.rol);
+      router.push("/dashboard");
+    } catch (err: any) {
+      console.error("LOGIN ERROR:", err);
+      setError(err?.message ?? "Ocurrió un error al iniciar sesión.");
+    } finally {
+      setLoading(false);
+    }
   }
+
 
   return (
     <div className="min-h-screen flex flex-col bg-[#262425]">
@@ -64,6 +111,8 @@ export default function AuthPage() {
                       placeholder="admin@sandia.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
+                      autoComplete="email"
+                      required
                     />
                   </div>
 
@@ -76,6 +125,7 @@ export default function AuthPage() {
                       <button
                         type="button"
                         className="text-[11px] font-medium text-gray-400 hover:text-white"
+                        onClick={() => router.push("/forgot-password")}
                       >
                         ¿Olvidaste tu contraseña?
                       </button>
@@ -88,6 +138,8 @@ export default function AuthPage() {
                         placeholder="••••••••"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
+                        autoComplete="current-password"
+                        required
                       />
                       <button
                         type="button"
@@ -127,17 +179,15 @@ export default function AuthPage() {
                 {/* Submit */}
                 <button
                   type="submit"
-                  className="mt-5 w-full rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] text-white py-2 text-sm font-semibold uppercase tracking-wide transition"
+                  disabled={loading}
+                  className="mt-5 w-full rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] disabled:opacity-60 text-white py-2 text-sm font-semibold uppercase tracking-wide transition"
                 >
-                  Entrar
+                  {loading ? "Entrando..." : "Entrar"}
                 </button>
 
                 <p className="mt-3 text-[11px] text-center text-gray-400">
                   Nuevo en SandíaShake?{" "}
-                  <a
-                    href="#"
-                    className="underline font-medium hover:text-white"
-                  >
+                  <a href="/signup" className="underline font-medium hover:text-white">
                     Crear cuenta
                   </a>
                 </p>
@@ -147,7 +197,7 @@ export default function AuthPage() {
         </div>
       </div>
 
-      {/* Simple footer */}
+      {/* Footer */}
       <footer className="py-3 text-center text-[11px] text-gray-400">
         © {new Date().getFullYear()} SandíaShake · Todos los derechos reservados
       </footer>
