@@ -23,12 +23,15 @@ export default function AuthPage() {
     setLoading(true);
 
     try {
-      const supabase = createSupabaseClient(keepLoggedIn);
 
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const supabase = createSupabaseClient();
+
+      const { data, error: signInError } =
+      await supabase.auth.signInWithPassword({ email, password });
+
+      const { data: sesion } = await supabase.auth.getSession();
+      console.log("SESSION:", sesion?.session ? "OK" : "NO", sesion);
+
 
       if (signInError) {
         console.error("SIGNIN ERROR:", signInError);
@@ -154,19 +157,6 @@ export default function AuthPage() {
                       </button>
                     </div>
                   </div>
-                </div>
-
-                {/* Keep me logged in */}
-                <div className="flex justify-center mt-4">
-                  <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      className="rounded border-[#3a3a40] bg-[#1a1a1d] text-[#6cbe45] focus:ring-[#6cbe45]"
-                      checked={keepLoggedIn}
-                      onChange={(e) => setKeepLoggedIn(e.target.checked)}
-                    />
-                    Mantener sesión iniciada
-                  </label>
                 </div>
 
                 {/* Error message */}

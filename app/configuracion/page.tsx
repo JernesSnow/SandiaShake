@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Shell } from "../../components/Shell";
-import { SectionCard } from "../../components/SectionCard";
 import {
   User,
   Mail,
@@ -19,47 +19,56 @@ import {
   Award,
 } from "react-feather";
 
-/* ------------------ TYPES (TOP LEVEL, NOT INSIDE JSX) ------------------ */
+/* ------------------ TYPES (UI) ------------------ */
 
 type RolUsuario = "Admin" | "Colaborador" | "Cliente";
 type EstadoUsuario = "Activo" | "Suspendido";
 
 type UsuarioSistema = {
-  id: string;
+  id: string; // id_usuario bigint -> string
   nombre: string;
   correo: string;
   rol: RolUsuario;
   estado: EstadoUsuario;
+  adminNivel?: "PRIMARIO" | "SECUNDARIO" | null;
 };
 
-const initialUsuarios: UsuarioSistema[] = [
-  {
-    id: "u1",
-    nombre: "Jimena Torres",
-    correo: "jimena@sandiashake.com",
-    rol: "Admin",
-    estado: "Activo",
-  },
-  {
-    id: "u2",
-    nombre: "Carlos Méndez",
-    correo: "carlos@sandiashake.com",
-    rol: "Colaborador",
-    estado: "Activo",
-  },
-  {
-    id: "u3",
-    nombre: "Café La Plaza",
-    correo: "cafe@cliente.com",
-    rol: "Cliente",
-    estado: "Suspendido",
-  },
-];
+/* ------------------ MAPPERS DB <-> UI ------------------ */
 
-/* ------------------ PAGE ------------------ */
+function rolDbToUi(rol: string): RolUsuario {
+  const r = (rol ?? "").toUpperCase();
+  if (r === "ADMIN") return "Admin";
+  if (r === "COLABORADOR") return "Colaborador";
+  return "Cliente";
+}
+
+function rolUiToDb(rol: RolUsuario) {
+  if (rol === "Admin") return "ADMIN";
+  if (rol === "Colaborador") return "COLABORADOR";
+  return "CLIENTE";
+}
+
+function estadoDbToUi(estado: string): EstadoUsuario {
+  const e = (estado ?? "").toUpperCase();
+  return e === "ACTIVO" ? "Activo" : "Suspendido";
+}
+
+function estadoUiToDb(estado: EstadoUsuario) {
+  return estado === "Activo" ? "ACTIVO" : "INACTIVO";
+}
+
+function safeJsonParse(text: string) {
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function ConfiguracionPage() {
-  // Perfil
+  const router = useRouter();
+
+  // Perfil (placeholder)
   const [name, setName] = useState("Usuario Admin");
   const [email, setEmail] = useState("admin@sandia.com");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -67,13 +76,15 @@ export default function ConfiguracionPage() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   // CRUD Usuarios
-  const [usuarios, setUsuarios] = useState<UsuarioSistema[]>(initialUsuarios);
+  const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([]);
   const [userSearch, setUserSearch] = useState("");
-  const [userRoleFilter, setUserRoleFilter] = useState<RolUsuario | "Todos">(
-    "Todos"
-  );
+  const [userRoleFilter, setUserRoleFilter] = useState<RolUsuario | "Todos">("Todos");
   const [editingUser, setEditingUser] = useState<UsuarioSistema | null>(null);
   const [isNewUser, setIsNewUser] = useState(false);
+
+  const [cargandoUsuarios, setCargandoUsuarios] = useState(false);
+  const [errorUsuarios, setErrorUsuarios] = useState<string | null>(null);
+  const [noAutenticado, setNoAutenticado] = useState(false);
 
   // Chilli / Rewards / Notifications
   const [chilliAutoAward, setChilliAutoAward] = useState(true);
@@ -100,19 +111,62 @@ export default function ConfiguracionPage() {
   const [hostingProvider, setHostingProvider] = useState("Railway");
   const [envMode, setEnvMode] = useState<"Testing" | "Production">("Testing");
 
-  const handleSaveProfile = (e: React.FormEvent) => {
-    e.preventDefault();
-    // TODO: Implement profile update logic
-    console.log("Saving profile...");
-  };
+  async function cargarUsuarios() {
+    setCargandoUsuarios(true);
+    setErrorUsuarios(null);
+    setNoAutenticado(false);
+
+    try {
+      const res = await fetch("/api/admin/usuarios", {
+        method: "GET",
+        credentials: "include",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+      });
+
+      const text = await res.text();
+      const json = safeJsonParse(text);
+
+      if (res.status === 401) {
+        setNoAutenticado(true);
+        setUsuarios([]);
+        setErrorUsuarios(json?.error ?? "No autenticado.");
+        return;
+      }
+
+      if (!res.ok) {
+        setUsuarios([]);
+        setErrorUsuarios(json?.error ?? "No se pudieron cargar los usuarios.");
+        return;
+      }
+
+      const lista: UsuarioSistema[] = (json?.usuarios ?? []).map((u: any) => ({
+        id: String(u.id_usuario), // ✅ important
+        nombre: u.nombre ?? "",
+        correo: u.correo ?? "",
+        rol: rolDbToUi(u.rol),
+        estado: estadoDbToUi(u.estado),
+        adminNivel: u.admin_nivel ?? null,
+      }));
+
+      setUsuarios(lista);
+    } catch {
+      setUsuarios([]);
+      setErrorUsuarios("Error cargando usuarios.");
+    } finally {
+      setCargandoUsuarios(false);
+    }
+  }
+
+  useEffect(() => {
+    cargarUsuarios();
+  }, []);
 
   const filteredUsuarios = useMemo(() => {
     const s = userSearch.trim().toLowerCase();
     return usuarios.filter((u) => {
       const matchesSearch =
-        !s ||
-        u.nombre.toLowerCase().includes(s) ||
-        u.correo.toLowerCase().includes(s);
+        !s || u.nombre.toLowerCase().includes(s) || u.correo.toLowerCase().includes(s);
       const matchesRole = userRoleFilter === "Todos" || u.rol === userRoleFilter;
       return matchesSearch && matchesRole;
     });
@@ -126,63 +180,141 @@ export default function ConfiguracionPage() {
       correo: "",
       rol: "Colaborador",
       estado: "Activo",
+      adminNivel: "SECUNDARIO",
     });
   }
 
   function openEditUser(u: UsuarioSistema) {
     setIsNewUser(false);
-    setEditingUser(u);
+    setEditingUser({ ...u }); // ✅ copy
   }
 
-  function saveUser(u: UsuarioSistema) {
+  async function saveUser(u: UsuarioSistema) {
     if (!u.nombre.trim() || !u.correo.trim()) {
       alert("Nombre y correo son obligatorios.");
       return;
     }
 
-    // naive email uniqueness check (UI only)
-    const emailTaken = usuarios.some(
-      (x) => x.correo.toLowerCase() === u.correo.toLowerCase() && x.id !== u.id
-    );
-    if (emailTaken) {
-      alert("Ese correo ya existe.");
+    if (isNewUser) {
+      if (u.rol === "Cliente") {
+        alert("Para crear Clientes es mejor un flujo separado (cliente + cliente_usuario).");
+        return;
+      }
+
+      const res = await fetch("/api/admin/crear-usuario", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
+        body: JSON.stringify({
+          nombre: u.nombre,
+          correo: u.correo,
+          rol: rolUiToDb(u.rol),
+          admin_nivel: u.rol === "Admin" ? (u.adminNivel ?? "SECUNDARIO") : null,
+        }),
+      });
+
+      const text = await res.text();
+      const json = safeJsonParse(text);
+
+      if (res.status === 401) {
+        setNoAutenticado(true);
+        alert(json?.error ?? "No autenticado.");
+        return;
+      }
+      if (!res.ok) {
+        alert(json?.error ?? "No se pudo crear el usuario.");
+        return;
+      }
+
+      await cargarUsuarios();
+      setEditingUser(null);
+      setIsNewUser(false);
       return;
     }
 
-    if (isNewUser) {
-      const id = `u${Date.now()}`;
-      setUsuarios((prev) => [...prev, { ...u, id }]);
-    } else {
-      setUsuarios((prev) => prev.map((x) => (x.id === u.id ? u : x)));
+    // EDITAR: requiere id
+    if (!u.id || !/^\d+$/.test(u.id)) {
+      alert("ID inválido");
+      return;
     }
 
+    const res = await fetch(`/api/admin/usuarios/${u.id}`, {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({
+        nombre: u.nombre,
+        correo: u.correo,
+        rol: rolUiToDb(u.rol),
+        admin_nivel: u.rol === "Admin" ? (u.adminNivel ?? "SECUNDARIO") : null,
+        estado: estadoUiToDb(u.estado),
+      }),
+    });
+
+    const text = await res.text();
+    const json = safeJsonParse(text);
+
+    if (res.status === 401) {
+      setNoAutenticado(true);
+      alert(json?.error ?? "No autenticado.");
+      return;
+    }
+    if (!res.ok) {
+      alert(json?.error ?? "No se pudo actualizar el usuario.");
+      return;
+    }
+
+    await cargarUsuarios();
     setEditingUser(null);
     setIsNewUser(false);
   }
 
-  function softDeleteUser(id: string) {
-    // delete lógico: suspendemos
-    setUsuarios((prev) =>
-      prev.map((u) => (u.id === id ? { ...u, estado: "Suspendido" } : u))
-    );
+  async function softDeleteUser(id: string) {
+    if (!id || !/^\d+$/.test(id)) {
+      alert("ID inválido");
+      return;
+    }
+
+    const res = await fetch(`/api/admin/usuarios/${id}/desactivar`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+
+    const text = await res.text();
+    const json = safeJsonParse(text);
+
+    if (res.status === 401) {
+      setNoAutenticado(true);
+      alert(json?.error ?? "No autenticado.");
+      return;
+    }
+    if (!res.ok) {
+      alert(json?.error ?? "No se pudo desactivar.");
+      return;
+    }
+
+    await cargarUsuarios();
     setEditingUser(null);
     setIsNewUser(false);
   }
+
+  const handleSaveProfile = (e: React.FormEvent) => {
+    e.preventDefault();
+    alert("Guardar perfil (pendiente).");
+  };
 
   return (
     <Shell>
       <h1 className="text-xl font-semibold mb-6 text-white">Configuración</h1>
 
-      {/* ------------------ PERFIL ------------------ */}
+      {/* PERFIL */}
       <div className="bg-[#333132] rounded-xl border border-[#4a4748]/40 shadow mb-6">
         <div className="p-6">
-          <h2 className="text-lg font-semibold text-white mb-6">
-            Información del Perfil
-          </h2>
+          <h2 className="text-lg font-semibold text-white mb-6">Información del Perfil</h2>
 
           <form onSubmit={handleSaveProfile}>
             <div className="grid gap-6 md:grid-cols-2">
-              {/* Name */}
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-400 mb-2">
                   <User size={16} />
@@ -193,11 +325,9 @@ export default function ConfiguracionPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45] focus:border-[#6cbe45]"
-                  placeholder="Tu nombre completo"
                 />
               </div>
 
-              {/* Email */}
               <div>
                 <label className="flex items-center gap-2 text-sm font-medium text-gray-400 mb-2">
                   <Mail size={16} />
@@ -208,12 +338,10 @@ export default function ConfiguracionPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45] focus:border-[#6cbe45]"
-                  placeholder="tu@email.com"
                 />
               </div>
             </div>
 
-            {/* Password Change Section */}
             <div className="mt-8 pt-6 border-t border-[#3a3a40]">
               <h3 className="text-md font-semibold text-white mb-4 flex items-center gap-2">
                 <Lock size={18} />
@@ -221,7 +349,6 @@ export default function ConfiguracionPage() {
               </h3>
 
               <div className="grid gap-6 md:grid-cols-3">
-                {/* Current Password */}
                 <div>
                   <label className="text-sm font-medium text-gray-400 mb-2 block">
                     Contraseña actual
@@ -230,12 +357,10 @@ export default function ConfiguracionPage() {
                     type="password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45] focus:border-[#6cbe45]"
-                    placeholder="••••••••"
+                    className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45]"
                   />
                 </div>
 
-                {/* New Password */}
                 <div>
                   <label className="text-sm font-medium text-gray-400 mb-2 block">
                     Nueva contraseña
@@ -244,12 +369,10 @@ export default function ConfiguracionPage() {
                     type="password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45] focus:border-[#6cbe45]"
-                    placeholder="••••••••"
+                    className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45]"
                   />
                 </div>
 
-                {/* Confirm Password */}
                 <div>
                   <label className="text-sm font-medium text-gray-400 mb-2 block">
                     Confirmar contraseña
@@ -258,14 +381,12 @@ export default function ConfiguracionPage() {
                     type="password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45] focus:border-[#6cbe45]"
-                    placeholder="••••••••"
+                    className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45]"
                   />
                 </div>
               </div>
             </div>
 
-            {/* Save Button */}
             <div className="mt-6 flex justify-end">
               <button
                 type="submit"
@@ -278,7 +399,7 @@ export default function ConfiguracionPage() {
         </div>
       </div>
 
-      {/* ------------------ CRUD USUARIOS (ANTES DE DRIVE) ------------------ */}
+      {/* CRUD USUARIOS */}
       <div className="bg-[#333132] rounded-xl border border-[#4a4748]/40 shadow mb-6">
         <div className="p-6">
           <div className="flex items-start justify-between gap-3 mb-4">
@@ -288,21 +409,55 @@ export default function ConfiguracionPage() {
                 Gestión de usuarios
               </h2>
               <p className="text-[11px] text-gray-400 mt-1">
-                Admin principal: crea y administra Admins, Colaboradores y
-                Clientes (desactivación lógica).
+                Lista desde <span className="text-gray-200">/api/admin/usuarios</span>
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={openNewUser}
-              className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold bg-[#ee2346] hover:bg-[#d8203f] text-white transition"
-            >
-              <Plus size={16} /> Nuevo usuario
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={cargarUsuarios}
+                className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold border border-[#4a4748]/40 text-gray-200 hover:bg-[#3a3738] transition"
+              >
+                Recargar
+              </button>
+
+              <button
+                type="button"
+                onClick={openNewUser}
+                className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold bg-[#ee2346] hover:bg-[#d8203f] text-white transition"
+              >
+                <Plus size={16} /> Nuevo usuario
+              </button>
+            </div>
           </div>
 
-          {/* filtros */}
+          {cargandoUsuarios && <p className="text-sm text-gray-300 mb-3">Cargando usuarios...</p>}
+
+          {errorUsuarios && (
+            <div className="mb-3">
+              <p className="text-sm text-red-400">{errorUsuarios}</p>
+              {noAutenticado && (
+                <div className="mt-2 flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => router.push("/auth")}
+                    className="px-3 py-2 rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] text-white text-sm font-semibold transition"
+                  >
+                    Ir a iniciar sesión
+                  </button>
+                  <button
+                    type="button"
+                    onClick={cargarUsuarios}
+                    className="px-3 py-2 rounded-md border border-[#4a4748]/40 text-gray-200 hover:bg-[#3a3738] text-sm font-semibold transition"
+                  >
+                    Reintentar
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="grid gap-3 md:grid-cols-3 mb-4">
             <div className="md:col-span-2">
               <label className="text-sm font-medium text-gray-400 mb-2 block">
@@ -317,14 +472,10 @@ export default function ConfiguracionPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-gray-400 mb-2 block">
-                Filtrar por rol
-              </label>
+              <label className="text-sm font-medium text-gray-400 mb-2 block">Filtrar por rol</label>
               <select
                 value={userRoleFilter}
-                onChange={(e) =>
-                  setUserRoleFilter(e.target.value as RolUsuario | "Todos")
-                }
+                onChange={(e) => setUserRoleFilter(e.target.value as RolUsuario | "Todos")}
                 className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45]"
               >
                 <option value="Todos">Todos</option>
@@ -335,7 +486,6 @@ export default function ConfiguracionPage() {
             </div>
           </div>
 
-          {/* tabla */}
           <div className="overflow-x-auto rounded-lg border border-[#4a4748]/40">
             <table className="w-full text-sm">
               <thead className="bg-[#2b2b30] text-gray-300">
@@ -347,13 +497,12 @@ export default function ConfiguracionPage() {
                   <th className="text-right px-4 py-3">Acciones</th>
                 </tr>
               </thead>
+
               <tbody className="bg-[#333132] text-gray-200">
                 {filteredUsuarios.map((u) => (
                   <tr key={u.id} className="border-t border-[#4a4748]/30">
                     <td className="px-4 py-3 whitespace-nowrap">{u.nombre}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-gray-300">
-                      {u.correo}
-                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-gray-300">{u.correo}</td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className="inline-flex rounded-full px-2 py-0.5 text-[11px] border border-[#7dd3fc]/30 bg-[#7dd3fc]/10 text-[#7dd3fc]">
                         {u.rol}
@@ -391,12 +540,9 @@ export default function ConfiguracionPage() {
                   </tr>
                 ))}
 
-                {filteredUsuarios.length === 0 && (
+                {!cargandoUsuarios && filteredUsuarios.length === 0 && (
                   <tr>
-                    <td
-                      colSpan={5}
-                      className="px-4 py-6 text-center text-gray-400"
-                    >
+                    <td colSpan={5} className="px-4 py-6 text-center text-gray-400">
                       No hay usuarios que coincidan con los filtros.
                     </td>
                   </tr>
@@ -405,7 +551,6 @@ export default function ConfiguracionPage() {
             </table>
           </div>
 
-          {/* modal */}
           {editingUser && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
               <div className="w-full max-w-lg rounded-xl bg-[#333132] border border-[#4a4748]/40 shadow-lg">
@@ -427,30 +572,22 @@ export default function ConfiguracionPage() {
 
                 <div className="p-5 space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-gray-400 mb-2 block">
-                      Nombre
-                    </label>
+                    <label className="text-sm font-medium text-gray-400 mb-2 block">Nombre</label>
                     <input
                       value={editingUser.nombre}
                       onChange={(e) =>
-                        setEditingUser((p) =>
-                          p ? { ...p, nombre: e.target.value } : p
-                        )
+                        setEditingUser((p) => (p ? { ...p, nombre: e.target.value } : p))
                       }
                       className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45]"
                     />
                   </div>
 
                   <div>
-                    <label className="text-sm font-medium text-gray-400 mb-2 block">
-                      Correo
-                    </label>
+                    <label className="text-sm font-medium text-gray-400 mb-2 block">Correo</label>
                     <input
                       value={editingUser.correo}
                       onChange={(e) =>
-                        setEditingUser((p) =>
-                          p ? { ...p, correo: e.target.value } : p
-                        )
+                        setEditingUser((p) => (p ? { ...p, correo: e.target.value } : p))
                       }
                       className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45]"
                     />
@@ -458,16 +595,12 @@ export default function ConfiguracionPage() {
 
                   <div className="grid gap-4 md:grid-cols-2">
                     <div>
-                      <label className="text-sm font-medium text-gray-400 mb-2 block">
-                        Rol
-                      </label>
+                      <label className="text-sm font-medium text-gray-400 mb-2 block">Rol</label>
                       <select
                         value={editingUser.rol}
                         onChange={(e) =>
                           setEditingUser((p) =>
-                            p
-                              ? { ...p, rol: e.target.value as RolUsuario }
-                              : p
+                            p ? { ...p, rol: e.target.value as RolUsuario } : p
                           )
                         }
                         className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45]"
@@ -479,19 +612,12 @@ export default function ConfiguracionPage() {
                     </div>
 
                     <div>
-                      <label className="text-sm font-medium text-gray-400 mb-2 block">
-                        Estado
-                      </label>
+                      <label className="text-sm font-medium text-gray-400 mb-2 block">Estado</label>
                       <select
                         value={editingUser.estado}
                         onChange={(e) =>
                           setEditingUser((p) =>
-                            p
-                              ? {
-                                  ...p,
-                                  estado: e.target.value as EstadoUsuario,
-                                }
-                              : p
+                            p ? { ...p, estado: e.target.value as EstadoUsuario } : p
                           )
                         }
                         className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45]"
@@ -501,6 +627,28 @@ export default function ConfiguracionPage() {
                       </select>
                     </div>
                   </div>
+
+                  {editingUser.rol === "Admin" && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-400 mb-2 block">
+                        Nivel de Admin
+                      </label>
+                      <select
+                        value={editingUser.adminNivel ?? "SECUNDARIO"}
+                        onChange={(e) =>
+                          setEditingUser((p) =>
+                            p
+                              ? { ...p, adminNivel: e.target.value as "PRIMARIO" | "SECUNDARIO" }
+                              : p
+                          )
+                        }
+                        className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45]"
+                      >
+                        <option value="PRIMARIO">PRIMARIO</option>
+                        <option value="SECUNDARIO">SECUNDARIO</option>
+                      </select>
+                    </div>
+                  )}
 
                   <div className="flex justify-end gap-2 pt-2 border-t border-[#4a4748]/30">
                     {!isNewUser && (
@@ -521,12 +669,21 @@ export default function ConfiguracionPage() {
                       Guardar
                     </button>
                   </div>
+
+                  {isNewUser && (
+                    <p className="text-[11px] text-gray-400">
+                      Para Admin/Colaborador se crea mediante tu endpoint. Para Cliente, se recomienda un flujo
+                      separado.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
           )}
         </div>
       </div>
+
+      
 
       {/* ------------------ CHILLI POINTS / REWARDS / NOTIFICACIONES ------------------ */}
       <div className="bg-[#333132] rounded-xl border border-[#4a4748]/40 shadow mb-6">
@@ -823,7 +980,6 @@ export default function ConfiguracionPage() {
           </div>
         </div>
       </div>
-
     </Shell>
   );
 }
