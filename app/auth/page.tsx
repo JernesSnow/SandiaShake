@@ -74,8 +74,8 @@ export default function AuthPage() {
         return;
       }
 
-      localStorage.setItem("rol", perfil.rol);
-      router.push("/dashboard");
+      // Redirect to MFA verification instead of dashboard
+      router.push("/verify-email-mfa");
     } catch (err: any) {
       console.error("LOGIN ERROR:", err);
       setError(err?.message ?? "Ocurrió un error al iniciar sesión.");
