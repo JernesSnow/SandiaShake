@@ -16,7 +16,7 @@ export default function InvitePage() {
     async function handleInvite() {
       const supabase = createSupabaseClient(true);
 
-      // Supabase puts tokens in the URL HASH
+      //tokens en el URL HASH
       const hash = window.location.hash.substring(1);
       const params = new URLSearchParams(hash);
 
@@ -29,7 +29,7 @@ export default function InvitePage() {
         return;
       }
 
-      // Establish session
+      //Sesion
       const { error } = await supabase.auth.setSession({
         access_token,
         refresh_token,

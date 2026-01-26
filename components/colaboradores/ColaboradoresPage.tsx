@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   CheckCircle,
@@ -13,7 +13,10 @@ import {
   User,
 } from "react-feather";
 
+/* ===================== TYPES ===================== */
+
 type MentalState = "Estable" | "Atento" | "En riesgo";
+
 type RolColaborador =
   | "Admin"
   | "Estratega"
@@ -21,33 +24,34 @@ type RolColaborador =
   | "Diseñador"
   | "Editor"
   | "Community Manager";
+
 type EstadoCuenta = "Activo" | "Suspendido";
 
-type TaskStatus = "Pendiente" | "En progreso" | "En revisión" | "Aprobada";
-type TaskPrioridad = "Alta" | "Media" | "Baja";
-
-export type ColaboradorTask = {
-  id: string;
-  titulo: string;
-  cliente: string;
-  status: TaskStatus;
-  prioridad: TaskPrioridad;
-  mes: string;
+type UsuarioDB = {
+  id_usuario: number;
+  nombre: string;
+  correo: string;
+  rol: "ADMIN" | "COLABORADOR";
+  admin_nivel: "PRIMARIO" | "SECUNDARIO" | null;
+  estado: "ACTIVO" | "SUSPENDIDO";
 };
 
 export type Colaborador = {
-  id: string;
+  id: number;
   nombre: string;
-  rol: RolColaborador;
+  rol: RolColaborador; // UI role label (Admin vs Colab role label)
   email: string;
-  telefono?: string;
+
   esAdmin: boolean;
+  esAdminPrimario: boolean;
+
   estadoCuenta: EstadoCuenta;
   mentalState: MentalState;
   ultimaRevision: string;
+
   clientesAsignados: string[];
 
-  // Stats
+  // Stats (por ahora placeholders si no tienes tablas de KPIs listas)
   totalTareas: number;
   tareasPendientes: number;
   tareasAprobadas: number;
@@ -55,13 +59,14 @@ export type Colaborador = {
   chilliPoints: number;
   chilliPointsMes: number;
 
-  tareasRecientes: ColaboradorTask[];
-
+  // opcional
   notas?: string;
 };
 
 type FiltroEstado = "Todos" | EstadoCuenta;
 type FiltroMental = "Todos" | MentalState;
+
+/* ===================== THEME ===================== */
 
 const palette = {
   dark: "#333132",
@@ -71,205 +76,6 @@ const palette = {
   alert: "#ee2346",
   success: "#6cbe45",
 };
-
-const initialColaboradores: Colaborador[] = [
-  {
-    id: "c1",
-    nombre: "Ana Rodríguez",
-    rol: "Ejecutivo de cuenta",
-    email: "ana@sandiashake.com",
-    telefono: "+506 8888-1111",
-    esAdmin: false,
-    estadoCuenta: "Activo",
-    mentalState: "Estable",
-    ultimaRevision: "2025-02-01",
-    clientesAsignados: ["Café La Plaza", "Gimnasio PowerFit"],
-
-    totalTareas: 34,
-    tareasPendientes: 4,
-    tareasAprobadas: 26,
-    porcentajeAprobacion: 76,
-    chilliPoints: 320,
-    chilliPointsMes: 95,
-
-    tareasRecientes: [
-      {
-        id: "t1",
-        titulo: "Calendario de contenidos febrero",
-        cliente: "Café La Plaza",
-        status: "Aprobada",
-        prioridad: "Alta",
-        mes: "Febrero 2025",
-      },
-      {
-        id: "t2",
-        titulo: "Brief campaña membresías Q1",
-        cliente: "Gimnasio PowerFit",
-        status: "En progreso",
-        prioridad: "Media",
-        mes: "Febrero 2025",
-      },
-      {
-        id: "t3",
-        titulo: "Revisión pauta Meta enero",
-        cliente: "Café La Plaza",
-        status: "Pendiente",
-        prioridad: "Baja",
-        mes: "Enero 2025",
-      },
-    ],
-
-    notas:
-      "Le gusta recibir feedback estructurado; reuniones 1:1 mensuales funcionan bien.",
-  },
-  {
-    id: "c2",
-    nombre: "Carlos Méndez",
-    rol: "Diseñador",
-    email: "carlos@sandiashake.com",
-    telefono: "+506 8888-2222",
-    esAdmin: false,
-    estadoCuenta: "Activo",
-    mentalState: "Atento",
-    ultimaRevision: "2025-01-25",
-    clientesAsignados: ["Hotel Las Olas", "Panadería Dulce Vida"],
-
-    totalTareas: 41,
-    tareasPendientes: 7,
-    tareasAprobadas: 28,
-    porcentajeAprobacion: 68,
-    chilliPoints: 280,
-    chilliPointsMes: 80,
-
-    tareasRecientes: [
-      {
-        id: "t4",
-        titulo: "Pack de historias IG San Valentín",
-        cliente: "Hotel Las Olas",
-        status: "En revisión",
-        prioridad: "Alta",
-        mes: "Febrero 2025",
-      },
-      {
-        id: "t5",
-        titulo: "Arte para combo de desayunos",
-        cliente: "Panadería Dulce Vida",
-        status: "Aprobada",
-        prioridad: "Media",
-        mes: "Enero 2025",
-      },
-      {
-        id: "t6",
-        titulo: "Adaptaciones para stories",
-        cliente: "Hotel Las Olas",
-        status: "En progreso",
-        prioridad: "Media",
-        mes: "Enero 2025",
-      },
-    ],
-
-    notas:
-      "Reporta cansancio en cierres de mes; ideal programar descansos luego de entregas grandes.",
-  },
-  {
-    id: "c3",
-    nombre: "Jimena Torres",
-    rol: "Admin",
-    email: "jimena@sandiashake.com",
-    telefono: "+506 8888-3333",
-    esAdmin: true,
-    estadoCuenta: "Activo",
-    mentalState: "Estable",
-    ultimaRevision: "2025-02-05",
-    clientesAsignados: ["Sandía con Chile"],
-
-    totalTareas: 18,
-    tareasPendientes: 2,
-    tareasAprobadas: 14,
-    porcentajeAprobacion: 78,
-    chilliPoints: 410,
-    chilliPointsMes: 120,
-
-    tareasRecientes: [
-      {
-        id: "t7",
-        titulo: "Revisión pipeline CRM",
-        cliente: "Sandía con Chile",
-        status: "Aprobada",
-        prioridad: "Alta",
-        mes: "Febrero 2025",
-      },
-      {
-        id: "t8",
-        titulo: "Definición de SLA internos",
-        cliente: "Sandía con Chile",
-        status: "En progreso",
-        prioridad: "Alta",
-        mes: "Febrero 2025",
-      },
-      {
-        id: "t9",
-        titulo: "Actualización formatos de briefing",
-        cliente: "Sandía con Chile",
-        status: "Aprobada",
-        prioridad: "Media",
-        mes: "Enero 2025",
-      },
-    ],
-
-    notas:
-      "Admin general; monitoriza carga de clientes y balance del equipo. Ideal como punto de escalamiento.",
-  },
-  {
-    id: "c4",
-    nombre: "Luis Navarro",
-    rol: "Community Manager",
-    email: "luis@sandiashake.com",
-    telefono: "+506 8888-4444",
-    esAdmin: false,
-    estadoCuenta: "Suspendido",
-    mentalState: "En riesgo",
-    ultimaRevision: "2025-01-10",
-    clientesAsignados: ["Marca Confidencial"],
-
-    totalTareas: 22,
-    tareasPendientes: 6,
-    tareasAprobadas: 10,
-    porcentajeAprobacion: 45,
-    chilliPoints: 150,
-    chilliPointsMes: 20,
-
-    tareasRecientes: [
-      {
-        id: "t10",
-        titulo: "Monitoreo de comentarios Q4",
-        cliente: "Marca Confidencial",
-        status: "Pendiente",
-        prioridad: "Alta",
-        mes: "Enero 2025",
-      },
-      {
-        id: "t11",
-        titulo: "Reporte mensual de interacción",
-        cliente: "Marca Confidencial",
-        status: "Aprobada",
-        prioridad: "Media",
-        mes: "Diciembre 2024",
-      },
-      {
-        id: "t12",
-        titulo: "Documentar respuestas frecuentes",
-        cliente: "Marca Confidencial",
-        status: "En revisión",
-        prioridad: "Media",
-        mes: "Diciembre 2024",
-      },
-    ],
-
-    notas:
-      "Caso en seguimiento con RRHH; importante priorizar tareas esenciales y reducir presión en picos.",
-  },
-];
 
 function getEstadoBadgeClasses(estado: EstadoCuenta) {
   return estado === "Activo"
@@ -288,49 +94,311 @@ function getMentalClasses(mental: MentalState) {
   }
 }
 
-function getStatusPill(status: TaskStatus) {
-  switch (status) {
-    case "Pendiente":
-      return "bg-[#4b5563]/40 text-[#e5e7eb] border border-[#6b7280]";
-    case "En progreso":
-      return "bg-[#0ea5e9]/20 text-[#7dd3fc] border border-[#0ea5e9]/60";
-    case "En revisión":
-      return "bg-[#f97316]/20 text-[#fed7aa] border border-[#f97316]/60";
-    case "Aprobada":
-      return "bg-[#6cbe45]/20 text-[#bbf7d0] border border-[#6cbe45]/60";
-  }
+/* ===================== MAPPERS ===================== */
+
+function mapDbToUi(u: UsuarioDB): Colaborador {
+  const esAdmin = u.rol === "ADMIN";
+  const esAdminPrimario = esAdmin && u.admin_nivel === "PRIMARIO";
+
+  return {
+    id: u.id_usuario,
+    nombre: u.nombre,
+    email: u.correo,
+
+    // si es ADMIN -> "Admin"; si no, default "Ejecutivo de cuenta"
+    rol: esAdmin ? "Admin" : "Ejecutivo de cuenta",
+
+    esAdmin,
+    esAdminPrimario,
+
+    estadoCuenta: u.estado === "ACTIVO" ? "Activo" : "Suspendido",
+
+    // estos puedes luego persistir en tablas reales
+    mentalState: "Estable",
+    ultimaRevision: new Date().toISOString().slice(0, 10),
+
+    clientesAsignados: [],
+
+    totalTareas: 0,
+    tareasPendientes: 0,
+    tareasAprobadas: 0,
+    porcentajeAprobacion: 0,
+    chilliPoints: 0,
+    chilliPointsMes: 0,
+
+    notas: "",
+  };
 }
 
-function getPrioridadDot(prioridad: TaskPrioridad) {
-  if (prioridad === "Alta") return "bg-[#ee2346]";
-  if (prioridad === "Media") return "bg-[#facc15]";
-  return "bg-[#9ca3af]";
-}
+/* ===================== PAGE ===================== */
 
 export function ColaboradoresPage() {
-  const [colaboradores, setColaboradores] =
-    useState<Colaborador[]>(initialColaboradores);
+  const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
+  const [seleccionado, setSeleccionado] = useState<Colaborador | null>(null);
+
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("Todos");
   const [filtroMental, setFiltroMental] = useState<FiltroMental>("Todos");
-  const [seleccionado, setSeleccionado] = useState<Colaborador | null>(
-    initialColaboradores[0]
-  );
+
+  const [cargando, setCargando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // edit modal
+  const [openEditar, setOpenEditar] = useState(false);
+  const [editNombre, setEditNombre] = useState("");
+  const [editEmail, setEditEmail] = useState("");
+  const [editRol, setEditRol] = useState<"ADMIN" | "COLABORADOR">("COLABORADOR");
+  const [guardando, setGuardando] = useState(false);
+
+  // create modal (opcional: depende de tu endpoint real)
+  const [openNuevo, setOpenNuevo] = useState(false);
+  const [nuevoNombre, setNuevoNombre] = useState("");
+  const [nuevoEmail, setNuevoEmail] = useState("");
+  const [nuevoRol, setNuevoRol] = useState<"ADMIN" | "COLABORADOR">("COLABORADOR");
+
+  /* ---------------- LOAD USERS ---------------- */
+
+  async function cargarUsuarios() {
+    setCargando(true);
+    setError(null);
+
+    try {
+      const res = await fetch("/api/admin/usuarios", { credentials: "include" });
+      const json = await res.json();
+
+      if (!res.ok) {
+        setError(json?.error ?? "Error cargando usuarios");
+        setColaboradores([]);
+        setSeleccionado(null);
+        return;
+      }
+
+      const lista: Colaborador[] = (json.usuarios ?? []).map(mapDbToUi);
+      setColaboradores(lista);
+
+      setSeleccionado((prev) => {
+        if (prev && lista.some((x) => x.id === prev.id)) {
+          return lista.find((x) => x.id === prev.id) ?? prev;
+        }
+        return lista[0] ?? null;
+      });
+    } catch {
+      setError("Error cargando usuarios");
+      setColaboradores([]);
+      setSeleccionado(null);
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  useEffect(() => {
+    cargarUsuarios();
+  }, []);
+
+  /* ---------------- LOAD ORGANIZACIONES (CLIENTES) ---------------- */
+
+  async function cargarOrganizacionesParaUsuario(idUsuario: number) {
+    try {
+      const res = await fetch(`/api/admin/usuarios/${idUsuario}/organizaciones`, {
+        credentials: "include",
+      });
+      const json = await res.json();
+
+      if (!res.ok) {
+        // deja vacío pero muestra error genérico arriba si quieres
+        return;
+      }
+
+      const orgs: string[] = json.organizaciones ?? [];
+
+      setColaboradores((prev) =>
+        prev.map((c) => (c.id === idUsuario ? { ...c, clientesAsignados: orgs } : c))
+      );
+
+      setSeleccionado((prev) => {
+        if (!prev || prev.id !== idUsuario) return prev;
+        return { ...prev, clientesAsignados: orgs };
+      });
+    } catch {
+      // no rompas la UI si falla
+    }
+  }
+
+  // cada vez que seleccionas uno, trae sus organizaciones si aún no están
+  useEffect(() => {
+    if (!seleccionado) return;
+    if (seleccionado.clientesAsignados && seleccionado.clientesAsignados.length > 0) return;
+    cargarOrganizacionesParaUsuario(seleccionado.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seleccionado?.id]);
+
+  /* ---------------- FILTER ---------------- */
 
   const filtrados = useMemo(() => {
-    const search = busqueda.toLowerCase();
+    const search = busqueda.toLowerCase().trim();
+
     return colaboradores.filter((c) => {
       const matchesSearch =
         !search ||
         c.nombre.toLowerCase().includes(search) ||
         c.email.toLowerCase().includes(search);
-      const matchesEstado =
-        filtroEstado === "Todos" || c.estadoCuenta === filtroEstado;
-      const matchesMental =
-        filtroMental === "Todos" || c.mentalState === filtroMental;
+
+      const matchesEstado = filtroEstado === "Todos" || c.estadoCuenta === filtroEstado;
+      const matchesMental = filtroMental === "Todos" || c.mentalState === filtroMental;
+
       return matchesSearch && matchesEstado && matchesMental;
     });
   }, [colaboradores, busqueda, filtroEstado, filtroMental]);
+
+  /* ---------------- CRUD: ROLE + EDIT + DEACTIVATE ---------------- */
+
+  function abrirEditar() {
+    if (!seleccionado) return;
+    setError(null);
+
+    setEditNombre(seleccionado.nombre);
+    setEditEmail(seleccionado.email);
+
+    // UI -> DB role
+    setEditRol(seleccionado.esAdmin ? "ADMIN" : "COLABORADOR");
+
+    setOpenEditar(true);
+  }
+
+  async function guardarEdicion() {
+    if (!seleccionado) return;
+    if (seleccionado.esAdminPrimario) {
+      setError("No se puede editar el Admin Primario.");
+      return;
+    }
+
+    const nombre = editNombre.trim();
+    const correo = editEmail.trim().toLowerCase();
+
+    if (!nombre || !correo) {
+      setError("Nombre y correo son obligatorios.");
+      return;
+    }
+
+    setGuardando(true);
+    setError(null);
+
+    try {
+      const body =
+        editRol === "ADMIN"
+          ? {
+              nombre,
+              correo,
+              rol: "ADMIN",
+              admin_nivel: "SECUNDARIO", // regla dura
+              estado: seleccionado.estadoCuenta === "Activo" ? "ACTIVO" : "SUSPENDIDO",
+            }
+          : {
+              nombre,
+              correo,
+              rol: "COLABORADOR",
+              admin_nivel: null,
+              estado: seleccionado.estadoCuenta === "Activo" ? "ACTIVO" : "SUSPENDIDO",
+            };
+
+      const res = await fetch(`/api/admin/usuarios/${seleccionado.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(json?.error ?? "No se pudo guardar.");
+        return;
+      }
+
+      setOpenEditar(false);
+      await cargarUsuarios();
+
+      // refresca orgs del seleccionado (por si cambió)
+      await cargarOrganizacionesParaUsuario(seleccionado.id);
+    } catch {
+      setError("No se pudo guardar.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function desactivarUsuario() {
+    if (!seleccionado) return;
+    if (seleccionado.esAdminPrimario) {
+      setError("No se puede desactivar el Admin Primario.");
+      return;
+    }
+
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/usuarios/${seleccionado.id}/desactivar`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json?.error ?? "No se pudo desactivar.");
+        return;
+      }
+
+      await cargarUsuarios();
+    } catch {
+      setError("No se pudo desactivar.");
+    }
+  }
+
+  // (Opcional) crear usuario: ajusta URL/body a tu endpoint real
+  async function crearUsuario() {
+    const nombre = nuevoNombre.trim();
+    const correo = nuevoEmail.trim().toLowerCase();
+    if (!nombre || !correo) {
+      setError("Nombre y correo son obligatorios.");
+      return;
+    }
+
+    setGuardando(true);
+    setError(null);
+
+    try {
+      const body =
+        nuevoRol === "ADMIN"
+          ? { nombre, correo, rol: "ADMIN", admin_nivel: "SECUNDARIO" }
+          : { nombre, correo, rol: "COLABORADOR", admin_nivel: null };
+
+      // ⚠️ Ajusta esta ruta si tu proyecto crea por otro endpoint
+      const res = await fetch("/api/admin/usuarios/nuevo", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json?.error ?? "No se pudo crear.");
+        return;
+      }
+
+      setOpenNuevo(false);
+      setNuevoNombre("");
+      setNuevoEmail("");
+      setNuevoRol("COLABORADOR");
+
+      await cargarUsuarios();
+    } catch {
+      setError("No se pudo crear.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  /* ===================== UI ===================== */
 
   return (
     <div
@@ -340,31 +408,39 @@ export function ColaboradoresPage() {
       {/* HEADER BAR */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-xl font-semibold text-[#fffef9]">
-            Colaboradores
-          </h1>
+          <h1 className="text-xl font-semibold text-[#fffef9]">Colaboradores</h1>
           <p className="text-xs text-[#fffef9]/70">
             Gestiona cuentas, carga de trabajo y bienestar del equipo.
           </p>
         </div>
-        <button
-          className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium bg-[#ee2346] text-[#fffef9] hover:bg-[#d8203f]"
-          onClick={() => {
-            // futuro: abrir modal de nuevo colaborador
-            alert("Crear nuevo colaborador (pendiente de implementar)");
-          }}
-        >
-          <Plus size={16} /> Nuevo colaborador
-        </button>
+
+        <div className="flex items-center gap-2">
+          <button
+            className="rounded-md px-3 py-2 text-sm font-medium border border-[#4a4748] bg-[#3d3b3c] hover:bg-[#4a4748]"
+            onClick={cargarUsuarios}
+          >
+            Recargar
+          </button>
+
+          <button
+            className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium bg-[#ee2346] text-[#fffef9] hover:bg-[#d8203f]"
+            onClick={() => {
+              setError(null);
+              setOpenNuevo(true);
+            }}
+          >
+            <Plus size={16} /> Nuevo
+          </button>
+        </div>
       </div>
+
+      {cargando && <p className="text-sm text-[#fffef9]/70">Cargando…</p>}
+      {error && <p className="text-sm text-red-400">{error}</p>}
 
       {/* FILTERS */}
       <div className="grid gap-3 md:grid-cols-3">
         <div className="relative">
-          <Search
-            size={14}
-            className="absolute left-2 top-2 text-[#fffef9]/40"
-          />
+          <Search size={14} className="absolute left-2 top-2 text-[#fffef9]/40" />
           <input
             type="text"
             value={busqueda}
@@ -402,7 +478,7 @@ export function ColaboradoresPage() {
         <div className="rounded-xl bg-[#3d3b3c] border border-[#4a4748] p-3 space-y-2 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs uppercase tracking-wide text-[#fffef9]/60 flex items-center gap-1">
-              <User size={12} /> Colaboradores ({filtrados.length})
+              <User size={12} /> Usuarios ({filtrados.length})
             </span>
           </div>
 
@@ -419,47 +495,40 @@ export function ColaboradoresPage() {
             >
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-[#fffef9]">
-                    {c.nombre}
-                  </span>
+                  <span className="text-sm font-semibold text-[#fffef9]">{c.nombre}</span>
+
                   {c.esAdmin && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ee2346]/20 text-[#ee2346] border border-[#ee2346]/50">
                       Admin
                     </span>
                   )}
+
+                  {c.esAdminPrimario && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ee2346]/10 text-[#ee2346] border border-[#ee2346]/30">
+                      Primario
+                    </span>
+                  )}
                 </div>
+
                 <span className="text-xs text-[#fffef9]/70">{c.rol}</span>
+
                 <div className="mt-1 flex flex-wrap gap-1 items-center text-[10px] text-[#fffef9]/60">
                   <span>{c.email}</span>
-                  {c.telefono && (
-                    <>
-                      <span className="mx-1 text-[#fffef9]/30">•</span>
-                      <span>{c.telefono}</span>
-                    </>
-                  )}
                 </div>
               </div>
 
               <div className="flex flex-col items-end gap-1">
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full ${getMentalClasses(
-                    c.mentalState
-                  )}`}
-                >
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${getMentalClasses(c.mentalState)}`}>
                   {c.mentalState}
                 </span>
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full ${getEstadoBadgeClasses(
-                    c.estadoCuenta
-                  )}`}
-                >
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${getEstadoBadgeClasses(c.estadoCuenta)}`}>
                   {c.estadoCuenta}
                 </span>
               </div>
             </button>
           ))}
 
-          {filtrados.length === 0 && (
+          {!cargando && filtrados.length === 0 && (
             <p className="text-sm text-[#fffef9]/60 text-center py-4">
               No hay colaboradores que coincidan con los filtros.
             </p>
@@ -474,37 +543,35 @@ export function ColaboradoresPage() {
               <div>
                 <h2 className="text-lg font-semibold text-[#fffef9] flex items-center gap-2">
                   {seleccionado.nombre}
+
                   {seleccionado.esAdmin && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ee2346]/20 text-[#ee2346] border border-[#ee2346]/50">
                       Admin
                     </span>
                   )}
+
+                  {seleccionado.esAdminPrimario && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ee2346]/10 text-[#ee2346] border border-[#ee2346]/30">
+                      Primario
+                    </span>
+                  )}
                 </h2>
-                <p className="text-xs text-[#fffef9]/70 mb-1">
-                  {seleccionado.rol}
-                </p>
+
+                <p className="text-xs text-[#fffef9]/70 mb-1">{seleccionado.rol}</p>
+
                 <p className="text-xs text-[#fffef9]/60">
                   Última revisión de bienestar:{" "}
-                  <span className="font-medium text-[#fffef9]/80">
-                    {seleccionado.ultimaRevision}
-                  </span>
+                  <span className="font-medium text-[#fffef9]/80">{seleccionado.ultimaRevision}</span>
                 </p>
               </div>
 
               <div className="flex flex-col items-end gap-1">
-                <span
-                  className={`text-[11px] px-2 py-0.5 rounded-full ${getMentalClasses(
-                    seleccionado.mentalState
-                  )}`}
-                >
+                <span className={`text-[11px] px-2 py-0.5 rounded-full ${getMentalClasses(seleccionado.mentalState)}`}>
                   <Heart size={11} className="inline mr-1" />
                   {seleccionado.mentalState}
                 </span>
-                <span
-                  className={`text-[11px] px-2 py-0.5 rounded-full ${getEstadoBadgeClasses(
-                    seleccionado.estadoCuenta
-                  )}`}
-                >
+
+                <span className={`text-[11px] px-2 py-0.5 rounded-full ${getEstadoBadgeClasses(seleccionado.estadoCuenta)}`}>
                   {seleccionado.estadoCuenta}
                 </span>
               </div>
@@ -514,20 +581,16 @@ export function ColaboradoresPage() {
             <div className="grid gap-3 md:grid-cols-2 text-xs text-[#fffef9]/80">
               <div>
                 <p>
-                  <span className="font-semibold">Email:</span>{" "}
-                  {seleccionado.email}
+                  <span className="font-semibold">Email:</span> {seleccionado.email}
                 </p>
-                {seleccionado.telefono && (
-                  <p>
-                    <span className="font-semibold">Teléfono:</span>{" "}
-                    {seleccionado.telefono}
-                  </p>
-                )}
               </div>
+
               <div>
                 <p className="font-semibold mb-1">Clientes asignados:</p>
                 <p className="text-[11px] text-[#fffef9]/70">
-                  {seleccionado.clientesAsignados.join(" • ")}
+                  {seleccionado.clientesAsignados?.length
+                    ? seleccionado.clientesAsignados.join(" • ")
+                    : "—"}
                 </p>
               </div>
             </div>
@@ -538,25 +601,19 @@ export function ColaboradoresPage() {
                 <span className="text-[10px] text-[#fffef9]/60 flex items-center gap-1">
                   <List size={11} /> Tareas totales
                 </span>
-                <span className="text-lg font-semibold text-[#fffef9]">
-                  {seleccionado.totalTareas}
-                </span>
+                <span className="text-lg font-semibold text-[#fffef9]">{seleccionado.totalTareas}</span>
               </div>
 
               <div className="rounded-lg bg-[#4a4748] border border-[#6b7280] p-3 flex flex-col gap-1">
                 <span className="text-[10px] text-[#fffef9]/60">Pendientes</span>
-                <span className="text-lg font-semibold text-[#facc15]">
-                  {seleccionado.tareasPendientes}
-                </span>
+                <span className="text-lg font-semibold text-[#facc15]">{seleccionado.tareasPendientes}</span>
               </div>
 
               <div className="rounded-lg bg-[#4a4748] border border-[#6b7280] p-3 flex flex-col gap-1">
                 <span className="text-[10px] text-[#fffef9]/60 flex items-center gap-1">
                   <CheckCircle size={11} /> Aprobadas
                 </span>
-                <span className="text-lg font-semibold text-[#6cbe45]">
-                  {seleccionado.tareasAprobadas}
-                </span>
+                <span className="text-lg font-semibold text-[#6cbe45]">{seleccionado.tareasAprobadas}</span>
                 <span className="text-[10px] text-[#fffef9]/60">
                   {seleccionado.porcentajeAprobacion}% tasa de aprobación
                 </span>
@@ -566,59 +623,8 @@ export function ColaboradoresPage() {
                 <span className="text-[10px] text-[#fffef9]/60 flex items-center gap-1">
                   <Activity size={11} /> Chilli Points
                 </span>
-                <span className="text-lg font-semibold text-[#ee2346]">
-                  {seleccionado.chilliPoints}
-                </span>
-                <span className="text-[10px] text-[#fffef9]/60">
-                  +{seleccionado.chilliPointsMes} este mes
-                </span>
-              </div>
-            </div>
-
-            {/* TAREAS RECIENTES */}
-            <div className="mt-2">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs uppercase tracking-wide text-[#fffef9]/60 flex items-center gap-1">
-                  <List size={12} /> Tareas recientes
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                {seleccionado.tareasRecientes.map((t) => (
-                  <div
-                    key={t.id}
-                    className="rounded-lg bg-[#4a4748] border border-[#6b7280] p-2.5 flex items-start justify-between gap-3 text-xs"
-                  >
-                    <div className="space-y-0.5">
-                      <p className="font-semibold text-[#fffef9] text-[12px]">
-                        {t.titulo}
-                      </p>
-                      <p className="text-[11px] text-[#fffef9]/70">
-                        Cliente: <span className="font-medium">{t.cliente}</span>
-                      </p>
-                      <p className="text-[11px] text-[#fffef9]/60">
-                        Mes: {t.mes}
-                      </p>
-                    </div>
-                    <div className="flex flex-col items-end gap-1">
-                      <span
-                        className={`rounded-full px-2 py-0.5 text-[10px] border ${getStatusPill(
-                          t.status
-                        )}`}
-                      >
-                        {t.status}
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-[10px] text-[#fffef9]/70">
-                        <span
-                          className={`w-2 h-2 rounded-full ${getPrioridadDot(
-                            t.prioridad
-                          )}`}
-                        />
-                        {t.prioridad}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                <span className="text-lg font-semibold text-[#ee2346]">{seleccionado.chilliPoints}</span>
+                <span className="text-[10px] text-[#fffef9]/60">+{seleccionado.chilliPointsMes} este mes</span>
               </div>
             </div>
 
@@ -638,27 +644,184 @@ export function ColaboradoresPage() {
             {/* ACCIONES */}
             <div className="flex justify-end gap-2 pt-2 border-t border-[#4a4748] mt-2">
               <button
-                className="rounded-md bg-transparent border border-[#ee2346] text-[#ee2346] text-xs px-3 py-1.5 hover:bg-[#ee2346]/10 inline-flex items-center gap-1"
-                onClick={() =>
-                  alert("Editar colaborador (pendiente de implementar)")
-                }
+                className="rounded-md bg-transparent border border-[#ee2346] text-[#ee2346] text-xs px-3 py-1.5 hover:bg-[#ee2346]/10 inline-flex items-center gap-1 disabled:opacity-50"
+                onClick={abrirEditar}
+                disabled={seleccionado.esAdminPrimario}
+                title={seleccionado.esAdminPrimario ? "No se puede editar Admin Primario" : "Editar"}
               >
-                <Edit2 size={12} />
-                Editar
+                <Edit2 size={12} /> Editar
               </button>
+
               <button
-                className="rounded-md bg-transparent border border-[#ee2346]/50 text-[#ee2346]/80 text-xs px-3 py-1.5 hover:bg-[#ee2346]/10 inline-flex items-center gap-1"
-                onClick={() =>
-                  alert("Eliminar / desactivar colaborador (confirmación pendiente)")
-                }
+                className="rounded-md bg-transparent border border-[#ee2346]/50 text-[#ee2346]/80 text-xs px-3 py-1.5 hover:bg-[#ee2346]/10 inline-flex items-center gap-1 disabled:opacity-50"
+                onClick={desactivarUsuario}
+                disabled={seleccionado.esAdminPrimario}
+                title={seleccionado.esAdminPrimario ? "No se puede desactivar Admin Primario" : "Desactivar"}
               >
-                <Trash2 size={12} />
-                Eliminar / desactivar
+                <Trash2 size={12} /> Eliminar / desactivar
               </button>
             </div>
           </div>
         )}
       </div>
+
+      {/* MODAL: EDITAR */}
+      {openEditar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-xl bg-[#333132] border border-[#4a4748]/40 shadow-lg">
+            <div className="px-5 py-4 border-b border-[#4a4748]/30 flex items-center justify-between">
+              <h3 className="text-white font-semibold">Editar usuario</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenEditar(false);
+                  setError(null);
+                }}
+                className="text-xs text-gray-300 hover:text-white"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-400 mb-2 block">Nombre</label>
+                <input
+                  value={editNombre}
+                  onChange={(e) => setEditNombre(e.target.value)}
+                  className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#ee2346]"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-400 mb-2 block">Email</label>
+                <input
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#ee2346]"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-400 mb-2 block">Rol</label>
+                <select
+                  value={editRol}
+                  onChange={(e) => setEditRol(e.target.value as any)}
+                  className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#ee2346]"
+                >
+                  <option value="COLABORADOR">Colaborador</option>
+                  <option value="ADMIN">Admin secundario</option>
+                </select>
+
+                <p className="text-[11px] text-gray-400 mt-2">
+                  Nota: si eliges <span className="text-gray-200">Admin</span>, se guardará como{" "}
+                  <span className="text-gray-200">SECUNDARIO</span> automáticamente.
+                </p>
+              </div>
+
+              {error && <p className="text-sm text-red-400">{error}</p>}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#4a4748]/30">
+                <button
+                  type="button"
+                  onClick={() => setOpenEditar(false)}
+                  className="inline-flex items-center gap-2 rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm font-semibold text-gray-200 hover:bg-[#3a3738] transition"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  disabled={guardando}
+                  onClick={guardarEdicion}
+                  className="inline-flex items-center gap-2 rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-60"
+                >
+                  {guardando ? "Guardando..." : "Guardar"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: NUEVO */}
+      {openNuevo && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="w-full max-w-md rounded-xl bg-[#333132] border border-[#4a4748]/40 shadow-lg">
+            <div className="px-5 py-4 border-b border-[#4a4748]/30 flex items-center justify-between">
+              <h3 className="text-white font-semibold">Nuevo usuario</h3>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpenNuevo(false);
+                  setError(null);
+                }}
+                className="text-xs text-gray-300 hover:text-white"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="text-sm font-medium text-gray-400 mb-2 block">Nombre</label>
+                <input
+                  value={nuevoNombre}
+                  onChange={(e) => setNuevoNombre(e.target.value)}
+                  className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#ee2346]"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-400 mb-2 block">Email</label>
+                <input
+                  value={nuevoEmail}
+                  onChange={(e) => setNuevoEmail(e.target.value)}
+                  className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#ee2346]"
+                />
+              </div>
+
+              <div>
+                <label className="text-sm font-medium text-gray-400 mb-2 block">Rol</label>
+                <select
+                  value={nuevoRol}
+                  onChange={(e) => setNuevoRol(e.target.value as any)}
+                  className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#ee2346]"
+                >
+                  <option value="COLABORADOR">Colaborador</option>
+                  <option value="ADMIN">Admin secundario</option>
+                </select>
+              </div>
+
+              {error && <p className="text-sm text-red-400">{error}</p>}
+
+              <div className="flex justify-end gap-2 pt-2 border-t border-[#4a4748]/30">
+                <button
+                  type="button"
+                  onClick={() => setOpenNuevo(false)}
+                  className="inline-flex items-center gap-2 rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm font-semibold text-gray-200 hover:bg-[#3a3738] transition"
+                >
+                  Cancelar
+                </button>
+
+                <button
+                  type="button"
+                  disabled={guardando}
+                  onClick={crearUsuario}
+                  className="inline-flex items-center gap-2 rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-60"
+                >
+                  {guardando ? "Creando..." : "Crear"}
+                </button>
+              </div>
+
+              <p className="text-[11px] text-gray-400">
+                Si el endpoint de creación en tu proyecto no es <span className="text-gray-200">/api/admin/usuarios/nuevo</span>,
+                dime cuál estás usando (vi que tienes <span className="text-gray-200">/api/admin/crear-usuario</span>) y lo adapto.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

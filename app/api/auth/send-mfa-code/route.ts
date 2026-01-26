@@ -45,12 +45,16 @@ export async function POST(req: Request) {
       );
     }
 
+    
+
     // Invalidate any existing unused codes for this user
     await admin
       .from("mfa_email_codes")
       .update({ used: true })
       .eq("user_id", user.id)
       .eq("used", false);
+
+    
 
     // Generate new code
     const code = generateMFACode();
@@ -72,6 +76,8 @@ export async function POST(req: Request) {
         { status: 500 }
       );
     }
+
+    
 
     // Send email with code
     console.log("Sending email to:", perfil.correo);
