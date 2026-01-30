@@ -1,24 +1,71 @@
-<<<<<<< Updated upstream
-=======
 "use client";
 import { Eye, EyeOff } from "react-feather";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
->>>>>>> Stashed changes
 import { Shell } from "../../components/Shell";
-import { SectionCard } from "../../components/SectionCard";
+import {
+  User,
+  Mail,
+  Lock,
+  Users,
+  Plus,
+  Edit2,
+  Trash2,
+  Link as LinkIcon,
+  Database,
+  Cloud,
+  Bell,
+  Gift,
+  Award,
+} from "react-feather";
+
+/* ------------------ TYPES (UI) ------------------ */
+
+type RolUsuario = "Admin" | "Colaborador" | "Cliente";
+type EstadoUsuario = "Activo" | "Suspendido";
+
+type UsuarioSistema = {
+  id: string; // id_usuario bigint -> string
+  nombre: string;
+  correo: string;
+  rol: RolUsuario;
+  estado: EstadoUsuario;
+  adminNivel?: "PRIMARIO" | "SECUNDARIO" | null;
+};
+
+/* ------------------ MAPPERS DB <-> UI ------------------ */
+
+function rolDbToUi(rol: string): RolUsuario {
+  const r = (rol ?? "").toUpperCase();
+  if (r === "ADMIN") return "Admin";
+  if (r === "COLABORADOR") return "Colaborador";
+  return "Cliente";
+}
+
+function rolUiToDb(rol: RolUsuario) {
+  if (rol === "Admin") return "ADMIN";
+  if (rol === "Colaborador") return "COLABORADOR";
+  return "CLIENTE";
+}
+
+function estadoDbToUi(estado: string): EstadoUsuario {
+  const e = (estado ?? "").toUpperCase();
+  return e === "ACTIVO" ? "Activo" : "Suspendido";
+}
+
+function estadoUiToDb(estado: EstadoUsuario) {
+  return estado === "Activo" ? "ACTIVO" : "INACTIVO";
+}
+
+function safeJsonParse(text: string) {
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch {
+    return null;
+  }
+}
 
 export default function ConfiguracionPage() {
-<<<<<<< Updated upstream
-  return (
-    <Shell>
-      <h1 className="text-xl font-semibold mb-2">Configuración</h1>
-      <div className="grid gap-4 md:grid-cols-2">
-        <SectionCard title="Mi perfil" />
-        <SectionCard title="Preferencias de notificación" />
-        <SectionCard title="Integraciones (Google Drive, pasarela de pago)" />
-        <SectionCard title="Parámetros del sistema" />
-=======
   const router = useRouter();
 
   // Perfil (placeholder)
@@ -32,7 +79,6 @@ export default function ConfiguracionPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
 const [showNewPassword, setShowNewPassword] = useState(false);
 const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
 
   // CRUD Usuarios
   const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([]);
@@ -117,9 +163,8 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     }
   }
 
-  //Editar el perfil actual del usuario
-
-  async function cargarPerfil() {
+  //Editar perfil
+async function cargarPerfil() {
   try {
     const res = await fetch("/api/mi-perfil", {
       method: "GET",
@@ -177,7 +222,7 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   function openEditUser(u: UsuarioSistema) {
     setIsNewUser(false);
-    setEditingUser({ ...u }); 
+    setEditingUser({ ...u }); // ✅ copy
   }
 
   async function saveUser(u: UsuarioSistema) {
@@ -290,11 +335,9 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     setIsNewUser(false);
   }
 
-
- const handleSaveProfile = async (e: React.FormEvent) => {
-  e.preventDefault();
-
-  if (!name.trim()) {
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) {
     alert("Debes completar el nombre.");
     return;
   }
@@ -386,7 +429,6 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
                 <input
                   type="email"
                   value={email}
-                  disabled
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45] focus:border-[#6cbe45]"
                 />
@@ -1057,7 +1099,6 @@ const [showConfirmPassword, setShowConfirmPassword] = useState(false);
             </button>
           </div>
         </div>
->>>>>>> Stashed changes
       </div>
     </Shell>
   );
