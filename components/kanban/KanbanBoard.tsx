@@ -1,7 +1,7 @@
 // components/kanban/KanbanBoard.tsx
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   DragDropContext,
   Droppable,
@@ -54,73 +54,14 @@ export type KanbanState = {
   columnOrder: StatusId[];
 };
 
-const initialState: KanbanState = {
-  tasks: {
-    t1: {
-      id: "t1",
-      titulo: "Carrusel mensual Facebook",
-      cliente: "Café La Plaza",
-      asignadoA: "Ana",
-      statusId: "pendiente",
-      fechaEntrega: "2025-02-10",
-      mes: "Febrero 2025",
-      tipoEntregable: "Carrusel",
-      prioridad: "Alta",
-      googleDriveUrl: "https://drive.google.com/folder1",
-      descripcion: "Carrusel de 4 artes para promo del mes.",
-    },
-    t2: {
-      id: "t2",
-      titulo: "Reel lanzamiento producto",
-      cliente: "Sandía con Chile",
-      asignadoA: "Carlos",
-      statusId: "en_progreso",
-      fechaEntrega: "2025-02-07",
-      mes: "Febrero 2025",
-      tipoEntregable: "Reel",
-      prioridad: "Media",
-      googleDriveUrl: "https://drive.google.com/folder2",
-    },
-    t3: {
-      id: "t3",
-      titulo: "Arte historias IG",
-      cliente: "Hotel Las Olas",
-      asignadoA: "María",
-      statusId: "en_revision",
-      fechaEntrega: "2025-02-05",
-      mes: "Febrero 2025",
-      tipoEntregable: "Arte",
-      prioridad: "Alta",
-    },
-    t4: {
-      id: "t4",
-      titulo: "Banner campaña San Valentín",
-      cliente: "Panadería Dulce Vida",
-      asignadoA: "Luis",
-      statusId: "aprobada",
-      fechaEntrega: "2025-02-01",
-      mes: "Febrero 2025",
-      tipoEntregable: "Arte",
-      prioridad: "Media",
-    },
-    t5: {
-      id: "t5",
-      titulo: "Revisión copy pauta Meta",
-      cliente: "Gimnasio PowerFit",
-      asignadoA: "Ana",
-      statusId: "archivada",
-      fechaEntrega: "2025-01-20",
-      mes: "Enero 2025",
-      tipoEntregable: "Copy",
-      prioridad: "Baja",
-    },
-  },
+const emptyState: KanbanState = {
+  tasks: {},
   columns: {
-    pendiente: { id: "pendiente", titulo: "Pendiente", taskIds: ["t1"] },
-    en_progreso: { id: "en_progreso", titulo: "En progreso", taskIds: ["t2"] },
-    en_revision: { id: "en_revision", titulo: "En revisión", taskIds: ["t3"] },
-    aprobada: { id: "aprobada", titulo: "Aprobada", taskIds: ["t4"] },
-    archivada: { id: "archivada", titulo: "Archivada", taskIds: ["t5"] },
+    pendiente: { id: "pendiente", titulo: "Pendiente", taskIds: [] },
+    en_progreso: { id: "en_progreso", titulo: "En progreso", taskIds: [] },
+    en_revision: { id: "en_revision", titulo: "En revisión", taskIds: [] },
+    aprobada: { id: "aprobada", titulo: "Aprobada", taskIds: [] },
+    archivada: { id: "archivada", titulo: "Archivada", taskIds: [] },
   },
   columnOrder: ["pendiente", "en_progreso", "en_revision", "aprobada", "archivada"],
 };
@@ -156,15 +97,122 @@ function getPriorityClasses(prio?: Task["prioridad"]) {
   return "bg-[#374151] text-[#e5e7eb] border border-[#4b5563]";
 }
 
+async function safeJson(res: Response) {
+  const text = await res.text();
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
+
+function normalizeStatus(v: any): StatusId {
+  const s = String(v ?? "").toLowerCase();
+  if (s === "pendiente") return "pendiente";
+  if (s === "en_progreso") return "en_progreso";
+  if (s === "en_revision") return "en_revision";
+  if (s === "aprobada") return "aprobada";
+  if (s === "archivada") return "archivada";
+  return "pendiente";
+}
+
+function normalizePrioridad(v: any): Task["prioridad"] {
+  const p = String(v ?? "").toLowerCase();
+  if (p === "alta") return "Alta";
+  if (p === "media") return "Media";
+  if (p === "baja") return "Baja";
+  return undefined;
+}
+
+function normalizeEntregable(v: any): Task["tipoEntregable"] {
+  const t = String(v ?? "");
+  if (t === "Arte" || t === "Reel" || t === "Copy" || t === "Video" || t === "Carrusel" || t === "Otro") {
+    return t;
+  }
+  return undefined;
+}
+
+function buildStateFromApi(rows: any[]): KanbanState {
+  const next: KanbanState = {
+    tasks: {},
+    columns: {
+      pendiente: { ...emptyState.columns.pendiente, taskIds: [] },
+      en_progreso: { ...emptyState.columns.en_progreso, taskIds: [] },
+      en_revision: { ...emptyState.columns.en_revision, taskIds: [] },
+      aprobada: { ...emptyState.columns.aprobada, taskIds: [] },
+      archivada: { ...emptyState.columns.archivada, taskIds: [] },
+    },
+    columnOrder: emptyState.columnOrder,
+  };
+
+  for (const r of rows ?? []) {
+    const id = String(r.id_tarea ?? r.id ?? "");
+    if (!id) continue;
+
+    const statusId = normalizeStatus(r.status_kanban);
+
+    const cliente =
+      String(r.cliente ?? r.organizaciones?.nombre ?? r.organizacion?.nombre ?? "") || "";
+    const asignadoA =
+      String(r.asignadoA ?? r.usuarios?.nombre ?? r.colaborador?.nombre ?? "") || "";
+
+    const task: Task = {
+      id,
+      titulo: String(r.titulo ?? ""),
+      cliente,
+      asignadoA,
+      statusId,
+      fechaEntrega: r.fecha_entrega ?? r.fechaEntrega ?? undefined,
+      mes: r.mes ?? undefined,
+      tipoEntregable: normalizeEntregable(r.tipo_entregable ?? r.tipoEntregable),
+      prioridad: normalizePrioridad(r.prioridad),
+      googleDriveUrl: r.google_drive_url ?? r.googleDriveUrl ?? undefined,
+      descripcion: r.descripcion ?? undefined,
+    };
+
+    next.tasks[id] = task;
+    next.columns[statusId].taskIds.push(id);
+  }
+
+  return next;
+}
+
 /* ---------- MAIN BOARD COMPONENT ---------- */
 
 export function KanbanBoard() {
-  const [state, setState] = useState<KanbanState>(initialState);
+  const [state, setState] = useState<KanbanState>(emptyState);
   const [searchClient, setSearchClient] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("Todas");
-
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadErr, setLoadErr] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      setLoading(true);
+      setLoadErr("");
+
+      try {
+        const res = await fetch("/api/admin/tareas", { cache: "no-store" });
+        const json = await safeJson(res);
+
+        if (!res.ok) {
+          throw new Error(json?.error ?? "No se pudieron cargar tareas");
+        }
+
+        const next = buildStateFromApi(json?.data ?? []);
+        setState(next);
+      } catch (e: any) {
+        console.error(e);
+        setLoadErr(e?.message ?? "Error al cargar tareas");
+        setState(emptyState);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   function onDragEnd(result: DropResult) {
     const { destination, source, draggableId, type } = result;
@@ -230,7 +278,7 @@ export function KanbanBoard() {
     });
   }
 
-  // 🔍 filter by client + priority
+  // filter by client + priority
   const filteredTasks = useMemo(() => {
     const search = searchClient.trim().toLowerCase();
     const result: Record<string, Task> = {};
@@ -349,7 +397,7 @@ export function KanbanBoard() {
 
   return (
     <div className={kanbanStyles.root}>
-      {/* Filtros y botón Nueva tarea */}
+
       <div className={kanbanStyles.filtersRow}>
         <div className="flex-1">
           <label className={kanbanStyles.label}>Buscar por cliente</label>
@@ -394,6 +442,12 @@ export function KanbanBoard() {
           </button>
         </div>
       </div>
+
+      {loading ? (
+        <div className="text-sm text-[#fffef9]/60 mt-2">Cargando tareas…</div>
+      ) : loadErr ? (
+        <div className="text-sm text-[#ffb3c2] mt-2">{loadErr}</div>
+      ) : null}
 
       {/* Kanban board */}
       <div className={kanbanStyles.boardWrapper}>
@@ -483,11 +537,11 @@ export function KanbanBoard() {
                                             <div className={kanbanStyles.cardMetaRow}>
                                               <span className="inline-flex items-center gap-1">
                                                 <User size={12} />
-                                                {task.cliente}
+                                                {task.cliente || "—"}
                                               </span>
                                               <span className="inline-flex items-center gap-1">
                                                 <Edit2 size={11} />
-                                                {task.asignadoA}
+                                                {task.asignadoA || "—"}
                                               </span>
                                             </div>
                                           </div>

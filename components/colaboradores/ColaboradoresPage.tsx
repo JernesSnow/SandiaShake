@@ -37,29 +37,29 @@ type UsuarioDB = {
 };
 
 export type Colaborador = {
+  id: string;
+  id_usuario?: number;
+  nombre: string;
+  rol: RolColaborador; 
+  email: string;
+  telefono?: string;
   id: number;
   nombre: string;
-  rol: RolColaborador; // UI role label (Admin vs Colab role label)
+  rol: RolColaborador;
   email: string;
-
   esAdmin: boolean;
   esAdminPrimario: boolean;
-
   estadoCuenta: EstadoCuenta;
   mentalState: MentalState;
   ultimaRevision: string;
-
   clientesAsignados: string[];
-
-  // Stats (por ahora placeholders si no tienes tablas de KPIs listas)
   totalTareas: number;
   tareasPendientes: number;
   tareasAprobadas: number;
-  porcentajeAprobacion: number; // 0-100
+  porcentajeAprobacion: number;
   chilliPoints: number;
   chilliPointsMes: number;
-
-  // opcional
+  tareasRecientes: ColaboradorTask[];
   notas?: string;
 };
 
@@ -104,21 +104,13 @@ function mapDbToUi(u: UsuarioDB): Colaborador {
     id: u.id_usuario,
     nombre: u.nombre,
     email: u.correo,
-
-    // si es ADMIN -> "Admin"; si no, default "Ejecutivo de cuenta"
     rol: esAdmin ? "Admin" : "Ejecutivo de cuenta",
-
     esAdmin,
     esAdminPrimario,
-
     estadoCuenta: u.estado === "ACTIVO" ? "Activo" : "Suspendido",
-
-    // estos puedes luego persistir en tablas reales
     mentalState: "Estable",
     ultimaRevision: new Date().toISOString().slice(0, 10),
-
     clientesAsignados: [],
-
     totalTareas: 0,
     tareasPendientes: 0,
     tareasAprobadas: 0,
@@ -130,7 +122,6 @@ function mapDbToUi(u: UsuarioDB): Colaborador {
   };
 }
 
-/* ===================== PAGE ===================== */
 
 export function ColaboradoresPage() {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
@@ -140,99 +131,291 @@ export function ColaboradoresPage() {
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("Todos");
   const [filtroMental, setFiltroMental] = useState<FiltroMental>("Todos");
 
-  const [cargando, setCargando] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [asignaciones, setAsignaciones] = useState<any[]>([]);
+  const [seleccionado, setSeleccionado] = useState<Colaborador | null>(null);
 
-  // edit modal
-  const [openEditar, setOpenEditar] = useState(false);
-  const [editNombre, setEditNombre] = useState("");
-  const [editEmail, setEditEmail] = useState("");
-  const [editRol, setEditRol] = useState<"ADMIN" | "COLABORADOR">("COLABORADOR");
-  const [guardando, setGuardando] = useState(false);
+  const [modalAsignarOpen, setModalAsignarOpen] = useState(false);
+  const [orgs, setOrgs] = useState<any[]>([]);
+  const [orgSeleccionada, setOrgSeleccionada] = useState<number | "">("");
+  const [loadingOrgs, setLoadingOrgs] = useState(false);
 
-  // create modal (opcional: depende de tu endpoint real)
-  const [openNuevo, setOpenNuevo] = useState(false);
+  const [modalNuevoOpen, setModalNuevoOpen] = useState(false);
   const [nuevoNombre, setNuevoNombre] = useState("");
-  const [nuevoEmail, setNuevoEmail] = useState("");
-  const [nuevoRol, setNuevoRol] = useState<"ADMIN" | "COLABORADOR">("COLABORADOR");
+  const [nuevoCorreo, setNuevoCorreo] = useState("");
+  const [nuevoPass, setNuevoPass] = useState("");
+  const [creando, setCreando] = useState(false);
 
-  /* ---------------- LOAD USERS ---------------- */
+  const [modalEditarOpen, setModalEditarOpen] = useState(false);
+  const [editNombre, setEditNombre] = useState("");
+  const [editCorreo, setEditCorreo] = useState("");
+  const [editEstado, setEditEstado] = useState<"ACTIVO" | "INACTIVO">("ACTIVO");
+  const [guardandoEdit, setGuardandoEdit] = useState(false);
 
-  async function cargarUsuarios() {
-    setCargando(true);
-    setError(null);
-
+  async function cargarColaboradores() {
     try {
-      const res = await fetch("/api/admin/usuarios", { credentials: "include" });
+      const res = await fetch("/api/admin/colaboradores");
       const json = await res.json();
+      console.log("colaboradores status:", res.status, json);
 
       if (!res.ok) {
-        setError(json?.error ?? "Error cargando usuarios");
         setColaboradores([]);
         setSeleccionado(null);
         return;
       }
 
-      const lista: Colaborador[] = (json.usuarios ?? []).map(mapDbToUi);
-      setColaboradores(lista);
+      const raw = (json.colaboradores ?? []) as any[];
 
+      const mapped: Colaborador[] = raw.map((u: any) => ({
+        id: String(u.id_usuario),
+        id_usuario: u.id_usuario,
+
+        nombre: u.nombre ?? "",
+        rol: mapRolUIFromDB(u.rol),
+        email: u.correo ?? "",
+        telefono: u.telefono ?? undefined,
+
+        esAdmin: false,
+        estadoCuenta: mapEstadoCuentaFromDB(u.estado),
+        mentalState: "Estable",
+        ultimaRevision: String(u.created_at ?? "").slice(0, 10) || "—",
+        clientesAsignados: [],
+
+        totalTareas: 0,
+        tareasPendientes: 0,
+        tareasAprobadas: 0,
+        porcentajeAprobacion: 0,
+        chilliPoints: 0,
+        chilliPointsMes: 0,
+        tareasRecientes: [],
+        notas: "",
+      }));
+
+      setColaboradores(mapped);
       setSeleccionado((prev) => {
-        if (prev && lista.some((x) => x.id === prev.id)) {
-          return lista.find((x) => x.id === prev.id) ?? prev;
+        if (prev?.id_usuario) {
+          const still = mapped.find((m) => m.id_usuario === prev.id_usuario);
+          return still ?? mapped[0] ?? null;
         }
-        return lista[0] ?? null;
+        return mapped[0] ?? null;
       });
-    } catch {
-      setError("Error cargando usuarios");
+    } catch (e) {
+      console.error(e);
       setColaboradores([]);
       setSeleccionado(null);
-    } finally {
-      setCargando(false);
     }
   }
 
   useEffect(() => {
-    cargarUsuarios();
+    cargarColaboradores();
   }, []);
 
-  /* ---------------- LOAD ORGANIZACIONES (CLIENTES) ---------------- */
+  useEffect(() => {
+    if (seleccionado?.id_usuario) {
+      cargarAsignaciones(seleccionado.id_usuario);
+    } else {
+      setAsignaciones([]);
+    }
+  }, [seleccionado]);
 
-  async function cargarOrganizacionesParaUsuario(idUsuario: number) {
+  async function cargarAsignaciones(idColaborador: number) {
     try {
-      const res = await fetch(`/api/admin/usuarios/${idUsuario}/organizaciones`, {
-        credentials: "include",
-      });
+      const res = await fetch(
+        `/api/admin/asignaciones?id_colaborador=${idColaborador}`
+      );
       const json = await res.json();
 
+      console.log("asignaciones status:", res.status, json);
+
       if (!res.ok) {
-        // deja vacío pero muestra error genérico arriba si quieres
+        setAsignaciones([]);
         return;
       }
 
-      const orgs: string[] = json.organizaciones ?? [];
-
-      setColaboradores((prev) =>
-        prev.map((c) => (c.id === idUsuario ? { ...c, clientesAsignados: orgs } : c))
-      );
-
-      setSeleccionado((prev) => {
-        if (!prev || prev.id !== idUsuario) return prev;
-        return { ...prev, clientesAsignados: orgs };
-      });
-    } catch {
-      // no rompas la UI si falla
+      setAsignaciones(json.data ?? []);
+    } catch (e) {
+      console.error(e);
+      setAsignaciones([]);
     }
   }
 
-  // cada vez que seleccionas uno, trae sus organizaciones si aún no están
-  useEffect(() => {
-    if (!seleccionado) return;
-    if (seleccionado.clientesAsignados && seleccionado.clientesAsignados.length > 0) return;
-    cargarOrganizacionesParaUsuario(seleccionado.id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seleccionado?.id]);
+  async function cargarOrganizaciones() {
+    setLoadingOrgs(true);
+    try {
+      const res = await fetch(`/api/admin/organizaciones`);
+      const json = await res.json();
 
-  /* ---------------- FILTER ---------------- */
+      console.log("orgs status:", res.status, json);
+
+      if (!res.ok) {
+        setOrgs([]);
+        return;
+      }
+
+      setOrgs(json.data ?? []);
+    } catch (e) {
+      console.error(e);
+      setOrgs([]);
+    } finally {
+      setLoadingOrgs(false);
+    }
+  }
+
+  async function asignarCliente() {
+    if (!seleccionado?.id_usuario) {
+      alert("Debe seleccionar un colaborador");
+      return;
+    }
+    if (!orgSeleccionada) {
+      alert("Debe seleccionar una organización");
+      return;
+    }
+
+    const res = await fetch(`/api/admin/asignaciones`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id_colaborador: seleccionado.id_usuario,
+        id_organizacion: orgSeleccionada,
+      }),
+    });
+
+    const json = await res.json();
+    console.log("asignar status:", res.status, json);
+
+    if (!res.ok) {
+      alert(json.error || "Ocurrió un error al asignar");
+      return;
+    }
+
+    await cargarAsignaciones(seleccionado.id_usuario);
+
+    setModalAsignarOpen(false);
+    setOrgSeleccionada("");
+  }
+
+  async function crearColaborador() {
+    if (!nuevoNombre.trim() || !nuevoCorreo.trim()) {
+      alert("Nombre y correo son obligatorios");
+      return;
+    }
+
+    setCreando(true);
+    try {
+      const res = await fetch("/api/admin/colaboradores", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          nombre: nuevoNombre.trim(),
+          correo: nuevoCorreo.trim(),
+          password: nuevoPass.trim() || undefined,
+        }),
+      });
+
+      const json = await res.json();
+      console.log("crear colaborador:", res.status, json);
+
+      if (!res.ok) {
+        alert(json.error || "No se pudo crear el colaborador");
+        return;
+      }
+
+      await cargarColaboradores();
+
+      setModalNuevoOpen(false);
+      setNuevoNombre("");
+      setNuevoCorreo("");
+      setNuevoPass("");
+
+      if (json?.temp_password) {
+        alert(`Colaborador creado.\Contraseña temporal: ${json.temp_password}`);
+      } else {
+        alert("Colaborador creado.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error creando colaborador");
+    } finally {
+      setCreando(false);
+    }
+  }
+
+  function openEditar() {
+    if (!seleccionado?.id_usuario) return;
+    setEditNombre(seleccionado.nombre ?? "");
+    setEditCorreo(seleccionado.email ?? "");
+    setEditEstado(seleccionado.estadoCuenta === "Activo" ? "ACTIVO" : "INACTIVO");
+    setModalEditarOpen(true);
+  }
+
+  async function guardarEdicion() {
+    if (!seleccionado?.id_usuario) return;
+
+    const nombre = editNombre.trim();
+    const correo = editCorreo.trim();
+    if (!nombre || !correo) {
+      alert("Nombre y correo son obligatorios");
+      return;
+    }
+
+    setGuardandoEdit(true);
+    try {
+      const res = await fetch("/api/admin/colaboradores", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id_usuario: seleccionado.id_usuario,
+          nombre,
+          correo,
+          estado: editEstado,
+        }),
+      });
+
+      const json = await res.json();
+      console.log("editar colaborador:", res.status, json);
+
+      if (!res.ok) {
+        alert(json?.error || "No se pudo actualizar");
+        return;
+      }
+
+      setModalEditarOpen(false);
+
+      await cargarColaboradores();
+    } catch (e) {
+      console.error(e);
+      alert("Error actualizando colaborador");
+    } finally {
+      setGuardandoEdit(false);
+    }
+  }
+
+  async function eliminarColaborador() {
+    if (!seleccionado?.id_usuario) return;
+
+    const ok = confirm(
+      `¿Desea eliminar a "${seleccionado.nombre}"?`
+    );
+    if (!ok) return;
+
+    try {
+      const res = await fetch(
+        `/api/admin/colaboradores?id_usuario=${seleccionado.id_usuario}`,
+        { method: "DELETE" }
+      );
+      const json = await res.json();
+      console.log("eliminar colaborador:", res.status, json);
+
+      if (!res.ok) {
+        alert(json?.error || "No se pudo eliminar");
+        return;
+      }
+
+      await cargarColaboradores();
+    } catch (e) {
+      console.error(e);
+      alert("Error eliminando colaborador");
+    }
+  }
 
   const filtrados = useMemo(() => {
     const search = busqueda.toLowerCase().trim();
@@ -250,18 +433,13 @@ export function ColaboradoresPage() {
     });
   }, [colaboradores, busqueda, filtroEstado, filtroMental]);
 
-  /* ---------------- CRUD: ROLE + EDIT + DEACTIVATE ---------------- */
 
   function abrirEditar() {
     if (!seleccionado) return;
     setError(null);
-
     setEditNombre(seleccionado.nombre);
     setEditEmail(seleccionado.email);
-
-    // UI -> DB role
     setEditRol(seleccionado.esAdmin ? "ADMIN" : "COLABORADOR");
-
     setOpenEditar(true);
   }
 
@@ -290,7 +468,7 @@ export function ColaboradoresPage() {
               nombre,
               correo,
               rol: "ADMIN",
-              admin_nivel: "SECUNDARIO", // regla dura
+              admin_nivel: "SECUNDARIO", 
               estado: seleccionado.estadoCuenta === "Activo" ? "ACTIVO" : "SUSPENDIDO",
             }
           : {
@@ -318,7 +496,6 @@ export function ColaboradoresPage() {
       setOpenEditar(false);
       await cargarUsuarios();
 
-      // refresca orgs del seleccionado (por si cambió)
       await cargarOrganizacionesParaUsuario(seleccionado.id);
     } catch {
       setError("No se pudo guardar.");
@@ -353,7 +530,6 @@ export function ColaboradoresPage() {
     }
   }
 
-  // (Opcional) crear usuario: ajusta URL/body a tu endpoint real
   async function crearUsuario() {
     const nombre = nuevoNombre.trim();
     const correo = nuevoEmail.trim().toLowerCase();
@@ -371,7 +547,6 @@ export function ColaboradoresPage() {
           ? { nombre, correo, rol: "ADMIN", admin_nivel: "SECUNDARIO" }
           : { nombre, correo, rol: "COLABORADOR", admin_nivel: null };
 
-      // ⚠️ Ajusta esta ruta si tu proyecto crea por otro endpoint
       const res = await fetch("/api/admin/usuarios/nuevo", {
         method: "POST",
         credentials: "include",
@@ -398,8 +573,6 @@ export function ColaboradoresPage() {
     }
   }
 
-  /* ===================== UI ===================== */
-
   return (
     <div
       className="flex flex-col gap-4"
@@ -413,25 +586,12 @@ export function ColaboradoresPage() {
             Gestiona cuentas, carga de trabajo y bienestar del equipo.
           </p>
         </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            className="rounded-md px-3 py-2 text-sm font-medium border border-[#4a4748] bg-[#3d3b3c] hover:bg-[#4a4748]"
-            onClick={cargarUsuarios}
-          >
-            Recargar
-          </button>
-
-          <button
-            className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium bg-[#ee2346] text-[#fffef9] hover:bg-[#d8203f]"
-            onClick={() => {
-              setError(null);
-              setOpenNuevo(true);
-            }}
-          >
-            <Plus size={16} /> Nuevo
-          </button>
-        </div>
+        <button
+          className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium bg-[#ee2346] text-[#fffef9] hover:bg-[#d8203f]"
+          onClick={() => setModalNuevoOpen(true)}
+        >
+          <Plus size={16} /> Nuevo colaborador
+        </button>
       </div>
 
       {cargando && <p className="text-sm text-[#fffef9]/70">Cargando…</p>}
@@ -472,9 +632,9 @@ export function ColaboradoresPage() {
         </select>
       </div>
 
-      {/* GRID: LISTA IZQ + DETALLE DER */}
+      {/* GRID */}
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)]">
-        {/* LISTA IZQUIERDA */}
+        {/* LISTA DE COLABORADORES */}
         <div className="rounded-xl bg-[#3d3b3c] border border-[#4a4748] p-3 space-y-2 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs uppercase tracking-wide text-[#fffef9]/60 flex items-center gap-1">
@@ -535,10 +695,9 @@ export function ColaboradoresPage() {
           )}
         </div>
 
-        {/* PANEL DETALLE DERECHA */}
+        {/* INFO DEL COLABORADOR */}
         {seleccionado && (
           <div className="rounded-xl bg-[#3d3b3c] border border-[#4a4748] p-4 shadow-sm space-y-4">
-            {/* Cabecera */}
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-[#fffef9] flex items-center gap-2">
@@ -577,7 +736,6 @@ export function ColaboradoresPage() {
               </div>
             </div>
 
-            {/* CONTEXTO BÁSICO */}
             <div className="grid gap-3 md:grid-cols-2 text-xs text-[#fffef9]/80">
               <div>
                 <p>
@@ -586,16 +744,35 @@ export function ColaboradoresPage() {
               </div>
 
               <div>
-                <p className="font-semibold mb-1">Clientes asignados:</p>
-                <p className="text-[11px] text-[#fffef9]/70">
-                  {seleccionado.clientesAsignados?.length
-                    ? seleccionado.clientesAsignados.join(" • ")
-                    : "—"}
+                <p className="font-semibold mb-1 flex items-center justify-between">
+                  Organizaciones asignadas:
+                  <button
+                    className="text-[11px] px-2 py-1 rounded-md border border-[#ee2346]/50 text-[#ee2346]/90 hover:bg-[#ee2346]/10"
+                    onClick={async () => {
+                      setModalAsignarOpen(true);
+                      await cargarOrganizaciones();
+                    }}
+                  >
+                    Asignar a organizacion
+                  </button>
                 </p>
+
+                {asignaciones.length === 0 ? (
+                  <p className="text-[11px] text-[#fffef9]/60">
+                    Sin organizaciones asignadas.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-[#fffef9]/70">
+                    {asignaciones
+                      .map((a) => a.nombre)
+                      .filter(Boolean)
+                      .join(" • ")}
+                  </p>
+                )}
               </div>
             </div>
 
-            {/* STATS PRINCIPALES */}
+            {/* STATS */}
             <div className="grid gap-3 md:grid-cols-4 text-xs">
               <div className="rounded-lg bg-[#4a4748] border border-[#6b7280] p-3 flex flex-col gap-1">
                 <span className="text-[10px] text-[#fffef9]/60 flex items-center gap-1">
@@ -623,40 +800,79 @@ export function ColaboradoresPage() {
                 <span className="text-[10px] text-[#fffef9]/60 flex items-center gap-1">
                   <Activity size={11} /> Chilli Points
                 </span>
-                <span className="text-lg font-semibold text-[#ee2346]">{seleccionado.chilliPoints}</span>
-                <span className="text-[10px] text-[#fffef9]/60">+{seleccionado.chilliPointsMes} este mes</span>
+                <span className="text-lg font-semibold text-[#ee2346]">
+                  {seleccionado.chilliPoints}
+                </span>
+                <span className="text-[10px] text-[#fffef9]/60">
+                  +{seleccionado.chilliPointsMes} este mes
+                </span>
               </div>
             </div>
 
-            {/* NOTAS / BIENESTAR */}
-            {seleccionado.notas && (
-              <div className="mt-2 rounded-lg bg-[#4a4748] border border-[#6b7280] p-3 text-xs text-[#fffef9]/80">
-                <div className="flex items-center gap-2 mb-1">
-                  <Heart size={12} className="text-[#ee2346]" />
-                  <span className="font-semibold text-[11px] uppercase tracking-wide">
-                    Notas de bienestar / gestión
-                  </span>
-                </div>
-                <p>{seleccionado.notas}</p>
+            {/* TAREAS */}
+            <div className="mt-2">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs uppercase tracking-wide text-[#fffef9]/60 flex items-center gap-1">
+                  <List size={12} /> Tareas recientes
+                </span>
               </div>
-            )}
 
-            {/* ACCIONES */}
+              <div className="space-y-2">
+                {seleccionado.tareasRecientes.map((t) => (
+                  <div
+                    key={t.id}
+                    className="rounded-lg bg-[#4a4748] border border-[#6b7280] p-2.5 flex items-start justify-between gap-3 text-xs"
+                  >
+                    <div className="space-y-0.5">
+                      <p className="font-semibold text-[#fffef9] text-[12px]">
+                        {t.titulo}
+                      </p>
+                      <p className="text-[11px] text-[#fffef9]/70">
+                        Cliente: <span className="font-medium">{t.cliente}</span>
+                      </p>
+                      <p className="text-[11px] text-[#fffef9]/60">
+                        Mes: {t.mes}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1">
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] border ${getStatusPill(
+                          t.status
+                        )}`}
+                      >
+                        {t.status}
+                      </span>
+                      <span className="inline-flex items-center gap-1 text-[10px] text-[#fffef9]/70">
+                        <span
+                          className={`w-2 h-2 rounded-full ${getPrioridadDot(
+                            t.prioridad
+                          )}`}
+                        />
+                        {t.prioridad}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+
+                {seleccionado.tareasRecientes.length === 0 && (
+                  <p className="text-[11px] text-[#fffef9]/60">
+                    Sin tareas recientes.
+                  </p>
+                )}
+              </div>
+            </div>
+
             <div className="flex justify-end gap-2 pt-2 border-t border-[#4a4748] mt-2">
               <button
-                className="rounded-md bg-transparent border border-[#ee2346] text-[#ee2346] text-xs px-3 py-1.5 hover:bg-[#ee2346]/10 inline-flex items-center gap-1 disabled:opacity-50"
-                onClick={abrirEditar}
-                disabled={seleccionado.esAdminPrimario}
-                title={seleccionado.esAdminPrimario ? "No se puede editar Admin Primario" : "Editar"}
+                className="rounded-md bg-transparent border border-[#ee2346] text-[#ee2346] text-xs px-3 py-1.5 hover:bg-[#ee2346]/10 inline-flex items-center gap-1"
+                onClick={openEditar}
               >
                 <Edit2 size={12} /> Editar
               </button>
 
               <button
-                className="rounded-md bg-transparent border border-[#ee2346]/50 text-[#ee2346]/80 text-xs px-3 py-1.5 hover:bg-[#ee2346]/10 inline-flex items-center gap-1 disabled:opacity-50"
-                onClick={desactivarUsuario}
-                disabled={seleccionado.esAdminPrimario}
-                title={seleccionado.esAdminPrimario ? "No se puede desactivar Admin Primario" : "Desactivar"}
+                className="rounded-md bg-transparent border border-[#ee2346]/50 text-[#ee2346]/80 text-xs px-3 py-1.5 hover:bg-[#ee2346]/10 inline-flex items-center gap-1"
+                onClick={eliminarColaborador}
               >
                 <Trash2 size={12} /> Eliminar / desactivar
               </button>
@@ -665,159 +881,189 @@ export function ColaboradoresPage() {
         )}
       </div>
 
-      {/* MODAL: EDITAR */}
-      {openEditar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md rounded-xl bg-[#333132] border border-[#4a4748]/40 shadow-lg">
-            <div className="px-5 py-4 border-b border-[#4a4748]/30 flex items-center justify-between">
-              <h3 className="text-white font-semibold">Editar usuario</h3>
+      {/* EDITAR */}
+      {modalEditarOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-full max-w-md rounded-xl bg-[#3d3b3c] border border-[#4a4748] p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-[#fffef9]">
+                Editar colaborador
+              </h3>
               <button
-                type="button"
-                onClick={() => {
-                  setOpenEditar(false);
-                  setError(null);
-                }}
-                className="text-xs text-gray-300 hover:text-white"
+                className="text-[#fffef9]/70 hover:text-[#fffef9]"
+                onClick={() => setModalEditarOpen(false)}
               >
-                Cerrar
+                ✕
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-400 mb-2 block">Nombre</label>
-                <input
-                  value={editNombre}
-                  onChange={(e) => setEditNombre(e.target.value)}
-                  className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#ee2346]"
-                />
-              </div>
+            <label className="text-xs text-[#fffef9]/70">Nombre</label>
+            <input
+              value={editNombre}
+              onChange={(e) => setEditNombre(e.target.value)}
+              className="w-full mt-1 rounded-md bg-[#4a4748] border border-[#6b7280] text-[#fffef9] px-3 py-2 text-sm outline-none"
+              placeholder="Nombre"
+            />
 
-              <div>
-                <label className="text-sm font-medium text-gray-400 mb-2 block">Email</label>
-                <input
-                  value={editEmail}
-                  onChange={(e) => setEditEmail(e.target.value)}
-                  className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#ee2346]"
-                />
-              </div>
+            <label className="text-xs text-[#fffef9]/70 mt-3 block">
+              Correo
+            </label>
+            <input
+              value={editCorreo}
+              onChange={(e) => setEditCorreo(e.target.value)}
+              className="w-full mt-1 rounded-md bg-[#4a4748] border border-[#6b7280] text-[#fffef9] px-3 py-2 text-sm outline-none"
+              placeholder="correo@dominio.com"
+            />
 
-              <div>
-                <label className="text-sm font-medium text-gray-400 mb-2 block">Rol</label>
-                <select
-                  value={editRol}
-                  onChange={(e) => setEditRol(e.target.value as any)}
-                  className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#ee2346]"
-                >
-                  <option value="COLABORADOR">Colaborador</option>
-                  <option value="ADMIN">Admin secundario</option>
-                </select>
+            <label className="text-xs text-[#fffef9]/70 mt-3 block">
+              Estado de cuenta
+            </label>
+            <select
+              value={editEstado}
+              onChange={(e) => setEditEstado(e.target.value as any)}
+              className="w-full mt-1 rounded-md bg-[#4a4748] border border-[#6b7280] text-[#fffef9] px-3 py-2 text-sm outline-none"
+            >
+              <option value="ACTIVO">Activo</option>
+              <option value="INACTIVO">Suspendido</option>
+            </select>
 
-                <p className="text-[11px] text-gray-400 mt-2">
-                  Nota: si eliges <span className="text-gray-200">Admin</span>, se guardará como{" "}
-                  <span className="text-gray-200">SECUNDARIO</span> automáticamente.
-                </p>
-              </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                className="rounded-md bg-transparent border border-[#6b7280] text-[#fffef9]/80 text-xs px-3 py-2 hover:bg-[#4a4748]"
+                onClick={() => setModalEditarOpen(false)}
+              >
+                Cancelar
+              </button>
 
-              {error && <p className="text-sm text-red-400">{error}</p>}
-
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#4a4748]/30">
-                <button
-                  type="button"
-                  onClick={() => setOpenEditar(false)}
-                  className="inline-flex items-center gap-2 rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm font-semibold text-gray-200 hover:bg-[#3a3738] transition"
-                >
-                  Cancelar
-                </button>
-
-                <button
-                  type="button"
-                  disabled={guardando}
-                  onClick={guardarEdicion}
-                  className="inline-flex items-center gap-2 rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-60"
-                >
-                  {guardando ? "Guardando..." : "Guardar"}
-                </button>
-              </div>
+              <button
+                className="rounded-md bg-[#ee2346] text-[#fffef9] text-xs px-3 py-2 hover:bg-[#d8203f] disabled:opacity-60"
+                disabled={guardandoEdit}
+                onClick={guardarEdicion}
+              >
+                {guardandoEdit ? "Guardando..." : "Guardar"}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* MODAL: NUEVO */}
-      {openNuevo && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
-          <div className="w-full max-w-md rounded-xl bg-[#333132] border border-[#4a4748]/40 shadow-lg">
-            <div className="px-5 py-4 border-b border-[#4a4748]/30 flex items-center justify-between">
-              <h3 className="text-white font-semibold">Nuevo usuario</h3>
+      {/* ASIGNAR */}
+      {modalAsignarOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-full max-w-md rounded-xl bg-[#3d3b3c] border border-[#4a4748] p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-[#fffef9]">
+                Asignar a cliente
+              </h3>
               <button
-                type="button"
+                className="text-[#fffef9]/70 hover:text-[#fffef9]"
                 onClick={() => {
-                  setOpenNuevo(false);
-                  setError(null);
+                  setModalAsignarOpen(false);
+                  setOrgSeleccionada("");
                 }}
-                className="text-xs text-gray-300 hover:text-white"
               >
-                Cerrar
+                ✕
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
-              <div>
-                <label className="text-sm font-medium text-gray-400 mb-2 block">Nombre</label>
-                <input
-                  value={nuevoNombre}
-                  onChange={(e) => setNuevoNombre(e.target.value)}
-                  className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#ee2346]"
-                />
-              </div>
+            <label className="text-xs text-[#fffef9]/70">Cliente</label>
+            <select
+              value={orgSeleccionada}
+              onChange={(e) =>
+                setOrgSeleccionada(e.target.value ? Number(e.target.value) : "")
+              }
+              className="w-full mt-1 rounded-md bg-[#4a4748] border border-[#6b7280] text-[#fffef9] px-3 py-2 text-sm outline-none"
+            >
+              <option value="">Seleccionar...</option>
+              {orgs.map((o) => (
+                <option key={o.id_organizacion} value={o.id_organizacion}>
+                  {o.nombre}
+                </option>
+              ))}
+            </select>
 
-              <div>
-                <label className="text-sm font-medium text-gray-400 mb-2 block">Email</label>
-                <input
-                  value={nuevoEmail}
-                  onChange={(e) => setNuevoEmail(e.target.value)}
-                  className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#ee2346]"
-                />
-              </div>
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                className="rounded-md bg-transparent border border-[#6b7280] text-[#fffef9]/80 text-xs px-3 py-2 hover:bg-[#4a4748]"
+                onClick={() => {
+                  setModalAsignarOpen(false);
+                  setOrgSeleccionada("");
+                }}
+              >
+                Cancelar
+              </button>
 
-              <div>
-                <label className="text-sm font-medium text-gray-400 mb-2 block">Rol</label>
-                <select
-                  value={nuevoRol}
-                  onChange={(e) => setNuevoRol(e.target.value as any)}
-                  className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#ee2346]"
-                >
-                  <option value="COLABORADOR">Colaborador</option>
-                  <option value="ADMIN">Admin secundario</option>
-                </select>
-              </div>
+              <button
+                className="rounded-md bg-[#ee2346] text-[#fffef9] text-xs px-3 py-2 hover:bg-[#d8203f] disabled:opacity-60"
+                disabled={loadingOrgs}
+                onClick={asignarCliente}
+              >
+                {loadingOrgs ? "Cargando..." : "Asignar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-              {error && <p className="text-sm text-red-400">{error}</p>}
+      {/* AGREGAR UN COLABORADOR */}
+      {modalNuevoOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+          <div className="w-full max-w-md rounded-xl bg-[#3d3b3c] border border-[#4a4748] p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-[#fffef9]">
+                Nuevo colaborador
+              </h3>
+              <button
+                className="text-[#fffef9]/70 hover:text-[#fffef9]"
+                onClick={() => setModalNuevoOpen(false)}
+              >
+                ✕
+              </button>
+            </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-[#4a4748]/30">
-                <button
-                  type="button"
-                  onClick={() => setOpenNuevo(false)}
-                  className="inline-flex items-center gap-2 rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm font-semibold text-gray-200 hover:bg-[#3a3738] transition"
-                >
-                  Cancelar
-                </button>
+            <label className="text-xs text-[#fffef9]/70">Nombre</label>
+            <input
+              value={nuevoNombre}
+              onChange={(e) => setNuevoNombre(e.target.value)}
+              className="w-full mt-1 rounded-md bg-[#4a4748] border border-[#6b7280] text-[#fffef9] px-3 py-2 text-sm outline-none"
+              placeholder="Ej: Ana Rodríguez"
+            />
 
-                <button
-                  type="button"
-                  disabled={guardando}
-                  onClick={crearUsuario}
-                  className="inline-flex items-center gap-2 rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] px-4 py-2 text-sm font-semibold text-white transition disabled:opacity-60"
-                >
-                  {guardando ? "Creando..." : "Crear"}
-                </button>
-              </div>
+            <label className="text-xs text-[#fffef9]/70 mt-3 block">
+              Correo
+            </label>
+            <input
+              value={nuevoCorreo}
+              onChange={(e) => setNuevoCorreo(e.target.value)}
+              className="w-full mt-1 rounded-md bg-[#4a4748] border border-[#6b7280] text-[#fffef9] px-3 py-2 text-sm outline-none"
+              placeholder="correo@dominio.com"
+            />
 
-              <p className="text-[11px] text-gray-400">
-                Si el endpoint de creación en tu proyecto no es <span className="text-gray-200">/api/admin/usuarios/nuevo</span>,
-                dime cuál estás usando (vi que tienes <span className="text-gray-200">/api/admin/crear-usuario</span>) y lo adapto.
-              </p>
+            <label className="text-xs text-[#fffef9]/70 mt-3 block">
+              Password (opcional)
+            </label>
+            <input
+              value={nuevoPass}
+              onChange={(e) => setNuevoPass(e.target.value)}
+              className="w-full mt-1 rounded-md bg-[#4a4748] border border-[#6b7280] text-[#fffef9] px-3 py-2 text-sm outline-none"
+              placeholder="Si lo dejas vacío se genera uno temporal"
+            />
+
+            <div className="flex justify-end gap-2 mt-4">
+              <button
+                className="rounded-md bg-transparent border border-[#6b7280] text-[#fffef9]/80 text-xs px-3 py-2 hover:bg-[#4a4748]"
+                onClick={() => setModalNuevoOpen(false)}
+              >
+                Cancelar
+              </button>
+
+              <button
+                className="rounded-md bg-[#ee2346] text-[#fffef9] text-xs px-3 py-2 hover:bg-[#d8203f] disabled:opacity-60"
+                disabled={creando}
+                onClick={crearColaborador}
+              >
+                {creando ? "Creando..." : "Crear"}
+              </button>
             </div>
           </div>
         </div>
