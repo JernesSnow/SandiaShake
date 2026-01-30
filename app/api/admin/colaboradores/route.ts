@@ -126,7 +126,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: e?.message ?? "Error interno" }, { status: 500 });
   }
 }
-//Eliminar y editar un colaborador
+
 export async function PATCH(req: Request) {
   try {
     const { error } = await requireAdmin();
@@ -243,5 +243,67 @@ export async function DELETE(req: Request) {
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Error interno" }, { status: 500 });
+    //Si ya existe en public.usuarios, reactivar en vez de insertar
+    const { data: existente, error: exErr } = await admin
+      .from("usuarios")
+      .select("id_usuario, estado, auth_user_id, rol")
+      .eq("correo", correo)
+      .maybeSingle();
+
+    if (exErr) return NextResponse.json({ error: exErr.message }, { status: 500 });
+
+    if (existente) {
+      if (existente.rol !== "COLABORADOR") {
+        return NextResponse.json({ error: "Ese correo ya existe con otro rol en usuarios." }, { status: 409 });
+      }
+      
+      if (existente.estado !== "ACTIVO") {
+        const { error: upErr } = await admin
+          .from("usuarios")
+          .update({
+            nombre,
+            estado: "ACTIVO",
+            updated_by: perfil.id_usuario,
+          })
+          .eq("id_usuario", existente.id_usuario);
+
+        if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+
+        return NextResponse.json({ ok: true, mensaje: "Colaborador reactivado." }, { status: 200 });
+      }
+
+      return NextResponse.json({ error: "Ese correo ya existe en usuarios." }, { status: 409 });
+    }
+
+    const origin = req.headers.get("origin") ?? "";
+    const redirectTo = origin ? `${origin}/invite` : undefined;
+
+    const { data: invited, error: inviteErr } = await admin.auth.admin.inviteUserByEmail(correo, {
+      redirectTo,
+    });
+
+    if (inviteErr) return NextResponse.json({ error: inviteErr.message }, { status: 400 });
+
+    const authUserId = invited.user?.id;
+    if (!authUserId) {
+      return NextResponse.json({ error: "No se obtuvo auth_user_id del invitado" }, { status: 500 });
+    }
+
+    const { error: insErr } = await admin.from("usuarios").insert({
+      nombre,
+      correo,
+      rol: "COLABORADOR",
+      admin_nivel: null,
+      estado: "ACTIVO",
+      auth_user_id: authUserId,
+      created_by: perfil.id_usuario,
+      updated_by: perfil.id_usuario,
+    });
+
+    if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+
+    return NextResponse.json({ ok: true, mensaje: "Invitación enviada y colaborador creado." }, { status: 200 });
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message ?? "Error interno creando colaborador" }, { status: 500 });
   }
 }

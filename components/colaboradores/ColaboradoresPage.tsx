@@ -13,7 +13,10 @@ import {
   User,
 } from "react-feather";
 
+/* ===================== TYPES ===================== */
+
 type MentalState = "Estable" | "Atento" | "En riesgo";
+
 type RolColaborador =
   | "Admin"
   | "Estratega"
@@ -21,18 +24,16 @@ type RolColaborador =
   | "Diseñador"
   | "Editor"
   | "Community Manager";
+
 type EstadoCuenta = "Activo" | "Suspendido";
 
-type TaskStatus = "Pendiente" | "En progreso" | "En revisión" | "Aprobada";
-type TaskPrioridad = "Alta" | "Media" | "Baja";
-
-export type ColaboradorTask = {
-  id: string;
-  titulo: string;
-  cliente: string;
-  status: TaskStatus;
-  prioridad: TaskPrioridad;
-  mes: string;
+type UsuarioDB = {
+  id_usuario: number;
+  nombre: string;
+  correo: string;
+  rol: "ADMIN" | "COLABORADOR";
+  admin_nivel: "PRIMARIO" | "SECUNDARIO" | null;
+  estado: "ACTIVO" | "SUSPENDIDO";
 };
 
 export type Colaborador = {
@@ -42,26 +43,30 @@ export type Colaborador = {
   rol: RolColaborador; 
   email: string;
   telefono?: string;
-
+  id: number;
+  nombre: string;
+  rol: RolColaborador;
+  email: string;
   esAdmin: boolean;
+  esAdminPrimario: boolean;
   estadoCuenta: EstadoCuenta;
   mentalState: MentalState;
   ultimaRevision: string;
   clientesAsignados: string[];
-
   totalTareas: number;
   tareasPendientes: number;
   tareasAprobadas: number;
   porcentajeAprobacion: number;
   chilliPoints: number;
   chilliPointsMes: number;
-
   tareasRecientes: ColaboradorTask[];
   notas?: string;
 };
 
 type FiltroEstado = "Todos" | EstadoCuenta;
 type FiltroMental = "Todos" | MentalState;
+
+/* ===================== THEME ===================== */
 
 const palette = {
   dark: "#333132",
@@ -89,38 +94,39 @@ function getMentalClasses(mental: MentalState) {
   }
 }
 
-function getStatusPill(status: TaskStatus) {
-  switch (status) {
-    case "Pendiente":
-      return "bg-[#4b5563]/40 text-[#e5e7eb] border border-[#6b7280]";
-    case "En progreso":
-      return "bg-[#0ea5e9]/20 text-[#7dd3fc] border border-[#0ea5e9]/60";
-    case "En revisión":
-      return "bg-[#f97316]/20 text-[#fed7aa] border border-[#f97316]/60";
-    case "Aprobada":
-      return "bg-[#6cbe45]/20 text-[#bbf7d0] border border-[#6cbe45]/60";
-  }
+/* ===================== MAPPERS ===================== */
+
+function mapDbToUi(u: UsuarioDB): Colaborador {
+  const esAdmin = u.rol === "ADMIN";
+  const esAdminPrimario = esAdmin && u.admin_nivel === "PRIMARIO";
+
+  return {
+    id: u.id_usuario,
+    nombre: u.nombre,
+    email: u.correo,
+    rol: esAdmin ? "Admin" : "Ejecutivo de cuenta",
+    esAdmin,
+    esAdminPrimario,
+    estadoCuenta: u.estado === "ACTIVO" ? "Activo" : "Suspendido",
+    mentalState: "Estable",
+    ultimaRevision: new Date().toISOString().slice(0, 10),
+    clientesAsignados: [],
+    totalTareas: 0,
+    tareasPendientes: 0,
+    tareasAprobadas: 0,
+    porcentajeAprobacion: 0,
+    chilliPoints: 0,
+    chilliPointsMes: 0,
+
+    notas: "",
+  };
 }
 
-function getPrioridadDot(prioridad: TaskPrioridad) {
-  if (prioridad === "Alta") return "bg-[#ee2346]";
-  if (prioridad === "Media") return "bg-[#facc15]";
-  return "bg-[#9ca3af]";
-}
-
-function mapRolUIFromDB(rolDB: string | null | undefined): RolColaborador {
-  if (rolDB === "ADMIN") return "Admin";
-  return "Ejecutivo de cuenta";
-}
-
-function mapEstadoCuentaFromDB(
-  estadoDB: string | null | undefined
-): EstadoCuenta {
-  return estadoDB === "ACTIVO" ? "Activo" : "Suspendido";
-}
 
 export function ColaboradoresPage() {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
+  const [seleccionado, setSeleccionado] = useState<Colaborador | null>(null);
+
   const [busqueda, setBusqueda] = useState("");
   const [filtroEstado, setFiltroEstado] = useState<FiltroEstado>("Todos");
   const [filtroMental, setFiltroMental] = useState<FiltroMental>("Todos");
@@ -412,19 +418,160 @@ export function ColaboradoresPage() {
   }
 
   const filtrados = useMemo(() => {
-    const search = busqueda.toLowerCase();
+    const search = busqueda.toLowerCase().trim();
+
     return colaboradores.filter((c) => {
       const matchesSearch =
         !search ||
         c.nombre.toLowerCase().includes(search) ||
         c.email.toLowerCase().includes(search);
-      const matchesEstado =
-        filtroEstado === "Todos" || c.estadoCuenta === filtroEstado;
-      const matchesMental =
-        filtroMental === "Todos" || c.mentalState === filtroMental;
+
+      const matchesEstado = filtroEstado === "Todos" || c.estadoCuenta === filtroEstado;
+      const matchesMental = filtroMental === "Todos" || c.mentalState === filtroMental;
+
       return matchesSearch && matchesEstado && matchesMental;
     });
   }, [colaboradores, busqueda, filtroEstado, filtroMental]);
+
+
+  function abrirEditar() {
+    if (!seleccionado) return;
+    setError(null);
+    setEditNombre(seleccionado.nombre);
+    setEditEmail(seleccionado.email);
+    setEditRol(seleccionado.esAdmin ? "ADMIN" : "COLABORADOR");
+    setOpenEditar(true);
+  }
+
+  async function guardarEdicion() {
+    if (!seleccionado) return;
+    if (seleccionado.esAdminPrimario) {
+      setError("No se puede editar el Admin Primario.");
+      return;
+    }
+
+    const nombre = editNombre.trim();
+    const correo = editEmail.trim().toLowerCase();
+
+    if (!nombre || !correo) {
+      setError("Nombre y correo son obligatorios.");
+      return;
+    }
+
+    setGuardando(true);
+    setError(null);
+
+    try {
+      const body =
+        editRol === "ADMIN"
+          ? {
+              nombre,
+              correo,
+              rol: "ADMIN",
+              admin_nivel: "SECUNDARIO", 
+              estado: seleccionado.estadoCuenta === "Activo" ? "ACTIVO" : "SUSPENDIDO",
+            }
+          : {
+              nombre,
+              correo,
+              rol: "COLABORADOR",
+              admin_nivel: null,
+              estado: seleccionado.estadoCuenta === "Activo" ? "ACTIVO" : "SUSPENDIDO",
+            };
+
+      const res = await fetch(`/api/admin/usuarios/${seleccionado.id}`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const json = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        setError(json?.error ?? "No se pudo guardar.");
+        return;
+      }
+
+      setOpenEditar(false);
+      await cargarUsuarios();
+
+      await cargarOrganizacionesParaUsuario(seleccionado.id);
+    } catch {
+      setError("No se pudo guardar.");
+    } finally {
+      setGuardando(false);
+    }
+  }
+
+  async function desactivarUsuario() {
+    if (!seleccionado) return;
+    if (seleccionado.esAdminPrimario) {
+      setError("No se puede desactivar el Admin Primario.");
+      return;
+    }
+
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/usuarios/${seleccionado.id}/desactivar`, {
+        method: "POST",
+        credentials: "include",
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json?.error ?? "No se pudo desactivar.");
+        return;
+      }
+
+      await cargarUsuarios();
+    } catch {
+      setError("No se pudo desactivar.");
+    }
+  }
+
+  async function crearUsuario() {
+    const nombre = nuevoNombre.trim();
+    const correo = nuevoEmail.trim().toLowerCase();
+    if (!nombre || !correo) {
+      setError("Nombre y correo son obligatorios.");
+      return;
+    }
+
+    setGuardando(true);
+    setError(null);
+
+    try {
+      const body =
+        nuevoRol === "ADMIN"
+          ? { nombre, correo, rol: "ADMIN", admin_nivel: "SECUNDARIO" }
+          : { nombre, correo, rol: "COLABORADOR", admin_nivel: null };
+
+      const res = await fetch("/api/admin/usuarios/nuevo", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(json?.error ?? "No se pudo crear.");
+        return;
+      }
+
+      setOpenNuevo(false);
+      setNuevoNombre("");
+      setNuevoEmail("");
+      setNuevoRol("COLABORADOR");
+
+      await cargarUsuarios();
+    } catch {
+      setError("No se pudo crear.");
+    } finally {
+      setGuardando(false);
+    }
+  }
 
   return (
     <div
@@ -446,6 +593,9 @@ export function ColaboradoresPage() {
           <Plus size={16} /> Nuevo colaborador
         </button>
       </div>
+
+      {cargando && <p className="text-sm text-[#fffef9]/70">Cargando…</p>}
+      {error && <p className="text-sm text-red-400">{error}</p>}
 
       {/* FILTERS */}
       <div className="grid gap-3 md:grid-cols-3">
@@ -488,7 +638,7 @@ export function ColaboradoresPage() {
         <div className="rounded-xl bg-[#3d3b3c] border border-[#4a4748] p-3 space-y-2 shadow-sm">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs uppercase tracking-wide text-[#fffef9]/60 flex items-center gap-1">
-              <User size={12} /> Colaboradores ({filtrados.length})
+              <User size={12} /> Usuarios ({filtrados.length})
             </span>
           </div>
 
@@ -505,47 +655,40 @@ export function ColaboradoresPage() {
             >
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-semibold text-[#fffef9]">
-                    {c.nombre}
-                  </span>
+                  <span className="text-sm font-semibold text-[#fffef9]">{c.nombre}</span>
+
                   {c.esAdmin && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ee2346]/20 text-[#ee2346] border border-[#ee2346]/50">
                       Admin
                     </span>
                   )}
+
+                  {c.esAdminPrimario && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ee2346]/10 text-[#ee2346] border border-[#ee2346]/30">
+                      Primario
+                    </span>
+                  )}
                 </div>
+
                 <span className="text-xs text-[#fffef9]/70">{c.rol}</span>
+
                 <div className="mt-1 flex flex-wrap gap-1 items-center text-[10px] text-[#fffef9]/60">
                   <span>{c.email}</span>
-                  {c.telefono && (
-                    <>
-                      <span className="mx-1 text-[#fffef9]/30">•</span>
-                      <span>{c.telefono}</span>
-                    </>
-                  )}
                 </div>
               </div>
 
               <div className="flex flex-col items-end gap-1">
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full ${getMentalClasses(
-                    c.mentalState
-                  )}`}
-                >
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${getMentalClasses(c.mentalState)}`}>
                   {c.mentalState}
                 </span>
-                <span
-                  className={`text-[10px] px-2 py-0.5 rounded-full ${getEstadoBadgeClasses(
-                    c.estadoCuenta
-                  )}`}
-                >
+                <span className={`text-[10px] px-2 py-0.5 rounded-full ${getEstadoBadgeClasses(c.estadoCuenta)}`}>
                   {c.estadoCuenta}
                 </span>
               </div>
             </button>
           ))}
 
-          {filtrados.length === 0 && (
+          {!cargando && filtrados.length === 0 && (
             <p className="text-sm text-[#fffef9]/60 text-center py-4">
               No hay colaboradores que coincidan con los filtros.
             </p>
@@ -559,37 +702,35 @@ export function ColaboradoresPage() {
               <div>
                 <h2 className="text-lg font-semibold text-[#fffef9] flex items-center gap-2">
                   {seleccionado.nombre}
+
                   {seleccionado.esAdmin && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ee2346]/20 text-[#ee2346] border border-[#ee2346]/50">
                       Admin
                     </span>
                   )}
+
+                  {seleccionado.esAdminPrimario && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ee2346]/10 text-[#ee2346] border border-[#ee2346]/30">
+                      Primario
+                    </span>
+                  )}
                 </h2>
-                <p className="text-xs text-[#fffef9]/70 mb-1">
-                  {seleccionado.rol}
-                </p>
+
+                <p className="text-xs text-[#fffef9]/70 mb-1">{seleccionado.rol}</p>
+
                 <p className="text-xs text-[#fffef9]/60">
                   Última revisión de bienestar:{" "}
-                  <span className="font-medium text-[#fffef9]/80">
-                    {seleccionado.ultimaRevision}
-                  </span>
+                  <span className="font-medium text-[#fffef9]/80">{seleccionado.ultimaRevision}</span>
                 </p>
               </div>
 
               <div className="flex flex-col items-end gap-1">
-                <span
-                  className={`text-[11px] px-2 py-0.5 rounded-full ${getMentalClasses(
-                    seleccionado.mentalState
-                  )}`}
-                >
+                <span className={`text-[11px] px-2 py-0.5 rounded-full ${getMentalClasses(seleccionado.mentalState)}`}>
                   <Heart size={11} className="inline mr-1" />
                   {seleccionado.mentalState}
                 </span>
-                <span
-                  className={`text-[11px] px-2 py-0.5 rounded-full ${getEstadoBadgeClasses(
-                    seleccionado.estadoCuenta
-                  )}`}
-                >
+
+                <span className={`text-[11px] px-2 py-0.5 rounded-full ${getEstadoBadgeClasses(seleccionado.estadoCuenta)}`}>
                   {seleccionado.estadoCuenta}
                 </span>
               </div>
@@ -598,15 +739,8 @@ export function ColaboradoresPage() {
             <div className="grid gap-3 md:grid-cols-2 text-xs text-[#fffef9]/80">
               <div>
                 <p>
-                  <span className="font-semibold">Email:</span>{" "}
-                  {seleccionado.email}
+                  <span className="font-semibold">Email:</span> {seleccionado.email}
                 </p>
-                {seleccionado.telefono && (
-                  <p>
-                    <span className="font-semibold">Teléfono:</span>{" "}
-                    {seleccionado.telefono}
-                  </p>
-                )}
               </div>
 
               <div>
@@ -644,25 +778,19 @@ export function ColaboradoresPage() {
                 <span className="text-[10px] text-[#fffef9]/60 flex items-center gap-1">
                   <List size={11} /> Tareas totales
                 </span>
-                <span className="text-lg font-semibold text-[#fffef9]">
-                  {seleccionado.totalTareas}
-                </span>
+                <span className="text-lg font-semibold text-[#fffef9]">{seleccionado.totalTareas}</span>
               </div>
 
               <div className="rounded-lg bg-[#4a4748] border border-[#6b7280] p-3 flex flex-col gap-1">
                 <span className="text-[10px] text-[#fffef9]/60">Pendientes</span>
-                <span className="text-lg font-semibold text-[#facc15]">
-                  {seleccionado.tareasPendientes}
-                </span>
+                <span className="text-lg font-semibold text-[#facc15]">{seleccionado.tareasPendientes}</span>
               </div>
 
               <div className="rounded-lg bg-[#4a4748] border border-[#6b7280] p-3 flex flex-col gap-1">
                 <span className="text-[10px] text-[#fffef9]/60 flex items-center gap-1">
                   <CheckCircle size={11} /> Aprobadas
                 </span>
-                <span className="text-lg font-semibold text-[#6cbe45]">
-                  {seleccionado.tareasAprobadas}
-                </span>
+                <span className="text-lg font-semibold text-[#6cbe45]">{seleccionado.tareasAprobadas}</span>
                 <span className="text-[10px] text-[#fffef9]/60">
                   {seleccionado.porcentajeAprobacion}% tasa de aprobación
                 </span>
@@ -739,15 +867,14 @@ export function ColaboradoresPage() {
                 className="rounded-md bg-transparent border border-[#ee2346] text-[#ee2346] text-xs px-3 py-1.5 hover:bg-[#ee2346]/10 inline-flex items-center gap-1"
                 onClick={openEditar}
               >
-                <Edit2 size={12} />
-                Editar
+                <Edit2 size={12} /> Editar
               </button>
+
               <button
                 className="rounded-md bg-transparent border border-[#ee2346]/50 text-[#ee2346]/80 text-xs px-3 py-1.5 hover:bg-[#ee2346]/10 inline-flex items-center gap-1"
                 onClick={eliminarColaborador}
               >
-                <Trash2 size={12} />
-                Eliminar / desactivar
+                <Trash2 size={12} /> Eliminar / desactivar
               </button>
             </div>
           </div>
