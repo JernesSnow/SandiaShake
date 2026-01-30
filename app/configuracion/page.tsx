@@ -1,4 +1,5 @@
 "use client";
+
 import { Eye, EyeOff } from "react-feather";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -79,6 +80,7 @@ export default function ConfiguracionPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
 const [showNewPassword, setShowNewPassword] = useState(false);
 const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
 
   // CRUD Usuarios
   const [usuarios, setUsuarios] = useState<UsuarioSistema[]>([]);
@@ -396,6 +398,8 @@ async function cargarPerfil() {
     alert("No fue posible actualizar tu información debido a un error del sistema.");
   }
 };
+
+
 
   return (
     <Shell>

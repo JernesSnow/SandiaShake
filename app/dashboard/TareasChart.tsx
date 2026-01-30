@@ -20,7 +20,7 @@ export default function TareasChart() {
             <XAxis dataKey="name" stroke="#aaa" />
             <YAxis stroke="#aaa" />
             <Tooltip />
-            <Bar dataKey="value" fill="#5b8df6" radius={[6, 6, 0, 0]} />
+            <Bar dataKey="value" fill="#ee2346" radius={[6, 6, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>

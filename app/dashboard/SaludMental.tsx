@@ -3,9 +3,9 @@
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
 
 const bienestarData = [
-  { name: "Bien", value: 12, color: "#00c67a" },
+  { name: "Bien", value: 12, color: "#6cbe45" },
   { name: "Regular", value: 5, color: "#f1c232" },
-  { name: "Estrés", value: 2, color: "#ff4d4d" },
+  { name: "Estrés", value: 2, color: "#ee2346" },
 ];
 
 export default function SaludMentalPie() {
