@@ -12,6 +12,11 @@ type FacturaEstado =
 
 type MetodoPago = "SINPE" | "TRANSFERENCIA" | "OTRO";
 
+type OrgOption = {
+  id_organizacion: number;
+  nombre: string;
+};
+
 type DbFactura = {
   id_factura: number;
   id_organizacion: number;
@@ -129,6 +134,23 @@ export function FacturacionPage() {
   const [payReferencia, setPayReferencia] = useState<string>("");
   const [savingPay, setSavingPay] = useState(false);
 
+  const [organizaciones, setOrganizaciones] = useState<OrgOption[]>([]);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [createOrgId, setCreateOrgId] = useState<number | "">("");
+  const [createPeriodo, setCreatePeriodo] = useState("");
+  const [createTotal, setCreateTotal] = useState("");
+  const [createVencimiento, setCreateVencimiento] = useState("");
+  const [savingCreate, setSavingCreate] = useState(false);
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editPeriodo, setEditPeriodo] = useState("");
+  const [editTotal, setEditTotal] = useState("");
+  const [editVencimiento, setEditVencimiento] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [savingDelete, setSavingDelete] = useState(false);
+
   async function fetchFacturas() {
     setLoading(true);
     try {
@@ -155,6 +177,152 @@ export function FacturacionPage() {
   useEffect(() => {
     fetchFacturas();
   }, []);
+
+  useEffect(() => {
+    async function fetchOrgs() {
+      try {
+        const res = await fetch("/api/admin/organizaciones");
+        const json = await res.json();
+        if (res.ok && json?.data) {
+          setOrganizaciones(
+            (json.data as any[])
+              .filter((o) => o.estado === "ACTIVO")
+              .map((o) => ({ id_organizacion: o.id_organizacion, nombre: o.nombre }))
+          );
+        }
+      } catch {
+        /* silently ignore – dropdown will be empty */
+      }
+    }
+    fetchOrgs();
+  }, []);
+
+  function openCreateModal() {
+    setCreateOrgId("");
+    setCreatePeriodo("");
+    setCreateTotal("");
+    setCreateVencimiento("");
+    setCreateOpen(true);
+  }
+
+  async function submitCreate() {
+    if (!createOrgId) {
+      alert("Selecciona una organización.");
+      return;
+    }
+    if (!createPeriodo.trim()) {
+      alert("Ingresa el periodo.");
+      return;
+    }
+    const total = Number(createTotal);
+    if (!Number.isFinite(total) || total <= 0) {
+      alert("El total debe ser un número positivo.");
+      return;
+    }
+
+    setSavingCreate(true);
+    try {
+      const body: Record<string, unknown> = {
+        id_organizacion: Number(createOrgId),
+        periodo: createPeriodo.trim(),
+        total,
+      };
+      if (createVencimiento) {
+        body.fecha_vencimiento = createVencimiento;
+      }
+
+      const res = await fetch("/api/admin/facturas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "No se pudo crear la factura");
+
+      setCreateOpen(false);
+      await fetchFacturas();
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message ?? "Error creando factura");
+    } finally {
+      setSavingCreate(false);
+    }
+  }
+
+  function openEditModal() {
+    if (!selectedInvoice) return;
+    setEditPeriodo(selectedInvoice.periodo);
+    setEditTotal(String(selectedInvoice.total));
+    setEditVencimiento(selectedInvoice.fecha_vencimiento ?? "");
+    setEditOpen(true);
+  }
+
+  async function submitEdit() {
+    if (!selectedInvoice) return;
+
+    const total = Number(editTotal);
+    if (!Number.isFinite(total) || total <= 0) {
+      alert("El total debe ser un número positivo.");
+      return;
+    }
+    if (!editPeriodo.trim()) {
+      alert("Ingresa el periodo.");
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      const body: Record<string, unknown> = {
+        id_factura: selectedInvoice.id_factura,
+        periodo: editPeriodo.trim(),
+        total,
+      };
+      body.fecha_vencimiento = editVencimiento || null;
+
+      const res = await fetch("/api/admin/facturas", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "No se pudo editar la factura");
+
+      setEditOpen(false);
+      await fetchFacturas();
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message ?? "Error editando factura");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
+  async function submitDelete() {
+    if (!selectedInvoice) return;
+
+    setSavingDelete(true);
+    try {
+      const res = await fetch("/api/admin/facturas", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_factura: selectedInvoice.id_factura }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json?.error || "No se pudo eliminar la factura");
+
+      setDeleteOpen(false);
+      setSelectedId(null);
+      await fetchFacturas();
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message ?? "Error eliminando factura");
+    } finally {
+      setSavingDelete(false);
+    }
+  }
 
   const filteredInvoices = useMemo(() => {
     const s = search.trim().toLowerCase();
@@ -272,6 +440,20 @@ export function FacturacionPage() {
             <option value="PAGADA">Pagada</option>
             <option value="ANULADA">Anulada</option>
           </select>
+
+          {/* Nueva factura */}
+          <button
+            type="button"
+            onClick={openCreateModal}
+            className="
+              inline-flex items-center gap-2 rounded-md
+              bg-[#6cbe45] text-white px-3 py-2
+              text-xs font-medium shadow-sm hover:bg-[#5fa93d]
+              active:scale-[.98]
+            "
+          >
+            Nueva factura
+          </button>
 
           {/* Registrar pago  */}
           <button
@@ -408,18 +590,44 @@ export function FacturacionPage() {
                     {badgeEstado(selectedInvoice.estado_factura).label}
                   </span>
 
-                  <button
-                    type="button"
-                    onClick={openPagoModal}
-                    className="
-                      inline-flex items-center gap-2 rounded-md
-                      bg-[#ee2346] text-[#fffef9] px-3 py-2
-                      text-xs font-medium hover:bg-[#d8203f]
-                      active:scale-[.98]
-                    "
-                  >
-                    Registrar pago
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={openPagoModal}
+                      className="
+                        inline-flex items-center gap-2 rounded-md
+                        bg-[#ee2346] text-[#fffef9] px-3 py-2
+                        text-xs font-medium hover:bg-[#d8203f]
+                        active:scale-[.98]
+                      "
+                    >
+                      Registrar pago
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openEditModal}
+                      className="
+                        inline-flex items-center gap-2 rounded-md
+                        bg-[#4a4748] text-[#fffef9] px-3 py-2
+                        text-xs font-medium hover:bg-[#5a5758]
+                        active:scale-[.98]
+                      "
+                    >
+                      Editar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setDeleteOpen(true)}
+                      className="
+                        inline-flex items-center gap-2 rounded-md
+                        border border-[#ee2346]/60 text-[#ee2346] px-3 py-2
+                        text-xs font-medium hover:bg-[#ee2346]/10
+                        active:scale-[.98]
+                      "
+                    >
+                      Eliminar
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -530,6 +738,201 @@ export function FacturacionPage() {
                 placeholder="Comprobante / número referencia"
               />
             </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Nueva factura */}
+      {createOpen && (
+        <Modal
+          title="Nueva factura"
+          subtitle="Crea una factura para una organización."
+          onClose={() => setCreateOpen(false)}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setCreateOpen(false)}
+                className="rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm text-[#fffef9]/80 hover:text-white hover:bg-[#3a3738] transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={submitCreate}
+                disabled={savingCreate}
+                className="rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {savingCreate ? "Guardando..." : "Guardar"}
+              </button>
+            </>
+          }
+        >
+          <div className="grid gap-3 text-xs">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] text-[#fffef9]/70">Organización</label>
+              <select
+                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                value={createOrgId}
+                onChange={(e) =>
+                  setCreateOrgId(e.target.value ? Number(e.target.value) : "")
+                }
+              >
+                <option value="">Selecciona una organización</option>
+                {organizaciones.map((o) => (
+                  <option key={o.id_organizacion} value={o.id_organizacion}>
+                    {o.nombre}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] text-[#fffef9]/70">Periodo</label>
+              <input
+                type="text"
+                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                value={createPeriodo}
+                onChange={(e) => setCreatePeriodo(e.target.value)}
+                placeholder="Ej: Febrero 2026"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] text-[#fffef9]/70">Total (CRC)</label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                value={createTotal}
+                onChange={(e) => setCreateTotal(e.target.value)}
+                placeholder="Ej: 50000"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] text-[#fffef9]/70">
+                Fecha vencimiento (opcional)
+              </label>
+              <input
+                type="date"
+                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                value={createVencimiento}
+                onChange={(e) => setCreateVencimiento(e.target.value)}
+              />
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Editar factura */}
+      {editOpen && selectedInvoice && (
+        <Modal
+          title="Editar factura"
+          subtitle={`Factura #${selectedInvoice.id_factura} · ${selectedInvoice.organizacion_nombre}`}
+          onClose={() => setEditOpen(false)}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setEditOpen(false)}
+                className="rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm text-[#fffef9]/80 hover:text-white hover:bg-[#3a3738] transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={submitEdit}
+                disabled={savingEdit}
+                className="rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {savingEdit ? "Guardando..." : "Guardar"}
+              </button>
+            </>
+          }
+        >
+          <div className="grid gap-3 text-xs">
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] text-[#fffef9]/70">Periodo</label>
+              <input
+                type="text"
+                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                value={editPeriodo}
+                onChange={(e) => setEditPeriodo(e.target.value)}
+                placeholder="Ej: Febrero 2026"
+              />
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] text-[#fffef9]/70">Total (CRC)</label>
+              <input
+                type="number"
+                min={1}
+                step={1}
+                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                value={editTotal}
+                onChange={(e) => setEditTotal(e.target.value)}
+                placeholder="Ej: 50000"
+              />
+              {(() => {
+                const paid = selectedInvoice.total - selectedInvoice.saldo;
+                return paid > 0 ? (
+                  <p className="text-[10px] text-[#fffef9]/50 mt-0.5">
+                    Ya pagado: {formatCRC(paid)}. El total no puede ser menor a ese monto.
+                  </p>
+                ) : null;
+              })()}
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] text-[#fffef9]/70">
+                Fecha vencimiento (opcional)
+              </label>
+              <input
+                type="date"
+                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                value={editVencimiento}
+                onChange={(e) => setEditVencimiento(e.target.value)}
+              />
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {/* Confirmar eliminación */}
+      {deleteOpen && selectedInvoice && (
+        <Modal
+          title="Eliminar factura"
+          subtitle={`Factura #${selectedInvoice.id_factura} · ${selectedInvoice.organizacion_nombre}`}
+          onClose={() => setDeleteOpen(false)}
+          footer={
+            <>
+              <button
+                type="button"
+                onClick={() => setDeleteOpen(false)}
+                className="rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm text-[#fffef9]/80 hover:text-white hover:bg-[#3a3738] transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={submitDelete}
+                disabled={savingDelete}
+                className="rounded-md bg-[#ee2346] hover:bg-[#d8203f] px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {savingDelete ? "Eliminando..." : "Eliminar"}
+              </button>
+            </>
+          }
+        >
+          <p className="text-sm text-[#fffef9]/80">
+            ¿Estás seguro de que deseas eliminar esta factura? Esta acción no se puede deshacer fácilmente.
+          </p>
+          <div className="mt-3 rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-3 text-xs text-[#fffef9]/70">
+            <p>Periodo: {selectedInvoice.periodo}</p>
+            <p>Total: {formatCRC(selectedInvoice.total)}</p>
+            <p>Saldo: {formatCRC(selectedInvoice.saldo)}</p>
           </div>
         </Modal>
       )}
