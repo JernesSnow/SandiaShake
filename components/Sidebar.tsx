@@ -17,7 +17,13 @@ const NAV_ITEMS = [
   { href: "/configuracion", label: "Configuración" },
 ];
 
-export function Sidebar() {
+export function Sidebar({
+  mobileOpen,
+  onClose,
+}: {
+  mobileOpen?: boolean;
+  onClose?: () => void;
+}) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -55,8 +61,8 @@ export function Sidebar() {
     router.replace("/auth");
   }
 
-  return (
-    <aside className="hidden md:flex md:flex-col w-64 min-h-screen bg-gradient-to-b from-[#333132] via-[#2e2c2d] to-[#252324] text-[#fffef9] border-r border-[#444242]">
+  const sidebarContent = (
+    <>
       <div className="px-5 pt-6 pb-4 border-b border-[#444242] flex justify-center">
         <Image
           src="/mock-logo-sandia-con-chole.png"
@@ -79,6 +85,7 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
+              onClick={onClose}
               className={clsx(
                 "flex items-center gap-2 rounded-md px-3 py-2 transition-all border-l-4",
                 active
@@ -100,8 +107,6 @@ export function Sidebar() {
             <span className="inline-flex items-center rounded-full bg-[#ee2346] text-[#fffef9] px-2 py-0.5 text-[10px] font-semibold">
               {rolLabel}
             </span>
-
-
           </div>
         </div>
 
@@ -113,6 +118,30 @@ export function Sidebar() {
           Cerrar sesión
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Desktop sidebar — always visible, fixed */}
+      <aside className="hidden md:flex md:flex-col w-64 h-screen fixed top-0 left-0 bg-gradient-to-b from-[#333132] via-[#2e2c2d] to-[#252324] text-[#fffef9] border-r border-[#444242] overflow-y-auto z-30">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile drawer */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 md:hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={onClose}
+          />
+          {/* Drawer panel */}
+          <aside className="relative flex flex-col w-64 h-full bg-gradient-to-b from-[#333132] via-[#2e2c2d] to-[#252324] text-[#fffef9] border-r border-[#444242] overflow-y-auto shadow-xl">
+            {sidebarContent}
+          </aside>
+        </div>
+      )}
+    </>
   );
 }

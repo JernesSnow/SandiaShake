@@ -147,3 +147,208 @@ export async function GET(req: Request) {
     );
   }
 }
+
+export async function POST(req: Request) {
+  try {
+    const { perfil, error } = await getPerfilAdmin();
+    if (error) return error;
+
+    const body = await req.json();
+    const { id_organizacion, periodo, total, fecha_vencimiento } = body ?? {};
+
+    if (!id_organizacion || !periodo || total == null) {
+      return NextResponse.json(
+        { error: "Campos requeridos: id_organizacion, periodo, total" },
+        { status: 400 }
+      );
+    }
+
+    const totalNum = Number(total);
+    if (!Number.isFinite(totalNum) || totalNum <= 0) {
+      return NextResponse.json(
+        { error: "El total debe ser un número positivo" },
+        { status: 400 }
+      );
+    }
+
+    const admin = createSupabaseAdmin();
+
+    // Verify the organization exists and is active
+    const { data: org, error: orgErr } = await admin
+      .from("organizaciones")
+      .select("id_organizacion, estado")
+      .eq("id_organizacion", id_organizacion)
+      .maybeSingle();
+
+    if (orgErr) {
+      return NextResponse.json({ error: orgErr.message }, { status: 500 });
+    }
+
+    if (!org || org.estado !== "ACTIVO") {
+      return NextResponse.json(
+        { error: "Organización no encontrada o inactiva" },
+        { status: 400 }
+      );
+    }
+
+    const insertData: Record<string, unknown> = {
+      id_organizacion,
+      periodo: String(periodo).trim(),
+      total: totalNum,
+      saldo: totalNum,
+      estado_factura: "PENDIENTE",
+      estado: "ACTIVO",
+      created_by: perfil!.id_usuario,
+      updated_by: perfil!.id_usuario,
+    };
+
+    if (fecha_vencimiento) {
+      insertData.fecha_vencimiento = fecha_vencimiento;
+    }
+
+    const { data: factura, error: insertErr } = await admin
+      .from("facturas")
+      .insert(insertData)
+      .select("*")
+      .single();
+
+    if (insertErr) {
+      return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, factura }, { status: 201 });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: e?.message ?? "Error interno" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PATCH(req: Request) {
+  try {
+    const { perfil, error } = await getPerfilAdmin();
+    if (error) return error;
+
+    const body = await req.json();
+    const { id_factura, periodo, total, fecha_vencimiento } = body ?? {};
+
+    if (!id_factura) {
+      return NextResponse.json(
+        { error: "id_factura es requerido" },
+        { status: 400 }
+      );
+    }
+
+    const admin = createSupabaseAdmin();
+
+    // Fetch current factura
+    const { data: current, error: fetchErr } = await admin
+      .from("facturas")
+      .select("total, saldo, estado")
+      .eq("id_factura", id_factura)
+      .maybeSingle();
+
+    if (fetchErr) {
+      return NextResponse.json({ error: fetchErr.message }, { status: 500 });
+    }
+    if (!current || current.estado !== "ACTIVO") {
+      return NextResponse.json(
+        { error: "Factura no encontrada o eliminada" },
+        { status: 404 }
+      );
+    }
+
+    const updates: Record<string, unknown> = {
+      updated_by: perfil!.id_usuario,
+    };
+
+    if (periodo !== undefined) {
+      updates.periodo = String(periodo).trim();
+    }
+
+    if (fecha_vencimiento !== undefined) {
+      updates.fecha_vencimiento = fecha_vencimiento || null;
+    }
+
+    if (total !== undefined) {
+      const newTotal = Number(total);
+      if (!Number.isFinite(newTotal) || newTotal <= 0) {
+        return NextResponse.json(
+          { error: "El total debe ser un número positivo" },
+          { status: 400 }
+        );
+      }
+
+      const paid = current.total - current.saldo;
+      if (newTotal < paid) {
+        return NextResponse.json(
+          {
+            error: `No se puede establecer el total por debajo de lo ya pagado (${paid.toLocaleString("es-CR")})`,
+          },
+          { status: 400 }
+        );
+      }
+
+      updates.total = newTotal;
+      updates.saldo = newTotal - paid;
+    }
+
+    const { data: factura, error: updateErr } = await admin
+      .from("facturas")
+      .update(updates)
+      .eq("id_factura", id_factura)
+      .select("*")
+      .single();
+
+    if (updateErr) {
+      return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true, factura }, { status: 200 });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: e?.message ?? "Error interno" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(req: Request) {
+  try {
+    const { perfil, error } = await getPerfilAdmin();
+    if (error) return error;
+
+    const body = await req.json();
+    const { id_factura } = body ?? {};
+
+    if (!id_factura) {
+      return NextResponse.json(
+        { error: "id_factura es requerido" },
+        { status: 400 }
+      );
+    }
+
+    const admin = createSupabaseAdmin();
+
+    const { error: updateErr } = await admin
+      .from("facturas")
+      .update({
+        estado: "ELIMINADO",
+        updated_by: perfil!.id_usuario,
+      })
+      .eq("id_factura", id_factura)
+      .eq("estado", "ACTIVO");
+
+    if (updateErr) {
+      return NextResponse.json({ error: updateErr.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ ok: true }, { status: 200 });
+  } catch (e: any) {
+    return NextResponse.json(
+      { error: e?.message ?? "Error interno" },
+      { status: 500 }
+    );
+  }
+}
