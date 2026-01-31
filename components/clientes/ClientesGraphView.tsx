@@ -122,7 +122,7 @@ function Modal({
         <div className="p-5">{children}</div>
 
         {footer && (
-          <div className="px-5 py-4 border-t border-[#4a4748]/30 flex justify-end gap-2">
+          <div className="px-5 py-4 border-t border-[#4a4748]/30 flex flex-wrap justify-end gap-2">
             {footer}
           </div>
         )}
@@ -458,7 +458,7 @@ export function ClientesGraphView() {
         <div
           className={cx(
             "grid gap-8 h-full",
-            isAdmin ? "grid-cols-2" : "grid-cols-1"
+            isAdmin ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
           )}
         >
           {/* Clients column */}
@@ -489,13 +489,13 @@ export function ClientesGraphView() {
                   }}
                   onMouseLeave={() => setHoveredConnections(new Set())}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="text-sm font-semibold text-[#fffef9] mb-1">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-semibold text-[#fffef9] mb-1 break-words">
                         {client.nombre}
                       </h3>
                       {client.email ? (
-                        <p className="text-xs text-[#fffef9]/60 mb-2">
+                        <p className="text-xs text-[#fffef9]/60 mb-2 break-all">
                           {client.email}
                         </p>
                       ) : null}
@@ -508,7 +508,7 @@ export function ClientesGraphView() {
                           e.stopPropagation();
                           openAssignModal(client);
                         }}
-                        className="inline-flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] font-semibold bg-[#ee2346] hover:bg-[#d8203f] text-white transition"
+                        className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold bg-[#ee2346] hover:bg-[#d8203f] text-white transition shrink-0"
                         title="Asignar colaboradores"
                       >
                         <Users size={14} />
@@ -517,7 +517,7 @@ export function ClientesGraphView() {
                     )}
                   </div>
 
-                  <div className="flex items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
                     {client.plan ? (
                       <span className="text-xs text-[#fffef9]/70">
                         Plan: {client.plan}
@@ -529,7 +529,7 @@ export function ClientesGraphView() {
                     )}
 
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-medium ${getEstadoClasses(
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${getEstadoClasses(
                         client.estado
                       )}`}
                     >
@@ -731,10 +731,11 @@ export function ClientesGraphView() {
                     setSelectedClient(null);
                     openAssignModal(client);
                   }}
-                  className="rounded-md bg-[#ee2346] hover:bg-[#d8203f] px-3 py-2 text-sm font-semibold text-white transition inline-flex items-center gap-2"
+                  className="rounded-md bg-[#ee2346] hover:bg-[#d8203f] px-3 py-2 text-sm font-semibold text-white transition inline-flex items-center gap-1.5"
                 >
-                  <Users size={16} />
-                  Asignar colaboradores
+                  <Users size={16} className="shrink-0" />
+                  <span className="hidden sm:inline">Asignar colaboradores</span>
+                  <span className="sm:hidden">Asignar</span>
                 </button>
               )}
             </>
@@ -831,11 +832,11 @@ export function ClientesGraphView() {
                         key={String(t.id_tarea)}
                         className="rounded-md border border-[#4a4748]/40 bg-[#333132] px-3 py-2"
                       >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="text-sm font-semibold text-[#fffef9]">
+                        <div className="flex flex-wrap items-center justify-between gap-1">
+                          <div className="text-sm font-semibold text-[#fffef9] min-w-0 break-words">
                             {t.titulo}
                           </div>
-                          <span className="text-[11px] text-[#fffef9]/60">
+                          <span className="text-[11px] text-[#fffef9]/60 shrink-0">
                             {t.prioridad} • {t.status_kanban}
                           </span>
                         </div>
@@ -967,7 +968,7 @@ export function ClientesGraphView() {
               Selecciona uno o más colaboradores
             </p>
 
-            <div className="grid gap-2 md:grid-cols-2">
+            <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
               {colaboradores.map((c) => {
                 const checked = draftAssigned.includes(c.nombre);
                 return (
@@ -976,7 +977,7 @@ export function ClientesGraphView() {
                     key={c.id}
                     onClick={() => toggleDraftColab(c.nombre)}
                     className={cx(
-                      "rounded-lg border p-3 text-left transition flex items-start justify-between gap-3",
+                      "rounded-lg border p-3 text-left transition flex items-start justify-between gap-2",
                       checked
                         ? "border-[#6cbe45]/50 bg-[#6cbe45]/10"
                         : "border-[#4a4748]/40 bg-[#333132] hover:bg-[#3a3738]"
@@ -1005,7 +1006,7 @@ export function ClientesGraphView() {
               })}
             </div>
 
-            <div className="mt-3 flex items-center justify-between text-xs">
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
               <span className="text-[#fffef9]/60">
                 Seleccionados:{" "}
                 <span className="text-[#fffef9]/80 font-semibold">
@@ -1016,10 +1017,10 @@ export function ClientesGraphView() {
               <button
                 type="button"
                 onClick={() => setDraftAssigned([])}
-                className="inline-flex items-center gap-2 rounded-md px-2.5 py-1.5 text-[11px] font-semibold border border-[#4a4748]/40 text-[#fffef9]/70 hover:text-white hover:bg-[#3a3738] transition"
+                className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold border border-[#4a4748]/40 text-[#fffef9]/70 hover:text-white hover:bg-[#3a3738] transition"
               >
                 <Plus size={14} />
-                Limpiar selección
+                Limpiar
               </button>
             </div>
           </div>
