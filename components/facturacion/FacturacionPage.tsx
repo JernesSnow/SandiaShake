@@ -151,6 +151,42 @@ export function FacturacionPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [savingDelete, setSavingDelete] = useState(false);
 
+  
+//prueba
+const [sendingEmail, setSendingEmail] = useState(false);
+
+
+//fin prueba
+
+//prueba funciones email
+async function enviarNotificacion(tipo: "recordatorio" | "pago") {
+  if (!selectedInvoice) return;
+
+  setSendingEmail(true);
+  try {
+    const res = await fetch("/api/admin/facturacion/notificacion", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id_factura: selectedInvoice.id_factura,
+        tipo,
+      }),
+    });
+
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || "No se pudo enviar el correo");
+
+    alert(`Correo enviado a: ${json?.to || "cliente"}`);
+  } catch (e: any) {
+    console.error(e);
+    alert(e?.message ?? "Error enviando correo");
+  } finally {
+    setSendingEmail(false);
+  }
+}
+
+//fin prueba funciones email
+
   async function fetchFacturas() {
     setLoading(true);
     try {
@@ -384,6 +420,9 @@ export function FacturacionPage() {
 
       setPayOpen(false);
       await fetchFacturas();
+      //prueba
+await enviarNotificacion("pago");
+      //fin prueba
     } catch (e: any) {
       console.error(e);
       alert(e?.message ?? "Error registrando pago");
@@ -615,6 +654,25 @@ export function FacturacionPage() {
                     >
                       Editar
                     </button>
+                    {/*pureba boton */}
+                    <button
+  type="button"
+  onClick={() => enviarNotificacion("recordatorio")}
+  disabled={!selectedInvoice || sendingEmail}
+  className="
+    inline-flex items-center gap-2 rounded-md
+    bg-[#4a4748] text-[#fffef9] px-3 py-2
+    text-xs font-medium hover:bg-[#5a5758]
+    active:scale-[.98]
+    disabled:opacity-60 disabled:cursor-not-allowed
+  "
+>
+  {sendingEmail ? "Enviando..." : "Enviar recordatorio"}
+</button>
+
+
+
+                    {/*fin prueba boton */}
                     <button
                       type="button"
                       onClick={() => setDeleteOpen(true)}
