@@ -25,11 +25,11 @@ function badgeColor(estado: string) {
   if (e === "PAGADA") return { bg: "#E7F7EE", fg: "#0F7A3B", border: "#BEE9CE" };
   if (e === "PARCIAL") return { bg: "#E9F2FF", fg: "#1F5FBF", border: "#C9DEFF" };
   if (e === "VENCIDA") return { bg: "#FFE9EA", fg: "#B42318", border: "#FFC7CB" };
-  return { bg: "#F2F4F7", fg: "#344054", border: "#D0D5DD" }; // PENDIENTE / otros
+  return { bg: "#F2F4F7", fg: "#344054", border: "#D0D5DD" }; 
 }
 
 export function getFacturaEmailHTML(args: {
-  titulo: string; // "Recordatorio de pago" | "Pago registrado"
+  titulo: string; 
   organizacionNombre: string;
   clienteNombre: string;
   clienteCorreo: string;

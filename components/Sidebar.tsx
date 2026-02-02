@@ -6,13 +6,28 @@ import clsx from "clsx";
 import Image from "next/image";
 import { useEffect, useState } from "react";
 import { createSupabaseClient } from "@/lib/supabase/client";
+import path from "path";
 
-const NAV_ITEMS = [
+type NavItem = {
+  href: string;
+  label: string;
+  children?: { href: string; label: string }[];
+};
+
+const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard" },
   { href: "/clientes", label: "Clientes" },
   { href: "/tareas", label: "Tareas" },
   { href: "/cursos", label: "Cursos" },
-  { href: "/facturacion", label: "Facturación" },
+  { 
+    href: "/facturacion",
+    label: "Facturación",
+    children:[
+      { href: "/facturacion", label: "Facturación" },
+      { href: "/facturacion/morosidad", label: "Morosidad" },
+      { href: "/facturacion/historial", label: "Reporte de pagos" },
+    ],
+   },
   { href: "/colaboradores", label: "Colaboradores" },
   { href: "/configuracion", label: "Configuración" },
 ];
@@ -28,8 +43,10 @@ export function Sidebar({
   const router = useRouter();
 
   const [rolLabel, setRolLabel] = useState<"Admin" | "Colaborador" | "Cliente">("Colaborador");
-
+  const [openFacturacion, setOpenFacturacion] = useState(false);
   useEffect(() => {
+    setOpenFacturacion(pathname.startsWith("/facturacion"));
+    
     async function loadRole() {
       try {
         const supabase = createSupabaseClient(true);
@@ -53,7 +70,7 @@ export function Sidebar({
     }
 
     loadRole();
-  }, []);
+  }, [pathname]);
 
   async function logout() {
     const supabase = createSupabaseClient(true);
@@ -80,23 +97,80 @@ export function Sidebar({
 
       <nav className="flex-1 px-3 pb-4 space-y-1 text-sm">
         {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(item.href);
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={onClose}
-              className={clsx(
-                "flex items-center gap-2 rounded-md px-3 py-2 transition-all border-l-4",
-                active
-                  ? "bg-[#3e3b3c] border-l-[#ee2346] text-[#fffef9] shadow-inner"
-                  : "border-l-transparent text-[#fffef9]/80 hover:text-[#fffef9] hover:bg-[#3a3738]"
-              )}
-            >
-              <span className="truncate">{item.label}</span>
-            </Link>
-          );
-        })}
+  const hasChildren = !!(item as any).children?.length;
+
+  // Activo si estoy en la ruta padre o en alguna hija
+  const active =
+    pathname === item.href ||
+    pathname.startsWith(item.href + "/") ||
+    (hasChildren && (item as any).children.some((c: any) => pathname === c.href || pathname.startsWith(c.href + "/")));
+
+  // Padre "Facturación"
+  if (hasChildren) {
+    const isOpen = item.href === "/facturacion" ? openFacturacion : false;
+
+    return (
+      <div key={item.href} className="space-y-1">
+        <button
+          type="button"
+          onClick={() => setOpenFacturacion((v) => !v)}
+          className={clsx(
+            "w-full flex items-center justify-between gap-2 rounded-md px-3 py-2 transition-all border-l-4 text-sm",
+            active
+              ? "bg-[#3e3b3c] border-l-[#ee2346] text-[#fffef9] shadow-inner"
+              : "border-l-transparent text-[#fffef9]/80 hover:text-[#fffef9] hover:bg-[#3a3738]"
+          )}
+        >
+          <span className="truncate">{item.label}</span>
+          <span className={clsx("text-xs opacity-80 transition", isOpen ? "rotate-180" : "rotate-0")}>
+            ▼
+          </span>
+        </button>
+
+        {/* Submenu */}
+        {isOpen && (
+          <div className="ml-3 pl-3 border-l border-[#444242] space-y-1">
+            {(item as any).children.map((child: any) => {
+              const childActive = pathname === child.href || pathname.startsWith(child.href + "/");
+              return (
+                <Link
+                  key={child.href}
+                  href={child.href}
+                  onClick={onClose}
+                  className={clsx(
+                    "block rounded-md px-3 py-2 text-[13px] transition",
+                    childActive
+                      ? "bg-[#3a3738] text-[#fffef9]"
+                      : "text-[#fffef9]/70 hover:text-[#fffef9] hover:bg-[#343132]"
+                  )}
+                >
+                  {child.label}
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // Item normal (sin submenu)
+  return (
+    <Link
+      key={item.href}
+      href={item.href}
+      onClick={onClose}
+      className={clsx(
+        "flex items-center gap-2 rounded-md px-3 py-2 transition-all border-l-4 text-sm",
+        active
+          ? "bg-[#3e3b3c] border-l-[#ee2346] text-[#fffef9] shadow-inner"
+          : "border-l-transparent text-[#fffef9]/80 hover:text-[#fffef9] hover:bg-[#3a3738]"
+      )}
+    >
+      <span className="truncate">{item.label}</span>
+    </Link>
+  );
+})}
       </nav>
 
       <div className="px-4 pb-5 pt-3 border-t border-[#444242] text-xs space-y-3">
