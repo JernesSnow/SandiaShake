@@ -6,6 +6,7 @@ import { createSupabaseClient } from "@/lib/supabase/client";
 
 export default function InvitePage() {
   const router = useRouter();
+
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -16,8 +17,8 @@ export default function InvitePage() {
     async function handleInvite() {
       const supabase = createSupabaseClient(true);
 
-      //tokens en el URL HASH
-      const hash = window.location.hash.substring(1);
+      
+      const hash = window.location.hash.replace("#", "");
       const params = new URLSearchParams(hash);
 
       const access_token = params.get("access_token");
@@ -29,7 +30,7 @@ export default function InvitePage() {
         return;
       }
 
-      //Sesion
+     
       const { error } = await supabase.auth.setSession({
         access_token,
         refresh_token,
@@ -37,6 +38,8 @@ export default function InvitePage() {
 
       if (error) {
         setError("No se pudo validar la invitación.");
+        setLoading(false);
+        return;
       }
 
       setLoading(false);
@@ -53,6 +56,7 @@ export default function InvitePage() {
       setError("La contraseña debe tener al menos 8 caracteres.");
       return;
     }
+
     if (password !== confirm) {
       setError("Las contraseñas no coinciden.");
       return;
@@ -61,7 +65,9 @@ export default function InvitePage() {
     setSaving(true);
     const supabase = createSupabaseClient(true);
 
-    const { error } = await supabase.auth.updateUser({ password });
+    const { error } = await supabase.auth.updateUser({
+      password,
+    });
 
     if (error) {
       setError(error.message);
@@ -73,7 +79,11 @@ export default function InvitePage() {
   }
 
   if (loading) {
-    return <p className="text-white p-6">Validando invitación...</p>;
+    return (
+      <p className="text-white p-6">
+        Validando invitación...
+      </p>
+    );
   }
 
   return (
@@ -86,7 +96,11 @@ export default function InvitePage() {
           Activar cuenta
         </h1>
 
-        {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
+        {error && (
+          <p className="text-red-400 text-sm mb-3">
+            {error}
+          </p>
+        )}
 
         <input
           type="password"
@@ -106,7 +120,7 @@ export default function InvitePage() {
 
         <button
           disabled={saving}
-          className="w-full bg-[#6cbe45] py-2 rounded text-white"
+          className="w-full bg-[#6cbe45] py-2 rounded text-white disabled:opacity-60"
         >
           {saving ? "Guardando..." : "Guardar contraseña"}
         </button>

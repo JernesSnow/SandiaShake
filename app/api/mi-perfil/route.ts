@@ -12,28 +12,38 @@ export async function GET() {
     const supabase = await createSupabaseServer();
     const admin = createSupabaseAdmin();
 
+    // ⚠️ DO NOT fail hard on userErr
     const {
       data: { user },
-      error: userErr,
     } = await supabase.auth.getUser();
 
-    if (userErr) return jsonError(userErr.message, 401);
-    if (!user) return jsonError("No session", 401);
+    // Clean auth check (no Supabase internal error leakage)
+    if (!user) {
+      return jsonError("No session", 401);
+    }
 
     const { data: perfil, error } = await admin
       .from("usuarios")
-      .select("nombre, correo")
+      .select("id_usuario, nombre, correo, rol, admin_nivel")
       .eq("auth_user_id", user.id)
-      .single();
+      .maybeSingle(); // 👈 important
 
     if (error) return jsonError(error.message, 500);
     if (!perfil) return jsonError("Perfil no encontrado", 404);
 
-    return NextResponse.json({ nombre: perfil.nombre, correo: perfil.correo });
+    // ✅ return EVERYTHING the UI needs for permissions
+    return NextResponse.json({
+      id_usuario: perfil.id_usuario,
+      nombre: perfil.nombre,
+      correo: perfil.correo,
+      rol: perfil.rol,
+      admin_nivel: perfil.admin_nivel,
+    });
   } catch (e: any) {
     return jsonError(e?.message ?? "Error interno", 500);
   }
 }
+
 
 type PatchBody = {
   nombre?: string;
@@ -60,12 +70,10 @@ export async function PATCH(req: Request) {
     const newPassword = (body.newPassword ?? "").trim();
     const confirmPassword = (body.confirmPassword ?? "").trim();
 
-    // Validaciones de formulario incompleto / inválido
-    if (!nombre) {
-      return jsonError("El nombre es obligatorio.", 400);
-    }
+    if (!nombre) return jsonError("El nombre es obligatorio.", 400);
 
-    const wantsPasswordChange = !!newPassword || !!confirmPassword || !!currentPassword;
+    const wantsPasswordChange =
+      !!newPassword || !!confirmPassword || !!currentPassword;
 
     if (wantsPasswordChange) {
       if (!currentPassword || !newPassword || !confirmPassword) {
@@ -79,7 +87,6 @@ export async function PATCH(req: Request) {
       }
     }
 
-    //  Actualizar NOMBRE (NO correo)
     const { error: updErr } = await admin
       .from("usuarios")
       .update({ nombre, updated_at: new Date().toISOString() })
@@ -87,22 +94,18 @@ export async function PATCH(req: Request) {
 
     if (updErr) return jsonError(updErr.message, 500);
 
-    //  Cambiar CONTRASEÑA (Auth) 
     if (wantsPasswordChange) {
-      // Validar contraseña actual: signInWithPassword con ANON KEY
       const anon = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
       );
 
       const { error: signErr } = await anon.auth.signInWithPassword({
-        email: user.email!, // viene del user de auth
+        email: user.email!,
         password: currentPassword,
       });
 
-      if (signErr) {
-        return jsonError("Contraseña actual incorrecta.", 400);
-      }
+      if (signErr) return jsonError("Contraseña actual incorrecta.", 400);
 
       const { error: passErr } = await admin.auth.admin.updateUserById(user.id, {
         password: newPassword,
