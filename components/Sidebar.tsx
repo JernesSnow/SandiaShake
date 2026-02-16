@@ -30,6 +30,7 @@ const NAV_ITEMS: NavItem[] = [
    },
   { href: "/colaboradores", label: "Colaboradores" },
   { href: "/configuracion", label: "Configuración" },
+  { href: "/archivos", label: "Archivos" },
 ];
 
 export function Sidebar({

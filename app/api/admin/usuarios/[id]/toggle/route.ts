@@ -32,7 +32,7 @@ export async function POST(
     .eq("id_usuario", userId);
 
   await admin.auth.admin.updateUserById(usuario.auth_user_id, {
-    banned_until: activar ? null : "3000-01-01T00:00:00Z",
+    ban_duration: activar ? "none" : "876000h",
   });
 
   return NextResponse.json({ ok: true });
