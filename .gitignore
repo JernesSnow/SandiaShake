@@ -43,3 +43,7 @@ next-env.d.ts
 ./.claude/*
 
 mfa.md
+
+# credentials / local config
+annular-heading-370002-b3834771f8c9.json
+.mcp.json
