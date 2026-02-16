@@ -42,8 +42,4 @@ next-env.d.ts
 
 ./.claude/*
 
-# MCP configuration (personal settings)
-.mcp.json
-
-# Documentation folder
-docs/
+mfa.md
