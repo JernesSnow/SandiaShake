@@ -1,11 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Menu } from "react-feather";
 import { Sidebar } from "./Sidebar";
+import OrganizacionSetupModal from "./OrganizacionSetupModal";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showOrgModal, setShowOrgModal] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | undefined>();
+
+  useEffect(() => {
+    async function checkOrg() {
+      try {
+        const res = await fetch("/api/organizacion");
+        if (!res.ok) return;
+        const data = await res.json();
+
+        if (!data.hasOrg) {
+          setUserEmail(data.correo ?? undefined);
+          setShowOrgModal(true);
+        }
+      } catch {
+        // Silent fail — don't block the app
+      }
+    }
+
+    checkOrg();
+  }, []);
 
   return (
     // Single unified dark background
@@ -35,6 +57,9 @@ export function Shell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      {/* Mandatory org setup modal for CLIENTE users without org */}
+      {showOrgModal && <OrganizacionSetupModal userEmail={userEmail} />}
     </div>
   );
 }

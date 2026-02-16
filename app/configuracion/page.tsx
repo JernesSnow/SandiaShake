@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Shell } from "../../components/Shell";
 import {
   User,
@@ -17,7 +17,10 @@ import {
   Bell,
   Gift,
   Award,
+  CheckCircle,
 } from "react-feather";
+
+
 
 /* ------------------ TYPES (UI) ------------------ */
 
@@ -97,6 +100,21 @@ export default function ConfiguracionPage() {
   const [notifMorosidad, setNotifMorosidad] = useState(true);
 
   // Google Drive
+  const [driveConnected, setDriveConnected] = useState(false);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    // Check query param from OAuth callback
+    if (searchParams.get("drive") === "connected") {
+      setDriveConnected(true);
+    }
+    // Also verify with server
+    fetch("/api/google-drive/status")
+      .then((r) => r.json())
+      .then((d) => setDriveConnected(d.connected))
+      .catch(() => {});
+  }, [searchParams]);
+
   const [driveEnabled, setDriveEnabled] = useState(true);
   const [driveFolderBase, setDriveFolderBase] = useState(
     "https://drive.google.com/drive/folders/xxxxx"
@@ -303,6 +321,8 @@ export default function ConfiguracionPage() {
     e.preventDefault();
     alert("Guardar perfil (pendiente).");
   };
+
+ 
 
   return (
     <Shell>
@@ -822,45 +842,46 @@ export default function ConfiguracionPage() {
             Google Drive
           </h2>
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-lg border border-[#4a4748]/40 bg-[#2b2b30] p-4">
-              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={driveEnabled}
-                  onChange={(e) => setDriveEnabled(e.target.checked)}
-                  className="rounded border-[#3a3a40] bg-[#1a1a1d] text-[#6cbe45] focus:ring-[#6cbe45]"
-                />
-                Habilitar integración con Google Drive
-              </label>
-
-              <p className="text-[11px] text-gray-400 mt-2">
-                Si está deshabilitado, no se mostrará el link del folder en tareas/entregables.
-              </p>
-            </div>
-
-            <div className="rounded-lg border border-[#4a4748]/40 bg-[#2b2b30] p-4">
-              <label className="text-sm font-medium text-gray-400 mb-2 block">
-                Carpeta base (link)
-              </label>
-              <input
-                type="url"
-                value={driveFolderBase}
-                onChange={(e) => setDriveFolderBase(e.target.value)}
-                className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45]"
-                placeholder="https://drive.google.com/drive/folders/..."
-              />
-            </div>
-          </div>
-
-          <div className="mt-5 flex justify-end">
-            <button
-              type="button"
-              onClick={() => alert("Guardar Google Drive (pendiente)")}
-              className="px-6 py-2 rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] text-white text-sm font-semibold transition"
-            >
-              Guardar Google Drive
-            </button>
+          <div className="rounded-lg border border-[#4a4748]/40 bg-[#2b2b30] p-4">
+            {driveConnected ? (
+              <>
+                <div className="flex items-center gap-2 mb-3">
+                  <CheckCircle size={20} className="text-[#6cbe45]" />
+                  <span className="text-sm font-semibold text-[#6cbe45]">Google Drive conectado</span>
+                </div>
+                <p className="text-sm text-gray-300 mb-4">
+                  Tu cuenta de Google está vinculada. Puedes explorar tus archivos desde la sección
+                  <a href="/archivos" className="text-[#7dd3fc] hover:underline ml-1">Archivos</a>.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => window.location.href = "/api/oauth2/connect"}
+                  className="inline-flex items-center gap-2 rounded-md border border-[#4a4748]/40 px-4 py-2 text-sm font-semibold text-gray-200 hover:bg-[#3a3738] transition"
+                >
+                  Reconectar con otra cuenta
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-gray-300 mb-4">
+                  Conecta tu cuenta de Google para almacenar archivos de tareas directamente en tu Drive.
+                  Se crearán carpetas automáticas por organización y por tarea.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => window.location.href = "/api/oauth2/connect"}
+                  className="inline-flex items-center gap-2 rounded-lg bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow hover:bg-gray-100 transition"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+                    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18A10.96 10.96 0 0 0 1 12c0 1.77.42 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                  </svg>
+                  Conectar Google Drive
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>
