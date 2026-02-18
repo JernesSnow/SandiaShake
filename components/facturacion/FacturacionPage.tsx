@@ -152,13 +152,8 @@ export function FacturacionPage() {
   const [savingDelete, setSavingDelete] = useState(false);
 
   
-//prueba
 const [sendingEmail, setSendingEmail] = useState(false);
 
-
-//fin prueba
-
-//prueba funciones email
 async function enviarNotificacion(tipo: "recordatorio" | "pago") {
   if (!selectedInvoice) return;
 
@@ -184,8 +179,6 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
     setSendingEmail(false);
   }
 }
-
-//fin prueba funciones email
 
   async function fetchFacturas() {
     setLoading(true);

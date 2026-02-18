@@ -204,8 +204,37 @@ export default function ConfiguracionPage() {
 
   function openEditUser(u: UsuarioSistema) {
     setIsNewUser(false);
-    setEditingUser({ ...u }); // ✅ copy
+    setEditingUser({ ...u }); 
   }
+
+useEffect(() => {
+  let cancel = false;
+
+  async function cargarPerfil() {
+    try {
+      const res = await fetch("/api/mi-perfil", {
+        method: "GET",
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) return; 
+
+      if (!cancel) {
+        setName(json?.nombre ?? "");
+        setEmail(json?.correo ?? "");
+      }
+    } catch {
+    }
+  }
+
+  cargarPerfil();
+  return () => {
+    cancel = true;
+  };
+}, []);
+
 
   async function saveUser(u: UsuarioSistema) {
     if (!u.nombre.trim() || !u.correo.trim()) {
@@ -317,10 +346,51 @@ export default function ConfiguracionPage() {
     setIsNewUser(false);
   }
 
-  const handleSaveProfile = (e: React.FormEvent) => {
+  const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    alert("Guardar perfil (pendiente).");
-  };
+    try {
+    const res = await fetch("/api/mi-perfil", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({
+        nombre: name,
+        currentPassword: currentPassword || undefined,
+        newPassword: newPassword || undefined,
+        confirmPassword: confirmPassword || undefined,
+      }),
+    });
+
+    const json = await res.json();
+
+    if (res.status === 401) {
+  alert("Por cuestiones de seguridad, debes iniciar sesión nuevamente para cambiar tu contraseña.");
+  window.location.href = "/auth"; 
+  return;
+}
+
+    if (!res.ok) {
+      alert(json.error || "Error al actualizar perfil");
+      return;
+    }
+
+    const wantsPasswordChange =
+      currentPassword || newPassword || confirmPassword;
+
+    alert(
+      wantsPasswordChange
+        ? "Contraseña actualizada correctamente."
+        : "Perfil actualizado correctamente."
+    );
+
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+  } catch (err) {
+    console.error(err);
+    alert("Error inesperado");
+  }
+};
 
  
 

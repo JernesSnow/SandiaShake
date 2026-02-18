@@ -1,8 +1,7 @@
 "use client";
 
 import { Eye, EyeOff, User, Mail, Lock } from "react-feather";
-import { useState } from "react";
-import { error } from "console";
+import { useMemo, useState } from "react";
 
 type Props = {
   name: string;
@@ -26,22 +25,25 @@ export default function PerfilSection({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const [message, setMessage] = useState<string | null>(null);
-const [saving, setSaving] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const wantsPasswordChange = useMemo(() => {
+    return (
+      !!currentPassword.trim() ||
+      !!newPassword.trim() ||
+      !!confirmPassword.trim()
+    );
+  }, [currentPassword, newPassword, confirmPassword]);
 
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
+    setMessage(null);
 
-    const nombreTrim = name.trim();
-    if(!nombreTrim) {
-      setMessage("El nombre no puede estar vacío");
+    if(!name.trim()) {
+      setMessage("El nombre no puede estar vacío.");
       return;
     }
-
-
-    const wantsPasswordChange =
-    !!currentPassword.trim() || !!newPassword.trim() || !!confirmPassword.trim();
-
   if (wantsPasswordChange) {
     if (!currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
       setMessage("Debes completar todos los campos de contraseña.");
@@ -79,7 +81,7 @@ const [saving, setSaving] = useState(false);
     }
 
 
-    alert(wantsPasswordChange ? "Contraseña actualizada." : "Perfil actualizado.");
+    setMessage(wantsPasswordChange ? "Contraseña actualizada." : "Perfil actualizado.");
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
@@ -215,12 +217,19 @@ const [saving, setSaving] = useState(false);
             </div>
           </div>
 
+          {message && (
+            <div className="mt-4 rounded-md border border-[#4a4748]/50 bg-[#2b2b30] px-3 py-2 text-sm text-white/80">
+              {message}
+            </div>
+          )}
+
           <div className="mt-6 flex justify-end">
             <button
               type="submit"
+              disabled={saving}
               className="px-6 py-2 rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] text-white text-sm font-semibold transition"
             >
-              Guardar cambios
+              {saving ? "Guardando..." : "Guardar cambios"}
             </button>
           </div>
         </form>
