@@ -2,6 +2,7 @@
 
 import { Eye, EyeOff, User, Mail, Lock } from "react-feather";
 import { useState } from "react";
+import { error } from "console";
 
 type Props = {
   name: string;
@@ -24,10 +25,41 @@ export default function PerfilSection({
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
+  const [message, setMessage] = useState<string | null>(null);
+const [saving, setSaving] = useState(false);
+
+
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    await fetch("/api/mi-perfil", {
+    const nombreTrim = name.trim();
+    if(!nombreTrim) {
+      setMessage("El nombre no puede estar vacío");
+      return;
+    }
+
+
+    const wantsPasswordChange =
+    !!currentPassword.trim() || !!newPassword.trim() || !!confirmPassword.trim();
+
+  if (wantsPasswordChange) {
+    if (!currentPassword.trim() || !newPassword.trim() || !confirmPassword.trim()) {
+      setMessage("Debes completar todos los campos de contraseña.");
+      return;
+    }
+    if (newPassword.trim().length < 8) {
+      setMessage("La nueva contraseña debe tener al menos 8 caracteres.");
+      return;
+    }
+    if (newPassword.trim() !== confirmPassword.trim()) {
+      setMessage("La confirmación no coincide con la nueva contraseña.");
+      return;
+    }
+  }
+
+  setSaving(true);
+  try {
+    const res =await fetch("/api/mi-perfil", {
       method: "PATCH",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
@@ -39,11 +71,26 @@ export default function PerfilSection({
       }),
     });
 
-    alert("Perfil actualizado correctamente");
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      setMessage(json.message || "Error al actualizar el perfil");
+      return;
+    }
+
+
+    alert(wantsPasswordChange ? "Contraseña actualizada." : "Perfil actualizado.");
     setCurrentPassword("");
     setNewPassword("");
     setConfirmPassword("");
-  };
+  } catch (err: any) {
+    console.error(err);
+    setMessage("Error al actualizar el perfil");
+  } finally{
+    setSaving(false);
+  }
+};
+
 
   return (
     <div className="bg-[#333132] rounded-xl border border-[#4a4748]/40 shadow mb-6">
