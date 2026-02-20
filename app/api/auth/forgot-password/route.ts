@@ -25,7 +25,6 @@ export async function POST(req: Request) {
 
     const admin = createSupabaseAdmin();
 
-
     const { data: userData, error: userError } =
       await admin.auth.admin.listUsers();
 
@@ -45,6 +44,7 @@ export async function POST(req: Request) {
       );
     }
 
+    const tempPassword = generateTempPassword();
 
     const { error: updateError } =
       await admin.auth.admin.updateUserById(user.id, {
@@ -66,7 +66,6 @@ export async function POST(req: Request) {
       })
       .eq("auth_user_id", user.id);
 
-    
     const loginUrl = `${process.env.NEXT_PUBLIC_SITE_URL}/auth`;
 
     const { error: emailError } = await resend.emails.send({
