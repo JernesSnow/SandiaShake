@@ -1,11 +1,16 @@
 // components/kanban/TaskCard.tsx
-
 "use client";
 
 import React from "react";
-import { Calendar, User, Folder, Link as LinkIcon } from "react-feather";
+import { Calendar, User, Link as LinkIcon, MessageCircle } from "react-feather";
 
-export function TaskCard({ task }: any) {
+type Props = {
+  task: any;
+  onOpenDetails?: (task: any) => void;
+  onOpenChat?: (task: any) => void;
+};
+
+export function TaskCard({ task, onOpenDetails, onOpenChat }: Props) {
   return (
     <div
       className="
@@ -20,11 +25,30 @@ export function TaskCard({ task }: any) {
         duration-200
         cursor-pointer
       "
+      onClick={() => onOpenDetails?.(task)} // ✅ abrir detalles
     >
-      {/* Title */}
-      <h3 className="font-semibold text-sm text-[#2e2e2e] mb-1">
-        {task.title}
-      </h3>
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2">
+        <h3 className="font-semibold text-sm text-[#2e2e2e] mb-1">
+          {task.title}
+        </h3>
+
+        {/* ✅ Botón chat */}
+        {onOpenChat && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation(); // 🚫 no abre detalles
+              onOpenChat(task);
+            }}
+            className="text-xs flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 hover:bg-gray-100"
+            title="Abrir conversación"
+          >
+            <MessageCircle size={14} />
+            Chat
+          </button>
+        )}
+      </div>
 
       {/* Client & Assigned */}
       <div className="text-xs text-[#666] flex items-center gap-1 mb-2">
@@ -38,11 +62,12 @@ export function TaskCard({ task }: any) {
         {task.fecha}
       </div>
 
-      {/* Google Drive Link */}
+      {/* Google Drive */}
       {task.drive && (
         <a
           href={task.drive}
           target="_blank"
+          onClick={(e) => e.stopPropagation()}
           className="text-xs flex items-center gap-1 text-[#5c5aff] hover:underline"
         >
           <LinkIcon size={12} />
@@ -50,7 +75,7 @@ export function TaskCard({ task }: any) {
         </a>
       )}
 
-      {/* Priority Badge */}
+      {/* Priority */}
       {task.prioridad && (
         <span
           className={`
