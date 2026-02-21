@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Shell } from "@/components/Shell";
 
 type OrgItem = {
   id_organizacion: number;
@@ -134,7 +135,8 @@ export default function HistorialPagosPage() {
   }, [orgs, selectedOrgId]);
 
   return (
-    <div className="p-6">
+    <Shell>
+    <div>
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
           <h1 className="text-xl font-bold text-[#fffef9]">Reporte de pagos</h1>
@@ -295,5 +297,6 @@ export default function HistorialPagosPage() {
         </div>
       </div>
     </div>
+    </Shell>
   );
 }

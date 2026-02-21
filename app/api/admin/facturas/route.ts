@@ -154,17 +154,51 @@ export async function POST(req: Request) {
     if (error) return error;
 
     const body = await req.json();
-    const { id_organizacion, periodo, total, fecha_vencimiento } = body ?? {};
+    const { id_organizacion, periodo, fecha_vencimiento, items } = body ?? {};
 
-    if (!id_organizacion || !periodo || total == null) {
+    if (!id_organizacion || !periodo) {
       return NextResponse.json(
-        { error: "Campos requeridos: id_organizacion, periodo, total" },
+        { error: "Campos requeridos: id_organizacion, periodo" },
         { status: 400 }
       );
     }
 
-    const totalNum = Number(total);
-    if (!Number.isFinite(totalNum) || totalNum <= 0) {
+    // Validate items array
+    if (!Array.isArray(items) || items.length === 0) {
+      return NextResponse.json(
+        { error: "Debe incluir al menos un item" },
+        { status: 400 }
+      );
+    }
+
+    for (const item of items) {
+      if (!item.tipo || typeof item.tipo !== "string" || !item.tipo.trim()) {
+        return NextResponse.json(
+          { error: "Cada item debe tener un tipo" },
+          { status: 400 }
+        );
+      }
+      if (!Number.isFinite(Number(item.cantidad)) || Number(item.cantidad) <= 0) {
+        return NextResponse.json(
+          { error: "Cada item debe tener cantidad > 0" },
+          { status: 400 }
+        );
+      }
+      if (!Number.isFinite(Number(item.precio_unitario)) || Number(item.precio_unitario) <= 0) {
+        return NextResponse.json(
+          { error: "Cada item debe tener precio_unitario > 0" },
+          { status: 400 }
+        );
+      }
+    }
+
+    // Compute total from items
+    const totalNum = items.reduce(
+      (sum: number, item: any) => sum + Number(item.cantidad) * Number(item.precio_unitario),
+      0
+    );
+
+    if (totalNum <= 0) {
       return NextResponse.json(
         { error: "El total debe ser un número positivo" },
         { status: 400 }
@@ -214,6 +248,59 @@ export async function POST(req: Request) {
 
     if (insertErr) {
       return NextResponse.json({ error: insertErr.message }, { status: 500 });
+    }
+
+    const facturaId = factura.id_factura;
+
+    // Insert factura_detalles for each line item
+    const detallesRows = items.map((item: any, idx: number) => ({
+      id_factura: facturaId,
+      concepto: String(item.tipo).trim(),
+      tipo: "OTRO",
+      cantidad: Number(item.cantidad),
+      precio_unitario: Number(item.precio_unitario),
+      total_linea: Number(item.cantidad) * Number(item.precio_unitario),
+      orden: idx + 1,
+      estado: "ACTIVO",
+    }));
+
+    const { error: detallesErr } = await admin
+      .from("factura_detalles")
+      .insert(detallesRows);
+
+    if (detallesErr) {
+      return NextResponse.json({ error: detallesErr.message }, { status: 500 });
+    }
+
+    // Create tareas for each line item (cantidad tareas per item)
+    const tareasRows: Record<string, unknown>[] = [];
+    for (const item of items) {
+      const cantidad = Number(item.cantidad);
+      const titulo = String(item.tipo).trim();
+      for (let i = 0; i < cantidad; i++) {
+        tareasRows.push({
+          id_organizacion,
+          id_colaborador: perfil!.id_usuario,
+          id_factura: facturaId,
+          titulo,
+          status_kanban: "pendiente",
+          tipo_entregable: "Otro",
+          prioridad: "Media",
+          estado: "ACTIVO",
+          created_by: perfil!.id_usuario,
+          updated_by: perfil!.id_usuario,
+        });
+      }
+    }
+
+    if (tareasRows.length > 0) {
+      const { error: tareasErr } = await admin
+        .from("tareas")
+        .insert(tareasRows);
+
+      if (tareasErr) {
+        return NextResponse.json({ error: tareasErr.message }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ ok: true, factura }, { status: 201 });
