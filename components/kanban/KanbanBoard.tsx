@@ -1,6 +1,6 @@
 // components/kanban/KanbanBoard.tsx
 "use client";
-
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import {
   DragDropContext,
@@ -142,6 +142,7 @@ function getPriorityClasses(prio?: Task["prioridad"]) {
 /* ---------- MAIN BOARD COMPONENT ---------- */
 
 export function KanbanBoard() {
+  const router = useRouter();
   const [state, setState] = useState<KanbanState>(emptyState);
   const [searchClient, setSearchClient] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("Todas");
@@ -410,7 +411,7 @@ export function KanbanBoard() {
             <input
               type="text"
               className={kanbanStyles.searchInput}
-              placeholder="Ej: Café La Plaza"
+              placeholder=""
               value={searchClient}
               onChange={(e) => setSearchClient(e.target.value)}
             />
@@ -534,7 +535,7 @@ export function KanbanBoard() {
                                             : kanbanStyles.cardBorderIdle
                                         }`}
                                         onClick={() =>
-                                          openEditTask(task as Task)
+                                          router.push(`/tareas/${task.id}`)
                                         }
                                       >
                                         <div className="flex items-start justify-between gap-2">

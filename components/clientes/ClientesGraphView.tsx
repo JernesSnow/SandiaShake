@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { User, Briefcase, Search, X, Plus, Check, Users } from "react-feather";
 
 type Client = {
@@ -132,6 +133,7 @@ function Modal({
 }
 
 export function ClientesGraphView() {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -398,8 +400,7 @@ export function ClientesGraphView() {
   }
 
   function openClientDetails(client: Client) {
-    setSelectedColab(null);
-    setSelectedClient(client);
+    router.push(`/clientes/${client.id}`);
   }
 
   function openColabDetails(colab: Colaborador) {

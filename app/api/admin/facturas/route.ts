@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { google } from "googleapis";
+import oauth2Client, { ensureDriveCredentials } from "@/lib/google-drive/auth";
 
 type EstadoFactura = "PENDIENTE" | "PARCIAL" | "PAGADA" | "VENCIDA";
 
@@ -294,14 +296,74 @@ export async function POST(req: Request) {
     }
 
     if (tareasRows.length > 0) {
-      const { error: tareasErr } = await admin
-        .from("tareas")
-        .insert(tareasRows);
+  const { data: insertedTareas, error: tareasErr } = await admin
+    .from("tareas")
+    .insert(tareasRows)
+    .select("id_tarea, titulo"); // VERY IMPORTANT
 
-      if (tareasErr) {
-        return NextResponse.json({ error: tareasErr.message }, { status: 500 });
+  if (tareasErr) {
+    return NextResponse.json({ error: tareasErr.message }, { status: 500 });
+  }
+
+  // ============================================
+  // DRIVE FOLDER CREATION
+  // ============================================
+
+  const ok = await ensureDriveCredentials();
+
+  if (ok && insertedTareas?.length) {
+    const drive = google.drive({
+      version: "v3",
+      auth: oauth2Client,
+    });
+
+    // 1️⃣ Get org root folder
+    const { data: orgFolder } = await admin
+      .from("google_drive_org_folders")
+      .select("folder_id")
+      .eq("id_organizacion", id_organizacion)
+      .maybeSingle();
+
+    if (orgFolder?.folder_id) {
+
+      // 2️⃣ Create factura folder
+      const facturaFolder = await drive.files.create({
+        requestBody: {
+          name: `Factura-${facturaId}`,
+          mimeType: "application/vnd.google-apps.folder",
+          parents: [orgFolder.folder_id],
+        },
+        fields: "id",
+      });
+
+      const facturaFolderId = facturaFolder.data.id!;
+
+      // 3️⃣ Create subfolder per tarea
+      for (const tarea of insertedTareas) {
+
+        const safeTitle = tarea.titulo.replace(/[^\w\s-]/g, "").substring(0, 60);
+
+        const taskFolder = await drive.files.create({
+          requestBody: {
+            name: `Tarea-${tarea.id_tarea}-${safeTitle}`,
+            mimeType: "application/vnd.google-apps.folder",
+            parents: [facturaFolderId],
+          },
+          fields: "id, webViewLink",
+        });
+
+        await admin.from("google_drive_task_folders").insert({
+          id_tarea: tarea.id_tarea,
+          id_factura: facturaId,
+          id_organizacion,
+          folder_id: taskFolder.data.id,
+          folder_name: `Tarea-${tarea.id_tarea}`,
+          folder_url: taskFolder.data.webViewLink ?? "",
+        });
       }
     }
+  }
+}
 
     return NextResponse.json({ ok: true, factura }, { status: 201 });
   } catch (e: any) {

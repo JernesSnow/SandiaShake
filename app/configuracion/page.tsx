@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Shell } from "../../components/Shell";
+import PlanesEntregablesSection from "@/components/configuracion/PlanesEntregablesSection";
+
 import {
   User,
   Mail,
@@ -702,8 +704,9 @@ export default function ConfiguracionPage() {
           )}
         </div>
       </div>
-
       
+      {/* ------------------ ENTREGABLES ------------------ */}
+      <PlanesEntregablesSection />
 
       {/* ------------------ CHILLI POINTS / REWARDS / NOTIFICACIONES ------------------ */}
       <div className="bg-[#333132] rounded-xl border border-[#4a4748]/40 shadow mb-6">

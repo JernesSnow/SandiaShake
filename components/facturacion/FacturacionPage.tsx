@@ -34,6 +34,7 @@ type FacturaTarea = {
   status_kanban: string;
   prioridad: string;
   tipo_entregable: string;
+  drive_url?: string | null;
 };
 
 function formatCRC(n: number) {
@@ -269,6 +270,7 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
               status_kanban: t.status_kanban,
               prioridad: t.prioridad,
               tipo_entregable: t.tipo_entregable,
+              drive_url: t.google_drive_task_folders?.folder_url ?? null,
             }))
           );
         } else {
@@ -584,6 +586,7 @@ await enviarNotificacion("pago");
           gap-4
         "
       >
+        
         {/* LEFT: Invoice list */}
         <div
           className="
@@ -805,6 +808,16 @@ await enviarNotificacion("pago");
                           <p className="text-[10px] text-[#fffef9]/50">
                             {t.tipo_entregable}
                           </p>
+                          {t.drive_url && (
+                          <a
+                            href={t.drive_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-[#6cbe45] hover:underline mt-1 inline-block"
+                          >
+                            Abrir carpeta Drive
+                          </a>
+                        )}
                         </div>
                         <div className="flex items-center gap-2 shrink-0">
                           <span
