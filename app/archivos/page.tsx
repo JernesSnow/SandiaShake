@@ -14,7 +14,7 @@ import {
   X,
 } from "react-feather";
 
-const TARGET_FOLDER = "SandiaShake";
+const TARGET_FOLDER = "SandiaConChile";
 
 type DriveFile = {
   id: string;
@@ -114,9 +114,7 @@ export default function ArchivosPage() {
     setCurrentFolderId(null);
 
     try {
-      const folderRes = await fetch(
-        `/api/google-drive/find-folder?name=${encodeURIComponent(TARGET_FOLDER)}`
-      );
+      const folderRes = await fetch("/api/google-drive/root-folder");
       const folderJson = await folderRes.json();
 
       if (!folderRes.ok) {
