@@ -9,7 +9,6 @@ import { createSupabaseServer } from "@/lib/supabase/server";
 
 export async function POST(req: Request) {
   try {
-    // Ensure Drive credentials exist
     const ok = await ensureDriveCredentials();
     if (!ok) {
       return NextResponse.json(
@@ -18,7 +17,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 🔐 Resolve current user from session
     const supabase = await createSupabaseServer();
 
     const {
@@ -35,10 +33,10 @@ export async function POST(req: Request) {
 
     const admin = createSupabaseAdmin();
 
-    // Map auth user → public.usuarios
+
     const { data: dbUser, error: userError } = await admin
       .from("usuarios")
-      .select("id_usuario")
+      .select("id_usuario, rol")
       .eq("auth_user_id", user.id)
       .eq("estado", "ACTIVO")
       .maybeSingle();
@@ -50,9 +48,16 @@ export async function POST(req: Request) {
       );
     }
 
+    if (dbUser.rol === "CLIENTE") {
+      return NextResponse.json(
+        { error: "Clients cannot upload files" },
+        { status: 403 }
+      );
+    }
+
     const currentUserId = dbUser.id_usuario;
 
-    // Parse FormData
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const folderId = formData.get("folderId") as string | null;
@@ -72,7 +77,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Convert file to stream
+
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const stream = Readable.from(buffer);
@@ -82,7 +87,7 @@ export async function POST(req: Request) {
       auth: oauth2Client,
     });
 
-    // Upload file to Google Drive
+
     const uploaded = await drive.files.create({
       requestBody: {
         name: file.name,
@@ -101,7 +106,7 @@ export async function POST(req: Request) {
       throw new Error("Drive upload failed");
     }
 
-    // Determine next version number
+
     const { data: lastVersion } = await admin
       .from("entregables")
       .select("version_num")
@@ -114,7 +119,7 @@ export async function POST(req: Request) {
       ? lastVersion.version_num + 1
       : 1;
 
-    // Insert entregable
+
     const { data: entregable, error } = await admin
       .from("entregables")
       .insert({

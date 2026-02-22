@@ -4,33 +4,40 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { createSupabaseClient } from "@/lib/supabase/client";
-import path from "path";
+
+type Role = "ADMIN" | "COLABORADOR" | "CLIENTE";
 
 type NavItem = {
   href: string;
   label: string;
-  children?: { href: string; label: string }[];
+  roles?: Role[];
+  children?: {
+    href: string;
+    label: string;
+    roles?: Role[];
+  }[];
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard" },
-  { href: "/clientes", label: "Clientes" },
-  { href: "/tareas", label: "Tareas" },
-  { href: "/cursos", label: "Cursos" },
-  { 
+  { href: "/dashboard", label: "Dashboard", roles: ["ADMIN","COLABORADOR","CLIENTE"] },
+  { href: "/clientes", label: "Clientes", roles: ["ADMIN"] },
+  { href: "/tareas", label: "Tareas", roles: ["ADMIN","COLABORADOR","CLIENTE"] },
+  { href: "/cursos", label: "Cursos", roles: ["ADMIN","COLABORADOR","CLIENTE"] },
+  {
     href: "/facturacion",
     label: "Facturación",
-    children:[
-      { href: "/facturacion", label: "Facturación" },
-      { href: "/facturacion/morosidad", label: "Morosidad" },
-      { href: "/facturacion/historial", label: "Reporte de pagos" },
+    roles: ["ADMIN"],
+    children: [
+      { href: "/facturacion", label: "Facturación", roles: ["ADMIN"] },
+      { href: "/facturacion/morosidad", label: "Morosidad", roles: ["ADMIN"] },
+      { href: "/facturacion/historial", label: "Reporte de pagos", roles: ["ADMIN"] },
     ],
-   },
-  { href: "/colaboradores", label: "Colaboradores" },
-  { href: "/configuracion", label: "Configuración" },
-  { href: "/archivos", label: "Archivos" },
+  },
+  { href: "/colaboradores", label: "Colaboradores", roles: ["ADMIN"] },
+  { href: "/configuracion", label: "Configuración", roles: ["ADMIN"] },
+  { href: "/archivos", label: "Archivos", roles: ["ADMIN","COLABORADOR"] },
 ];
 
 export function Sidebar({
@@ -43,35 +50,79 @@ export function Sidebar({
   const pathname = usePathname();
   const router = useRouter();
 
-  const [rolLabel, setRolLabel] = useState<"Admin" | "Colaborador" | "Cliente">("Colaborador");
+  const [userRole, setUserRole] = useState<Role | null>(null);
+  const [clienteOrg, setClienteOrg] = useState<{
+    id: number;
+    nombre: string;
+  } | null>(null);
+
   const [openFacturacion, setOpenFacturacion] = useState(false);
+
+  /* =========================================================
+     Load profile ONCE
+  ========================================================= */
+
   useEffect(() => {
-    setOpenFacturacion(pathname.startsWith("/facturacion"));
-    
-    async function loadRole() {
+    async function loadProfile() {
       try {
-        const supabase = createSupabaseClient(true);
-        const { data: auth } = await supabase.auth.getUser();
-        const user = auth?.user;
-        if (!user) return;
+        const res = await fetch("/api/auth/profile");
+        const json = await res.json();
 
-        const { data: perfil } = await supabase
-          .from("usuarios")
-          .select("rol")
-          .eq("auth_user_id", user.id)
-          .maybeSingle();
+        if (!res.ok) return;
 
-        const r = (perfil?.rol ?? "").toUpperCase();
-        if (r === "ADMIN") setRolLabel("Admin");
-        else if (r === "CLIENTE") setRolLabel("Cliente");
-        else setRolLabel("Colaborador");
-      } catch {
-     
+        setUserRole(json.rol);
+
+        if (json.rol === "CLIENTE" && json.organizacion) {
+          setClienteOrg({
+            id: json.organizacion.id_organizacion,
+            nombre: json.organizacion.nombre,
+          });
+        }
+      } catch (err) {
+        console.error("Sidebar profile error:", err);
       }
     }
 
-    loadRole();
+    loadProfile();
+  }, []);
+
+  /* =========================================================
+     Auto expand Facturación if inside route
+  ========================================================= */
+
+  useEffect(() => {
+    setOpenFacturacion(pathname.startsWith("/facturacion"));
   }, [pathname]);
+
+  /* =========================================================
+     Navigation Filtering
+  ========================================================= */
+
+  const filteredNav = useMemo(() => {
+    if (!userRole) return [];
+
+    const baseItems = NAV_ITEMS.filter(
+      (item) => !item.roles || item.roles.includes(userRole)
+    );
+
+    // CLIENTE → Add "Mi organización"
+    if (userRole === "CLIENTE" && clienteOrg) {
+      return [
+        ...baseItems,
+        {
+          href: `/clientes/${clienteOrg.id}`,
+          label: "Mi organización",
+          roles: ["CLIENTE"],
+        },
+      ];
+    }
+
+    return baseItems;
+  }, [userRole, clienteOrg]);
+
+  /* =========================================================
+     Logout
+  ========================================================= */
 
   async function logout() {
     const supabase = createSupabaseClient(true);
@@ -79,116 +130,107 @@ export function Sidebar({
     router.replace("/auth");
   }
 
+  /* =========================================================
+     Sidebar UI
+  ========================================================= */
+
   const sidebarContent = (
     <>
+      {/* Logo */}
       <div className="px-5 pt-6 pb-4 border-b border-[#444242] flex justify-center">
         <Image
           src="/mock-logo-sandia-con-chole.png"
           alt="SandiaShake"
           width={160}
           height={40}
-          className="object-contain"
+          style={{ width: "auto", height: "auto" }} // Fix Next.js warning
           priority
         />
       </div>
 
+      {/* Section Title */}
       <div className="px-5 pt-4 pb-1 text-[11px] uppercase tracking-wide text-[#fffef9]/50">
         Navegación
       </div>
 
+      {/* Navigation */}
       <nav className="flex-1 px-3 pb-4 space-y-1 text-sm">
-        {NAV_ITEMS.map((item) => {
-  const hasChildren = !!(item as any).children?.length;
+        {filteredNav.map((item) => {
+          const hasChildren = !!item.children?.length;
 
- 
-  const active =
-    pathname === item.href ||
-    pathname.startsWith(item.href + "/") ||
-    (hasChildren && (item as any).children.some((c: any) => pathname === c.href || pathname.startsWith(c.href + "/")));
+          const active =
+            pathname === item.href ||
+            pathname.startsWith(item.href + "/");
 
-  
-  if (hasChildren) {
-    const isOpen = item.href === "/facturacion" ? openFacturacion : false;
-
-    return (
-      <div key={item.href} className="space-y-1">
-        <button
-          type="button"
-          onClick={() => setOpenFacturacion((v) => !v)}
-          className={clsx(
-            "w-full flex items-center justify-between gap-2 rounded-md px-3 py-2 transition-all border-l-4 text-sm",
-            active
-              ? "bg-[#3e3b3c] border-l-[#ee2346] text-[#fffef9] shadow-inner"
-              : "border-l-transparent text-[#fffef9]/80 hover:text-[#fffef9] hover:bg-[#3a3738]"
-          )}
-        >
-          <span className="truncate">{item.label}</span>
-          <span className={clsx("text-xs opacity-80 transition", isOpen ? "rotate-180" : "rotate-0")}>
-            ▼
-          </span>
-        </button>
-
-       
-        {isOpen && (
-          <div className="ml-3 pl-3 border-l border-[#444242] space-y-1">
-            {(item as any).children.map((child: any) => {
-              const childActive = pathname === child.href || pathname.startsWith(child.href + "/");
-              return (
-                <Link
-                  key={child.href}
-                  href={child.href}
-                  onClick={onClose}
+          if (hasChildren) {
+            return (
+              <div key={item.href} className="space-y-1">
+                <button
+                  type="button"
+                  onClick={() => setOpenFacturacion((v) => !v)}
                   className={clsx(
-                    "block rounded-md px-3 py-2 text-[13px] transition",
-                    childActive
-                      ? "bg-[#3a3738] text-[#fffef9]"
-                      : "text-[#fffef9]/70 hover:text-[#fffef9] hover:bg-[#343132]"
+                    "w-full flex items-center justify-between rounded-md px-3 py-2 border-l-4 transition",
+                    active
+                      ? "bg-[#3e3b3c] border-l-[#ee2346]"
+                      : "border-l-transparent hover:bg-[#3a3738]"
                   )}
                 >
-                  {child.label}
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    );
-  }
+                  {item.label}
+                </button>
 
-  
-  return (
-    <Link
-      key={item.href}
-      href={item.href}
-      onClick={onClose}
-      className={clsx(
-        "flex items-center gap-2 rounded-md px-3 py-2 transition-all border-l-4 text-sm",
-        active
-          ? "bg-[#3e3b3c] border-l-[#ee2346] text-[#fffef9] shadow-inner"
-          : "border-l-transparent text-[#fffef9]/80 hover:text-[#fffef9] hover:bg-[#3a3738]"
-      )}
-    >
-      <span className="truncate">{item.label}</span>
-    </Link>
-  );
-})}
+                {openFacturacion && (
+                  <div className="ml-3 pl-3 border-l border-[#444242] space-y-1">
+                    {item.children!
+                      .filter(
+                        (c) =>
+                          !c.roles || c.roles.includes(userRole!)
+                      )
+                      .map((child) => (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          onClick={onClose}
+                          className="block px-3 py-2 rounded-md hover:bg-[#343132] transition"
+                        >
+                          {child.label}
+                        </Link>
+                      ))}
+                  </div>
+                )}
+              </div>
+            );
+          }
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onClose}
+              className={clsx(
+                "block px-3 py-2 rounded-md border-l-4 transition",
+                active
+                  ? "bg-[#3e3b3c] border-l-[#ee2346]"
+                  : "border-l-transparent hover:bg-[#3a3738]"
+              )}
+            >
+              {item.label}
+            </Link>
+          );
+        })}
       </nav>
 
-      <div className="px-4 pb-5 pt-3 border-t border-[#444242] text-xs space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <span className="text-[#fffef9]/60">Estado del sistema</span>
-
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center rounded-full bg-[#ee2346] text-[#fffef9] px-2 py-0.5 text-[10px] font-semibold">
-              {rolLabel}
-            </span>
-          </div>
+      {/* Footer */}
+      <div className="px-4 pb-5 pt-3 border-t border-[#444242] text-xs">
+        <div className="flex justify-between items-center mb-3">
+          <span className="text-[#fffef9]/60">Rol</span>
+          <span className="bg-[#ee2346] px-2 py-0.5 rounded-full text-[10px] font-semibold">
+            {userRole ?? "-"}
+          </span>
         </div>
 
         <button
-          type="button"
           onClick={logout}
-          className="w-full rounded-md border border-[#4a4748]/40 px-3 py-2 text-[12px] font-semibold text-gray-200 hover:bg-[#3a3738] transition"
+          className="w-full rounded-md border px-3 py-2 hover:bg-[#3a3738] transition"
         >
           Cerrar sesión
         </button>
@@ -198,21 +240,19 @@ export function Sidebar({
 
   return (
     <>
-
-      <aside className="hidden md:flex md:flex-col w-64 h-screen fixed top-0 left-0 bg-gradient-to-b from-[#333132] via-[#2e2c2d] to-[#252324] text-[#fffef9] border-r border-[#444242] overflow-y-auto z-30">
+      {/* Desktop */}
+      <aside className="hidden md:flex md:flex-col w-64 h-screen fixed bg-[#333132] text-white">
         {sidebarContent}
       </aside>
 
-    
+      {/* Mobile */}
       {mobileOpen && (
         <div className="fixed inset-0 z-40 md:hidden">
-         
           <div
             className="absolute inset-0 bg-black/60"
             onClick={onClose}
           />
-       
-          <aside className="relative flex flex-col w-64 h-full bg-gradient-to-b from-[#333132] via-[#2e2c2d] to-[#252324] text-[#fffef9] border-r border-[#444242] overflow-y-auto shadow-xl">
+          <aside className="relative w-64 h-full bg-[#333132]">
             {sidebarContent}
           </aside>
         </div>

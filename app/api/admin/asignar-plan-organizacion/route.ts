@@ -52,12 +52,12 @@ export async function POST(req: Request) {
 
     const admin = createSupabaseAdmin();
 
-    // 📅 Get current month & year
+
     const now = new Date();
     const mes = now.getMonth() + 1;
     const anio = now.getFullYear();
 
-    // 🔍 Get plan to calculate total deliverables
+
     const { data: plan, error: planErr } = await admin
       .from("planes_contenido")
       .select(`
@@ -84,7 +84,7 @@ export async function POST(req: Request) {
       (plan.cantidad_video ?? 0) +
       (plan.cantidad_carrusel ?? 0);
 
-    // 🚫 Prevent duplicate plan in same month
+
     const { data: existente } = await admin
       .from("organizacion_plan_contenido")
       .select("id_org_plan")
@@ -101,7 +101,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // ✅ Insert plan
+
     const { error: insertErr } = await admin
       .from("organizacion_plan_contenido")
       .insert({

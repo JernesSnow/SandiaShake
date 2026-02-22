@@ -1,15 +1,15 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { getSessionProfile } from "@/lib/auth/getSessionProfile";
 
-/* ================= TYPES ================= */
+
 
 type PostBody = {
   id_colaborador: number;
   id_organizacion: number;
 };
 
-/* ================= AUTH VALIDATION ================= */
 
 async function getPerfilAdmin() {
   const supabase = await createSupabaseServer();
@@ -71,117 +71,96 @@ async function getPerfilAdmin() {
   return { perfil };
 }
 
-/* ================= GET ================= */
+
 
 export async function GET(req: Request) {
   try {
-    const { error } = await getPerfilAdmin();
-    if (error) return error;
+    const perfil = await getSessionProfile();
 
-    const url = new URL(req.url);
-    const idOrganizacion = Number(url.searchParams.get("id_organizacion"));
-    const idColaborador = Number(url.searchParams.get("id_colaborador"));
+    if (!perfil) {
+      return NextResponse.json(
+        { error: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const orgId = searchParams.get("id_organizacion");
+
+    if (!orgId) {
+      return NextResponse.json(
+        { error: "Missing id_organizacion" },
+        { status: 400 }
+      );
+    }
 
     const admin = createSupabaseAdmin();
 
-    /* ================= CASE 1: ORGANIZATIONS OF A COLABORADOR ================= */
-    if (idColaborador) {
-      const { data: asignaciones, error: qErr } = await admin
-        .from("asignacion_organizacion")
-        .select("id_asignacion, id_organizacion")
-        .eq("id_colaborador", idColaborador)
-        .eq("estado", "ACTIVO");
 
-      if (qErr) {
-        console.error(qErr);
+    if (perfil.rol === "CLIENTE") {
+      const { data: link } = await admin
+        .from("organizacion_usuario")
+        .select("id_organizacion")
+        .eq("id_usuario_cliente", perfil.id_usuario)
+        .eq("id_organizacion", orgId)
+        .maybeSingle();
+
+      if (!link) {
         return NextResponse.json(
-          { error: qErr.message },
-          { status: 500 }
+          { error: "Forbidden" },
+          { status: 403 }
         );
       }
-
-      return NextResponse.json(
-        { ok: true, data: asignaciones ?? [] },
-        { status: 200 }
-      );
     }
 
-    /* ================= CASE 2: COLABORADORES OF AN ORGANIZATION ================= */
-    if (idOrganizacion) {
-      const { data: asignaciones, error: qErr } = await admin
+
+    if (perfil.rol === "COLABORADOR") {
+      const { data: assignment } = await admin
         .from("asignacion_organizacion")
-        .select("id_asignacion, id_colaborador")
-        .eq("id_organizacion", idOrganizacion)
-        .eq("estado", "ACTIVO");
+        .select("id_asignacion")
+        .eq("id_colaborador", perfil.id_usuario)
+        .eq("id_organizacion", orgId)
+        .maybeSingle();
 
-      if (qErr) {
-        console.error(qErr);
+      if (!assignment) {
         return NextResponse.json(
-          { error: qErr.message },
-          { status: 500 }
+          { error: "Forbidden" },
+          { status: 403 }
         );
       }
-
-      if (!asignaciones?.length) {
-        return NextResponse.json(
-          { ok: true, data: [] },
-          { status: 200 }
-        );
-      }
-
-      const ids = asignaciones.map((a) => a.id_colaborador);
-
-      const { data: usuarios, error: uErr } = await admin
-        .from("usuarios")
-        .select("id_usuario, nombre, correo, estado")
-        .in("id_usuario", ids)
-        .eq("estado", "ACTIVO");
-
-      if (uErr) {
-        console.error(uErr);
-        return NextResponse.json(
-          { error: uErr.message },
-          { status: 500 }
-        );
-      }
-
-      const mapped = asignaciones
-        .map((a) => {
-          const user = usuarios?.find(
-            (u) => u.id_usuario === a.id_colaborador
-          );
-
-          if (!user) return null;
-
-          return {
-            id_asignacion: a.id_asignacion,
-            id_colaborador: user.id_usuario,
-            nombre: user.nombre,
-            correo: user.correo,
-          };
-        })
-        .filter(Boolean);
-
-      return NextResponse.json(
-        { ok: true, data: mapped },
-        { status: 200 }
-      );
     }
 
-    return NextResponse.json(
-      { error: "Debe enviar id_organizacion o id_colaborador" },
-      { status: 400 }
-    );
+    const { data, error } = await admin
+      .from("asignacion_organizacion")
+      .select(`
+        id_colaborador,
+        usuarios!fk_asignacion_clientes_colaborador (
+          nombre,
+          correo
+        )
+      `)
+      .eq("id_organizacion", orgId);
+
+    if (error) throw error;
+
+    const formatted = (data ?? []).map((a: any) => ({
+      id_colaborador: a.id_colaborador,
+      nombre: a.usuarios?.nombre,
+      correo: a.usuarios?.correo,
+    }));
+
+    return NextResponse.json({ data: formatted });
+
   } catch (e: any) {
-    console.error(e);
+    console.error("Asignaciones GET error:", e);
     return NextResponse.json(
-      { error: e?.message ?? "Error interno" },
+      { error: e?.message ?? "Internal error" },
       { status: 500 }
     );
   }
 }
 
-/* ================= POST ================= */
+
 
 export async function POST(req: Request) {
   try {
@@ -202,7 +181,6 @@ export async function POST(req: Request) {
 
     const admin = createSupabaseAdmin();
 
-    /* Validate colaborador */
     const { data: colab } = await admin
       .from("usuarios")
       .select("id_usuario, rol, estado")
@@ -227,7 +205,7 @@ export async function POST(req: Request) {
         { status: 400 }
       );
 
-    /* Prevent duplicates */
+
     const { data: existing } = await admin
       .from("asignacion_organizacion")
       .select("id_asignacion")
@@ -243,7 +221,7 @@ export async function POST(req: Request) {
       );
     }
 
-    /* Insert */
+
     const { data: inserted, error: insErr } = await admin
       .from("asignacion_organizacion")
       .insert({
@@ -280,7 +258,6 @@ export async function POST(req: Request) {
   }
 }
 
-/* ================= DELETE ================= */
 
 export async function DELETE(req: Request) {
   try {

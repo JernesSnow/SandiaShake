@@ -6,13 +6,13 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-/* ================= PATCH ================= */
+
 
 export async function PATCH(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params; // ✅ MUST await
+  const { id } = await context.params; 
 
   const planId = Number(id);
 
@@ -51,13 +51,13 @@ export async function PATCH(
   return NextResponse.json({ success: true });
 }
 
-/* ================= DELETE ================= */
+
 
 export async function DELETE(
   req: NextRequest,
   context: { params: Promise<{ id: string }> }
 ) {
-  const { id } = await context.params; // ✅ MUST await
+  const { id } = await context.params; 
 
   const planId = Number(id);
 

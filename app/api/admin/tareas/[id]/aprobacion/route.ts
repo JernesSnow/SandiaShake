@@ -36,7 +36,6 @@ export async function POST(
       );
     }
 
-    // 1️⃣ Update entregable status
     const { error: updateError } = await admin
       .from("entregables")
       .update({
@@ -48,10 +47,10 @@ export async function POST(
 
     if (updateError) throw updateError;
 
-    // 2️⃣ Insert comment
+
     await admin.from("tarea_comentarios").insert({
       id_tarea: tareaId,
-      id_usuario: 1, // Replace later with real session user
+      id_usuario: 1, 
       tipo_autor: "CLIENTE",
       comentario,
       estado: "ACTIVO",

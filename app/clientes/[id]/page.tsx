@@ -3,13 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { Shell } from "../../../components/Shell";
-
-import {
-  Folder,
-  Plus,
-  Trash2,
-  Users,
-} from "react-feather";
+import { Folder, Plus, Trash2, Users } from "react-feather";
 
 /* ================= TYPES ================= */
 
@@ -51,6 +45,71 @@ type Plan = {
 
 export default function ClienteDetailPage() {
   const { id } = useParams();
+
+ //* ================= ORG RESOLUTION ================= */
+
+const [resolvedOrgId, setResolvedOrgId] = useState<string | null>(null);
+const [role, setRole] = useState<Role | null>(null);
+const [orgResolvedFrom, setOrgResolvedFrom] = useState<"URL" | "CLIENTE_OWN_ORG" | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+
+    async function resolveOrg() {
+      try {
+        logDebug("Resolving org...");
+
+        const rProfile = await fetch("/api/auth/profile");
+        const jProfile = await rProfile.json();
+
+        if (!rProfile.ok || !alive) {
+          logDebug("Profile fetch failed");
+          return;
+        }
+
+        const r = (jProfile?.rol ?? "COLABORADOR") as Role;
+        setRole(r);
+        logDebug(`Role resolved: ${r}`);
+
+        // ADMIN / COLABORADOR -> use URL
+        if (r !== "CLIENTE") {
+          const orgId = String(id);
+          setResolvedOrgId(orgId);
+          setOrgResolvedFrom("URL");
+          logDebug(`Org resolved from URL: ${orgId}`);
+          return;
+        }
+
+        // CLIENTE -> use their own org (first org returned for that client)
+        const rOrgs = await fetch("/api/organizacion"); // <-- use the CLIENT-safe endpoint
+        const jOrgs = await rOrgs.json();
+
+        const own = jOrgs?.organizacion?.id_organizacion;
+        if (!rOrgs.ok || !own || !alive) {
+          logDebug("CLIENTE org resolution failed");
+          return;
+        }
+
+        const ownId = String(own);
+        setResolvedOrgId(ownId);
+        setOrgResolvedFrom("CLIENTE_OWN_ORG");
+        logDebug(`Org resolved for CLIENTE: ${ownId}`);
+
+      } catch (err) {
+        console.error("Resolve org error:", err);
+        logDebug("Resolve org crashed");
+      }
+    }
+
+    if (id) resolveOrg();
+
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  /* ================= DATA STATE ================= */
+
   const [facturas, setFacturas] = useState<any[]>([]);
   const [cliente, setCliente] = useState<any>(null);
   const [tareas, setTareas] = useState<Tarea[]>([]);
@@ -59,77 +118,162 @@ export default function ClienteDetailPage() {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [todosColaboradores, setTodosColaboradores] = useState<any[]>([]);
   const [planes, setPlanes] = useState<Plan[]>([]);
-  const [nuevoColaboradorId, setNuevoColaboradorId] =
-    useState<number | null>(null);
-  const [nuevoPlanId, setNuevoPlanId] =
-    useState<number | null>(null);
+  const [nuevoColaboradorId, setNuevoColaboradorId] = useState<number | null>(null);
+  const [nuevoPlanId, setNuevoPlanId] = useState<number | null>(null);
   const [nuevaNota, setNuevaNota] = useState("");
 
-  /* ================= LOAD ================= */
+  /* ================= DEBUG ================= */
 
-  async function cargarTodo() {
-    try {
-      const rOrg = await fetch("/api/admin/organizaciones");
-      const jOrg = await rOrg.json();
-      const found = jOrg?.data?.find(
-        (o: any) => String(o.id_organizacion) === id
-      );
-      setCliente(found ?? null);
+  const [debugOpen, setDebugOpen] = useState(true);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
 
-      const rPlanes = await fetch("/api/admin/planes-contenido");
-      setPlanes((await rPlanes.json())?.data ?? []);
-
-      const rUsuarios = await fetch("/api/admin/usuarios");
-      const jUsuarios = await rUsuarios.json();
-      setTodosColaboradores(
-        (jUsuarios?.usuarios ?? []).filter(
-          (u: any) =>
-            u.rol === "COLABORADOR" &&
-            u.estado === "ACTIVO"
-        )
-
-      
-      );
-
-      const rF = await fetch(
-        `/api/admin/facturas/organizacion-id?id_organizacion=${id}`
-      );
-      const jF = await rF.json();
-
-      if (rF.ok) {
-        setFacturas(jF?.facturas ?? []);
-      } else {
-        console.error("Error cargando facturas:", jF?.error);
-        setFacturas([]);
-      }
-      const rT = await fetch(
-        `/api/admin/tareas?id_organizacion=${id}`
-      );
-      setTareas((await rT.json())?.data ?? []);
-
-      const rTF = await fetch(
-        `/api/admin/google-drive-task-folders?id_organizacion=${id}`
-      );
-      setTaskFolders((await rTF.json())?.data ?? []);
-
-      const rN = await fetch(
-        `/api/admin/organizacion-notas?id_organizacion=${id}`
-      );
-      setNotas((await rN.json())?.data ?? []);
-
-      const rC = await fetch(
-        `/api/admin/asignaciones?id_organizacion=${id}`
-      );
-      const jC = await rC.json();
-      setColaboradores(jC?.data ?? []);
-    } catch (err) {
-      console.error("Error cargando cliente:", err);
-    }
+  function logDebug(message: string) {
+    console.log("[CLIENT_DEBUG]", message);
+    setDebugLog(prev => [...prev, message]);
   }
 
+  /* =========================================================
+     Resolve organization depending on role
+  ========================================================= */
+
   useEffect(() => {
-    if (id) cargarTodo();
+  let alive = true;
+
+    async function resolveOrg() {
+      try {
+        logDebug("Resolving org...");
+
+        const rProfile = await fetch("/api/auth/profile");
+        const jProfile = await rProfile.json();
+        if (!rProfile.ok || !alive) {
+          logDebug("Profile fetch failed");
+          return;
+        }
+
+        const r = (jProfile?.rol ?? "COLABORADOR") as Role;
+        setRole(r);
+        logDebug(`Role resolved: ${r}`);
+
+        // ADMIN / COLABORADOR
+        if (r !== "CLIENTE") {
+          const orgId = String(id);
+          setResolvedOrgId(orgId);
+          setOrgResolvedFrom("URL");
+          logDebug(`Org resolved from URL: ${orgId}`);
+          return;
+        }
+
+        // CLIENTE
+        const rOrgs = await fetch("/api/admin/organizaciones");
+        const jOrgs = await rOrgs.json();
+
+        const own = jOrgs?.data?.[0]?.id_organizacion;
+        if (!rOrgs.ok || !own || !alive) {
+          logDebug("CLIENTE org resolution failed");
+          return;
+        }
+
+        const ownId = String(own);
+        setResolvedOrgId(ownId);
+        setOrgResolvedFrom("CLIENTE_OWN_ORG");
+        logDebug(`Org resolved for CLIENTE: ${ownId}`);
+
+        if (String(id) !== ownId) {
+          logDebug("URL normalized to own org");
+          router.replace(`/clientes/${ownId}`);
+        }
+
+      } catch (err) {
+        console.error("Resolve org error:", err);
+        logDebug("Resolve org crashed");
+      }
+    }
+
+    if (id) resolveOrg();
+
+    return () => {
+      alive = false;
+    };
   }, [id]);
+
+  /* =========================================================
+     LOAD DATA
+  ========================================================= */
+
+  async function cargarTodo(orgId: string) {
+  try {
+    const rOrg = await fetch(`/api/organizacion?id_organizacion=${orgId}`);
+    const jOrg = await rOrg.json();
+
+    if (rOrg.ok) {
+      setCliente(jOrg.organizacion ?? null);
+    } else {
+      setCliente(null);
+    }
+
+    const rPlanes = await fetch("/api/admin/planes-contenido");
+    setPlanes((await rPlanes.json())?.data ?? []);
+
+    // Only ADMIN can fetch all users
+    if (role === "ADMIN") {
+      try {
+        const rUsuarios = await fetch("/api/admin/usuarios");
+        if (rUsuarios.ok) {
+          const jUsuarios = await rUsuarios.json();
+
+          setTodosColaboradores(
+            (jUsuarios?.usuarios ?? []).filter(
+              (u: any) =>
+                u.rol === "COLABORADOR" &&
+                u.estado === "ACTIVO"
+            )
+          );
+        } else {
+          setTodosColaboradores([]);
+        }
+      } catch {
+        setTodosColaboradores([]);
+      }
+    } else {
+      setTodosColaboradores([]);
+    }
+
+    const rF = await fetch(
+      `/api/admin/facturas/organizacion-id?id_organizacion=${orgId}`
+    );
+    setFacturas((await rF.json())?.facturas ?? []);
+
+    const rT = await fetch(
+      `/api/admin/tareas?id_organizacion=${orgId}`
+    );
+    setTareas((await rT.json())?.data ?? []);
+
+    const rTF = await fetch(
+      `/api/admin/google-drive-task-folders?id_organizacion=${orgId}`
+    );
+    setTaskFolders((await rTF.json())?.data ?? []);
+
+    const rN = await fetch(
+      `/api/admin/organizacion-notas?id_organizacion=${orgId}`
+    );
+    setNotas((await rN.json())?.data ?? []);
+
+    const rC = await fetch(
+      `/api/admin/asignaciones?id_organizacion=${orgId}`
+    );
+    setColaboradores((await rC.json())?.data ?? []);
+
+  } catch (err) {
+    console.error("Error cargando cliente:", err);
+  }
+}
+
+useEffect(() => {
+  if (!resolvedOrgId) return;
+
+  logDebug(`Trigger cargarTodo for org ${resolvedOrgId}`);
+  cargarTodo(resolvedOrgId);
+}, [resolvedOrgId]);
 
   /* ================= PLAN LOGIC ================= */
 
@@ -139,8 +283,7 @@ export default function ClienteDetailPage() {
   const planConfig = useMemo(() => {
     if (!planActual) return null;
     return (
-      planes.find((p) => p.id_plan === planActual.id_plan) ??
-      null
+      planes.find((p) => p.id_plan === planActual.id_plan) ?? null
     );
   }, [planActual, planes]);
 
@@ -176,59 +319,64 @@ export default function ClienteDetailPage() {
 
   /* ================= ACTIONS ================= */
 
-  async function asignarPlan() {
-    if (!nuevoPlanId) return;
-    await fetch("/api/admin/asignar-plan-organizacion", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        id_organizacion: Number(id),
-        id_plan: nuevoPlanId,
-      }),
-    });
-    await cargarTodo();
-  }
-
   async function asignarColaborador() {
-    if (!nuevoColaboradorId) return;
+    if (!nuevoColaboradorId || !resolvedOrgId) return;
+
     await fetch("/api/admin/asignaciones", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        id_organizacion: Number(id),
+        id_organizacion: Number(resolvedOrgId),
         id_colaborador: nuevoColaboradorId,
       }),
     });
+
     setNuevoColaboradorId(null);
-    await cargarTodo();
+    cargarTodo(resolvedOrgId);
   }
 
   async function removerColaborador(idColaborador: number) {
+    if (!resolvedOrgId) return;
+
     await fetch(
-      `/api/admin/asignaciones?id_organizacion=${id}&id_colaborador=${idColaborador}`,
+      `/api/admin/asignaciones?id_organizacion=${resolvedOrgId}&id_colaborador=${idColaborador}`,
       { method: "DELETE" }
     );
-    await cargarTodo();
+
+    cargarTodo(resolvedOrgId);
   }
 
   async function crearNota() {
-    if (!nuevaNota.trim()) return;
+    if (!nuevaNota.trim() || !resolvedOrgId) return;
+
     const r = await fetch(
       "/api/admin/organizacion-notas",
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          id_organizacion: id,
+          id_organizacion: resolvedOrgId,
           nota: nuevaNota,
         }),
       }
     );
+
     const j = await r.json();
+
     if (r.ok) {
       setNotas((prev) => [j.data, ...prev]);
       setNuevaNota("");
     }
+  }
+
+  /* ================= SECURITY GUARD ================= */
+
+    if (role === "CLIENTE" && !resolvedOrgId) {
+    return (
+      <Shell>
+        <div className="text-[#fffef9]/60">Cargando cliente...</div>
+      </Shell>
+    );
   }
 
   if (!cliente) {
@@ -528,62 +676,80 @@ export default function ClienteDetailPage() {
         {/* ================= RIGHT ================= */}
         <div className="space-y-8">
 
-          {/* COLABORADORES */}
-          <div className="bg-[#2b2b30] p-6 rounded-xl border border-[#4a4748]/40">
-            <h2 className="font-semibold mb-4 flex items-center gap-2">
-              <Users size={16} />
-              Equipo asignado
-            </h2>
+          {/* ================= COLABORADORES ================= */}
+          {role !== "CLIENTE" && (
+            <div className="bg-[#2b2b30] p-6 rounded-xl border border-[#4a4748]/40">
+              <h2 className="font-semibold mb-4 flex items-center gap-2">
+                <Users size={16} />
+                Equipo asignado
+              </h2>
 
-            <div className="space-y-3 mb-4">
-              {colaboradores.map((c) => (
-                <div
-                  key={c.id_colaborador}
-                  className="bg-[#1f1f24] p-3 rounded-lg flex justify-between"
-                >
-                  <div>
-                    {c.nombre}
-                    <div className="text-xs text-[#fffef9]/60">
-                      {c.correo}
-                    </div>
+              {/* LISTA DE COLABORADORES */}
+              <div className="space-y-3 mb-4">
+                {colaboradores.length === 0 && (
+                  <div className="text-xs text-[#fffef9]/50">
+                    No hay colaboradores asignados.
                   </div>
-                  <button
-                    onClick={() => removerColaborador(c.id_colaborador)}
-                    className="text-[#ee2346]"
+                )}
+
+                {colaboradores.map((c) => (
+                  <div
+                    key={c.id_colaborador}
+                    className="bg-[#1f1f24] p-3 rounded-lg flex justify-between items-center"
                   >
-                    <Trash2 size={14} />
+                    <div>
+                      <div className="font-medium">{c.nombre}</div>
+                      <div className="text-xs text-[#fffef9]/60">
+                        {c.correo}
+                      </div>
+                    </div>
+
+                    {/* SOLO ADMIN PUEDE REMOVER */}
+                    {role === "ADMIN" && (
+                      <button
+                        onClick={() => removerColaborador(c.id_colaborador)}
+                        className="text-[#ee2346] hover:text-red-400 transition"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* SOLO ADMIN PUEDE ASIGNAR */}
+              {role === "ADMIN" && (
+                <div className="flex gap-2">
+                  <select
+                    onChange={(e) =>
+                      setNuevoColaboradorId(Number(e.target.value))
+                    }
+                    className="bg-[#1f1f24] border border-[#4a4748]/40 rounded px-3 py-2 text-sm flex-1"
+                  >
+                    <option value="">Agregar colaborador</option>
+                    {todosColaboradores.map((c) => (
+                      <option
+                        key={c.id_usuario}
+                        value={c.id_usuario}
+                      >
+                        {c.nombre}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={asignarColaborador}
+                    className="bg-[#6cbe45] hover:bg-[#5aaa3c] transition px-3 rounded"
+                  >
+                    <Plus size={14} />
                   </button>
                 </div>
-              ))}
+              )}
             </div>
-
-            <div className="flex gap-2">
-              <select
-                onChange={(e) =>
-                  setNuevoColaboradorId(Number(e.target.value))
-                }
-                className="bg-[#1f1f24] border border-[#4a4748]/40 rounded px-3 py-2 text-sm flex-1"
-              >
-                <option value="">Agregar colaborador</option>
-                {todosColaboradores.map((c) => (
-                  <option
-                    key={c.id_usuario}
-                    value={c.id_usuario}
-                  >
-                    {c.nombre}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={asignarColaborador}
-                className="bg-[#6cbe45] px-3 rounded"
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-          </div>
+          )}
 
           {/* NOTAS INTERNAS */}
+          {role !== "CLIENTE" && (
           <div className="bg-[#2b2b30] p-6 rounded-xl border border-[#4a4748]/40">
             <h2 className="font-semibold mb-4">
               Notas internas
@@ -616,7 +782,7 @@ export default function ClienteDetailPage() {
               ))}
             </div>
           </div>
-
+          )}
         </div>
       </div>
     </div>

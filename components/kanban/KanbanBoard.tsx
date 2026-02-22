@@ -143,6 +143,7 @@ function getPriorityClasses(prio?: Task["prioridad"]) {
 
 export function KanbanBoard() {
   const router = useRouter();
+  const [role, setRole] = useState<string | null>(null);
   const [state, setState] = useState<KanbanState>(emptyState);
   const [searchClient, setSearchClient] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("Todas");
@@ -156,39 +157,36 @@ export function KanbanBoard() {
 
   // Fetch organizations on mount
   useEffect(() => {
-    async function fetchOrgs() {
+    async function fetchProfile() {
       try {
-        const res = await fetch("/api/admin/organizaciones");
+        const res = await fetch("/api/auth/profile");
         const json = await res.json();
-        if (res.ok && json?.data) {
-          setOrganizaciones(
-            (json.data as any[])
-              .filter((o) => o.estado === "ACTIVO")
-              .map((o) => ({ id_organizacion: o.id_organizacion, nombre: o.nombre }))
-          );
+
+        if (res.ok && json?.rol) {
+          setRole(json.rol);
         }
       } catch {
-        /* silently ignore */
+        setRole(null);
       }
     }
-    fetchOrgs();
+
+    fetchProfile();
   }, []);
 
   // Fetch tareas when selected org changes
   useEffect(() => {
-    if (!selectedOrgId) {
-      setState(emptyState);
-      return;
-    }
+    if (!role) return;
 
-    async function fetchTareas() {
+    async function fetchTareas(url: string) {
       setLoadingTareas(true);
       try {
-        const res = await fetch(`/api/admin/tareas?id_organizacion=${selectedOrgId}`);
+        const res = await fetch(url);
         const json = await res.json();
+
         if (res.ok && json?.data) {
-          const orgName = organizaciones.find((o) => o.id_organizacion === selectedOrgId)?.nombre ?? "";
-          setState(buildKanbanState(json.data, orgName));
+          setState(buildKanbanState(json.data, ""));
+        } else {
+          setState(emptyState);
         }
       } catch {
         setState(emptyState);
@@ -196,8 +194,22 @@ export function KanbanBoard() {
         setLoadingTareas(false);
       }
     }
-    fetchTareas();
-  }, [selectedOrgId, organizaciones]);
+
+    // CLIENTE → auto-load without org filter
+    if (role === "CLIENTE") {
+      fetchTareas("/api/admin/tareas");
+      return;
+    }
+
+    // ADMIN + COLABORADOR → require selected org
+    if (!selectedOrgId) {
+      setState(emptyState);
+      return;
+    }
+
+    fetchTareas(`/api/admin/tareas?id_organizacion=${selectedOrgId}`);
+
+  }, [role, selectedOrgId]);
 
   function onDragEnd(result: DropResult) {
     const { destination, source, draggableId, type } = result;
@@ -384,6 +396,7 @@ export function KanbanBoard() {
     <div className={kanbanStyles.root}>
       {/* Filtros y botón Nueva tarea */}
       <div className={kanbanStyles.filtersRow}>
+        {role !== "CLIENTE" && (
         <div className="w-full md:w-60">
           <label className={kanbanStyles.label}>Organización</label>
           <select
@@ -401,6 +414,7 @@ export function KanbanBoard() {
             ))}
           </select>
         </div>
+      )}
 
         <div className="flex-1">
           <label className={kanbanStyles.label}>Buscar por cliente</label>
