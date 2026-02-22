@@ -22,15 +22,15 @@ export async function proxy(_req: NextRequest) {
   });
 
   if (res.status === 401) {
-    // no logueado -> auth
+    
     return NextResponse.redirect(new URL("/auth", _req.url));
   }
 
   const json = await res.json().catch(() => null);
 
-  if (json?.blocked) {
-    return NextResponse.redirect(new URL("/morosidad", _req.url));
-  }
+ if (json?.blocked) {
+  return NextResponse.redirect(new URL("/morosidad", _req.url));
+}
 
   return NextResponse.next();
 }

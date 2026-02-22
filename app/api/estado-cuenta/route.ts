@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
+
 function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
@@ -13,7 +14,6 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return jsonError("No auth", 401);
 
-  // 1) usuario interno
   const { data: u } = await admin
     .from("usuarios")
     .select("id_usuario, rol")
@@ -22,12 +22,12 @@ export async function GET() {
 
   if (!u) return jsonError("Usuario no encontrado", 404);
 
-  // Solo bloqueamos clientes (si querés)
+  // Solo bloqueamos clientes 
   if (u.rol !== "CLIENTE") {
     return NextResponse.json({ blocked: false });
   }
 
-  // 2) organizacion del cliente (1 a 1)
+  // organizacion del cliente 
   const { data: ou } = await admin
     .from("organizacion_usuario")
     .select("id_organizacion")
@@ -41,11 +41,19 @@ export async function GET() {
 
   const idOrg = ou.id_organizacion;
 
-  // 3) morosidad: vencida + 2 días + saldo>0
-  // (usamos admin para saltar RLS en server, ok)
+
+  // Traer nombre real de la organización
+const { data: org } = await admin
+  .from("organizaciones")
+  .select("nombre")
+  .eq("id_organizacion", idOrg)
+  .maybeSingle();
+
+const nombreOrganizacion = org?.nombre ?? null;
+  // morosidad vencida + 2 días + saldo>0
   const { data: facturasMorosas, error } = await admin
     .from("facturas")
-    .select("id_factura, saldo, fecha_vencimiento")
+    .select("id_factura, periodo, saldo, fecha_vencimiento")
     .eq("id_organizacion", idOrg)
     .gt("saldo", 0)
     .not("fecha_vencimiento", "is", null)
@@ -55,11 +63,10 @@ export async function GET() {
 
   const blocked = (facturasMorosas?.length ?? 0) > 0;
 
-  // (Opcional) actualizar estado_pago_organizacion aquí
-
   return NextResponse.json({
     blocked,
     id_organizacion: idOrg,
+    organizacion_nombre: nombreOrganizacion,
     facturasMorosas: facturasMorosas ?? [],
   });
 }
