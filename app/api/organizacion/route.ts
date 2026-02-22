@@ -18,11 +18,12 @@ type Body = {
 /* =========================================================
    GET
    - CLIENTE → returns their organization (if exists)
-   - ADMIN/COLABORADOR → returns null
+   - ADMIN/COLABORADOR → treated as NOT needing org setup
 ========================================================= */
 export async function GET() {
   try {
     const perfil = await getSessionProfile();
+
     if (!perfil) {
       return NextResponse.json(
         { error: "No autorizado" },
@@ -32,7 +33,9 @@ export async function GET() {
 
     const admin = createSupabaseAdmin();
 
-    // Only CLIENTE has 1 direct org
+    /* -------------------------------
+       CLIENTE → must have 1 org
+    -------------------------------- */
     if (perfil.rol === "CLIENTE") {
       const { data: link } = await admin
         .from("organizacion_usuario")
@@ -46,7 +49,7 @@ export async function GET() {
 
       if (!link?.organizaciones) {
         return NextResponse.json({
-          hasOrg: false,
+          hasOrg: false, // CLIENTE without org → show modal
           organizacion: null,
         });
       }
@@ -57,9 +60,12 @@ export async function GET() {
       });
     }
 
-    // Non-client roles
+    /* -------------------------------
+       ADMIN / COLABORADOR
+       They do NOT require org setup
+    -------------------------------- */
     return NextResponse.json({
-      hasOrg: false,
+      hasOrg: true, // 🔥 FIX: previously false
       organizacion: null,
     });
 
@@ -80,6 +86,7 @@ export async function GET() {
 export async function POST(req: Request) {
   try {
     const perfil = await getSessionProfile();
+
     if (!perfil) {
       return NextResponse.json(
         { error: "No autorizado" },
@@ -106,7 +113,7 @@ export async function POST(req: Request) {
 
     const admin = createSupabaseAdmin();
 
-    // Prevent multiple orgs
+    /* Prevent multiple orgs */
     const { data: existing } = await admin
       .from("organizacion_usuario")
       .select("id_organizacion")
@@ -121,7 +128,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Create organization
+    /* Create organization */
     const { data: org, error: orgErr } = await admin
       .from("organizaciones")
       .insert({
@@ -144,7 +151,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Link CLIENTE to organization
+    /* Link CLIENTE to organization */
     const { error: linkErr } = await admin
       .from("organizacion_usuario")
       .insert({
@@ -155,7 +162,7 @@ export async function POST(req: Request) {
     if (linkErr) {
       console.error("Error linking org:", linkErr);
 
-      // rollback
+      // Rollback
       await admin
         .from("organizaciones")
         .delete()
@@ -167,7 +174,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Create Drive folder (non-blocking)
+    /* Create Drive folder (non-blocking) */
     try {
       await createOrgDriveFolder(nombre, org.id_organizacion);
     } catch (driveErr) {
