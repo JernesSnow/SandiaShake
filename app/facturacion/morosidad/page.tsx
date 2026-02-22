@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Shell } from "@/components/Shell";
 
 type MorosoFactura = {
   id_factura: number;
@@ -82,6 +83,7 @@ export default function MorosidadPage() {
   }, [filtered, selectedOrgId]);
 
   return (
+    <Shell>
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
@@ -274,5 +276,6 @@ export default function MorosidadPage() {
         </div>
       </div>
     </div>
+    </Shell>
   );
 }

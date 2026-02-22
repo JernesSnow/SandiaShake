@@ -2,9 +2,8 @@ import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
-async function getPerfil() {
+async function getPerfilAdmin() {
   const supabase = await createSupabaseServer();
-
   const { data: userData } = await supabase.auth.getUser();
   const user = userData?.user;
 
@@ -14,117 +13,51 @@ async function getPerfil() {
     };
   }
 
-  const { data: perfil, error } = await supabase
+  const { data: perfil } = await supabase
     .from("usuarios")
-    .select("rol, estado, id_usuario")
+    .select("rol, estado")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
-  if (error) {
-    return { error: NextResponse.json({ error: error.message }, { status: 500 }) };
-  }
-
-  if (!perfil) {
+  if (!perfil || perfil.estado !== "ACTIVO" || perfil.rol !== "ADMIN") {
     return {
-      error: NextResponse.json(
-        { error: "Tu perfil no está configurado" },
-        { status: 403 }
-      ),
+      error: NextResponse.json({ error: "Sin permisos" }, { status: 403 }),
     };
   }
 
-  if (perfil.estado !== "ACTIVO") {
-    return {
-      error: NextResponse.json({ error: "Usuario inactivo" }, { status: 403 }),
-    };
-  }
-
-  return { perfil };
+  return { ok: true };
 }
 
 export async function GET() {
   try {
-    const { perfil, error } = await getPerfil();
+    const { error } = await getPerfilAdmin();
     if (error) return error;
 
     const admin = createSupabaseAdmin();
-    const rol = String(perfil!.rol ?? "").toUpperCase();
 
-    const orgSelect = `
-      id_organizacion,
-      nombre,
-      estado,
-      pais,
-      ciudad,
-      canton,
-      telefono,
-      correo,
-      descripcion,
-      estado_pago_organizacion:estado_pago_organizacion (
-        estado_cuenta,
-        dias_mora
-      ),
-      tareas:tareas (
-        id_tarea,
-        titulo,
-        descripcion,
+    // ✅ NO PLAN LOGIC
+    const { data, error: qErr } = await admin
+      .from("organizaciones")
+      .select(`
+        id_organizacion,
+        nombre,
         estado,
-        fecha_entrega,
-        created_at
-      )
-    `;
+        created_at,
+        pais,
+        ciudad,
+        canton,
+        telefono,
+        correo,
+        descripcion
+      `)
+      .neq("estado", "ELIMINADO");
 
-    if (rol === "ADMIN") {
-      const { data, error: qErr } = await admin
-        .from("organizaciones")
-        .select(orgSelect)
-        .neq("estado", "ELIMINADO")
-        .order("nombre", { ascending: true });
-
-      if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 });
-
-      const normalized = (data ?? []).map((o: any) => ({
-        ...o,
-        tareas: Array.isArray(o?.tareas) ? o.tareas : [],
-      }));
-
-      return NextResponse.json({ ok: true, data: normalized }, { status: 200 });
+    if (qErr) {
+      return NextResponse.json({ error: qErr.message }, { status: 500 });
     }
 
-    if (rol === "COLABORADOR") {
-      const { data, error: qErr } = await admin
-        .from("asignacion_organizacion")
-        .select(`
-          id_asignacion,
-          estado,
-          organizaciones:organizaciones (
-            ${orgSelect}
-          )
-        `)
-        .eq("id_colaborador", perfil!.id_usuario)
-        .eq("estado", "ACTIVO");
+    return NextResponse.json({ ok: true, data }, { status: 200 });
 
-      if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 });
-
-      const mapped = (data ?? [])
-        .map((r: any) => r.organizaciones)
-        .filter((o: any) => o && o.estado !== "ELIMINADO")
-        .map((o: any) => ({
-          ...o,
-          tareas: Array.isArray(o?.tareas) ? o.tareas : [],
-        }));
-
-      // evita los duplicados
-      const unique = Array.from(
-        new Map(mapped.map((o: any) => [o.id_organizacion, o])).values()
-      );
-
-      unique.sort((a: any, b: any) => String(a.nombre).localeCompare(String(b.nombre)));
-
-      return NextResponse.json({ ok: true, data: unique }, { status: 200 });
-    }
-
-    return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
   } catch (e: any) {
     return NextResponse.json(
       { error: e?.message ?? "Error interno" },

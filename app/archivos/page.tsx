@@ -14,7 +14,7 @@ import {
   X,
 } from "react-feather";
 
-const TARGET_FOLDER = "SandiaConChile";
+const TARGET_FOLDER = "SandiaShake";
 
 type DriveFile = {
   id: string;

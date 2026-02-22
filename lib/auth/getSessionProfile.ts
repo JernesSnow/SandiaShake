@@ -1,18 +1,55 @@
 import { createSupabaseServer } from "@/lib/supabase/server";
 
-export async function getSessionProfile() {
-  const supabase = await createSupabaseServer();
+type SessionProfile = {
+  id_usuario: number;
+  rol: string;
+  estado: string;
+  force_password_change: boolean | null;
+};
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+export async function getSessionProfile(): Promise<SessionProfile | null> {
+  try {
+    const supabase = await createSupabaseServer();
 
-  const { data: perfil } = await supabase
-    .from("usuarios")
-    .select("id_usuario, rol, estado, force_password_change")
-    .eq("auth_user_id", user.id)
-    .single();
+    if (!supabase) {
+      return null;
+    }
 
-  if (!perfil || perfil.estado !== "ACTIVO") return null;
+    /* =========================================================
+       1️⃣ Get Auth User
+    ========================================================= */
+    const authResponse = await supabase.auth.getUser();
 
-  return perfil;
+    if (!authResponse || !authResponse.data?.user) {
+      return null;
+    }
+
+    const user = authResponse.data.user;
+
+    /* =========================================================
+       2️⃣ Get App Profile (usuarios table)
+    ========================================================= */
+    const { data: perfil, error: perfilError } = await supabase
+      .from("usuarios")
+      .select("id_usuario, rol, estado, force_password_change")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+
+    if (perfilError || !perfil) {
+      return null;
+    }
+
+    /* =========================================================
+       3️⃣ Validate Profile State
+    ========================================================= */
+    if (perfil.estado !== "ACTIVO") {
+      return null;
+    }
+
+    return perfil as SessionProfile;
+
+  } catch (err) {
+    console.error("Session profile error:", err);
+    return null;
+  }
 }

@@ -1,7 +1,7 @@
 // components/kanban/KanbanBoard.tsx
 "use client";
-
-import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import {
   DragDropContext,
   Droppable,
@@ -54,76 +54,59 @@ export type KanbanState = {
   columnOrder: StatusId[];
 };
 
-const initialState: KanbanState = {
-  tasks: {
-    t1: {
-      id: "t1",
-      titulo: "Carrusel mensual Facebook",
-      cliente: "Café La Plaza",
-      asignadoA: "Ana",
-      statusId: "pendiente",
-      fechaEntrega: "2025-02-10",
-      mes: "Febrero 2025",
-      tipoEntregable: "Carrusel",
-      prioridad: "Alta",
-      googleDriveUrl: "https://drive.google.com/folder1",
-      descripcion: "Carrusel de 4 artes para promo del mes.",
-    },
-    t2: {
-      id: "t2",
-      titulo: "Reel lanzamiento producto",
-      cliente: "Sandía con Chile",
-      asignadoA: "Carlos",
-      statusId: "en_progreso",
-      fechaEntrega: "2025-02-07",
-      mes: "Febrero 2025",
-      tipoEntregable: "Reel",
-      prioridad: "Media",
-      googleDriveUrl: "https://drive.google.com/folder2",
-    },
-    t3: {
-      id: "t3",
-      titulo: "Arte historias IG",
-      cliente: "Hotel Las Olas",
-      asignadoA: "María",
-      statusId: "en_revision",
-      fechaEntrega: "2025-02-05",
-      mes: "Febrero 2025",
-      tipoEntregable: "Arte",
-      prioridad: "Alta",
-    },
-    t4: {
-      id: "t4",
-      titulo: "Banner campaña San Valentín",
-      cliente: "Panadería Dulce Vida",
-      asignadoA: "Luis",
-      statusId: "aprobada",
-      fechaEntrega: "2025-02-01",
-      mes: "Febrero 2025",
-      tipoEntregable: "Arte",
-      prioridad: "Media",
-    },
-    t5: {
-      id: "t5",
-      titulo: "Revisión copy pauta Meta",
-      cliente: "Gimnasio PowerFit",
-      asignadoA: "Ana",
-      statusId: "archivada",
-      fechaEntrega: "2025-01-20",
-      mes: "Enero 2025",
-      tipoEntregable: "Copy",
-      prioridad: "Baja",
-    },
-  },
+type OrgOption = {
+  id_organizacion: number;
+  nombre: string;
+};
+
+const emptyState: KanbanState = {
+  tasks: {},
   columns: {
-    pendiente: { id: "pendiente", titulo: "Pendiente", taskIds: ["t1"] },
-    en_progreso: { id: "en_progreso", titulo: "En progreso", taskIds: ["t2"] },
-    en_revision: { id: "en_revision", titulo: "En revisión", taskIds: ["t3"] },
-    aprobada: { id: "aprobada", titulo: "Aprobada", taskIds: ["t4"] },
-    archivada: { id: "archivada", titulo: "Archivada", taskIds: ["t5"] },
+    pendiente: { id: "pendiente", titulo: "Pendiente", taskIds: [] },
+    en_progreso: { id: "en_progreso", titulo: "En progreso", taskIds: [] },
+    en_revision: { id: "en_revision", titulo: "En revisión", taskIds: [] },
+    aprobada: { id: "aprobada", titulo: "Aprobada", taskIds: [] },
+    archivada: { id: "archivada", titulo: "Archivada", taskIds: [] },
   },
   columnOrder: ["pendiente", "en_progreso", "en_revision", "aprobada", "archivada"],
 };
+
+function buildKanbanState(dbTareas: any[], orgName: string): KanbanState {
+  const tasks: Record<string, Task> = {};
+  const columns: Record<StatusId, Column> = {
+    pendiente: { id: "pendiente", titulo: "Pendiente", taskIds: [] },
+    en_progreso: { id: "en_progreso", titulo: "En progreso", taskIds: [] },
+    en_revision: { id: "en_revision", titulo: "En revisión", taskIds: [] },
+    aprobada: { id: "aprobada", titulo: "Aprobada", taskIds: [] },
+    archivada: { id: "archivada", titulo: "Archivada", taskIds: [] },
+  };
+
+  for (const t of dbTareas) {
+    const id = String(t.id_tarea);
+    const statusId = (columns[t.status_kanban as StatusId] ? t.status_kanban : "pendiente") as StatusId;
+
+    tasks[id] = {
+      id,
+      titulo: t.titulo ?? "",
+      cliente: orgName,
+      asignadoA: "",
+      statusId,
+      fechaEntrega: t.fecha_entrega ?? undefined,
+      mes: t.mes ?? undefined,
+      tipoEntregable: t.tipo_entregable ?? "Otro",
+      prioridad: t.prioridad ?? "Media",
+      descripcion: t.descripcion ?? undefined,
+    };
+
+    columns[statusId].taskIds.push(id);
+  }
+
+  return {
+    tasks,
+    columns,
+    columnOrder: ["pendiente", "en_progreso", "en_revision", "aprobada", "archivada"],
+  };
+}
 
 /* ---------- CONSTANTS & HELPERS ---------- */
 
@@ -159,12 +142,62 @@ function getPriorityClasses(prio?: Task["prioridad"]) {
 /* ---------- MAIN BOARD COMPONENT ---------- */
 
 export function KanbanBoard() {
-  const [state, setState] = useState<KanbanState>(initialState);
+  const router = useRouter();
+  const [state, setState] = useState<KanbanState>(emptyState);
   const [searchClient, setSearchClient] = useState("");
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("Todas");
 
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isNew, setIsNew] = useState(false);
+
+  const [organizaciones, setOrganizaciones] = useState<OrgOption[]>([]);
+  const [selectedOrgId, setSelectedOrgId] = useState<number | "">("");
+  const [loadingTareas, setLoadingTareas] = useState(false);
+
+  // Fetch organizations on mount
+  useEffect(() => {
+    async function fetchOrgs() {
+      try {
+        const res = await fetch("/api/admin/organizaciones");
+        const json = await res.json();
+        if (res.ok && json?.data) {
+          setOrganizaciones(
+            (json.data as any[])
+              .filter((o) => o.estado === "ACTIVO")
+              .map((o) => ({ id_organizacion: o.id_organizacion, nombre: o.nombre }))
+          );
+        }
+      } catch {
+        /* silently ignore */
+      }
+    }
+    fetchOrgs();
+  }, []);
+
+  // Fetch tareas when selected org changes
+  useEffect(() => {
+    if (!selectedOrgId) {
+      setState(emptyState);
+      return;
+    }
+
+    async function fetchTareas() {
+      setLoadingTareas(true);
+      try {
+        const res = await fetch(`/api/admin/tareas?id_organizacion=${selectedOrgId}`);
+        const json = await res.json();
+        if (res.ok && json?.data) {
+          const orgName = organizaciones.find((o) => o.id_organizacion === selectedOrgId)?.nombre ?? "";
+          setState(buildKanbanState(json.data, orgName));
+        }
+      } catch {
+        setState(emptyState);
+      } finally {
+        setLoadingTareas(false);
+      }
+    }
+    fetchTareas();
+  }, [selectedOrgId, organizaciones]);
 
   function onDragEnd(result: DropResult) {
     const { destination, source, draggableId, type } = result;
@@ -351,6 +384,24 @@ export function KanbanBoard() {
     <div className={kanbanStyles.root}>
       {/* Filtros y botón Nueva tarea */}
       <div className={kanbanStyles.filtersRow}>
+        <div className="w-full md:w-60">
+          <label className={kanbanStyles.label}>Organización</label>
+          <select
+            className={kanbanStyles.select}
+            value={selectedOrgId}
+            onChange={(e) =>
+              setSelectedOrgId(e.target.value ? Number(e.target.value) : "")
+            }
+          >
+            <option value="">Selecciona una organización</option>
+            {organizaciones.map((o) => (
+              <option key={o.id_organizacion} value={o.id_organizacion}>
+                {o.nombre}
+              </option>
+            ))}
+          </select>
+        </div>
+
         <div className="flex-1">
           <label className={kanbanStyles.label}>Buscar por cliente</label>
           <div className={kanbanStyles.searchWrapper}>
@@ -360,7 +411,7 @@ export function KanbanBoard() {
             <input
               type="text"
               className={kanbanStyles.searchInput}
-              placeholder="Ej: Café La Plaza"
+              placeholder=""
               value={searchClient}
               onChange={(e) => setSearchClient(e.target.value)}
             />
@@ -394,6 +445,18 @@ export function KanbanBoard() {
           </button>
         </div>
       </div>
+
+      {/* Loading indicator */}
+      {loadingTareas && (
+        <p className="text-xs text-[#fffef9]/60">Cargando tareas...</p>
+      )}
+
+      {/* Empty state when no org selected */}
+      {!selectedOrgId && !loadingTareas && (
+        <p className="text-xs text-[#fffef9]/60">
+          Selecciona una organización para ver sus tareas.
+        </p>
+      )}
 
       {/* Kanban board */}
       <div className={kanbanStyles.boardWrapper}>
@@ -472,7 +535,7 @@ export function KanbanBoard() {
                                             : kanbanStyles.cardBorderIdle
                                         }`}
                                         onClick={() =>
-                                          openEditTask(task as Task)
+                                          router.push(`/tareas/${task.id}`)
                                         }
                                       >
                                         <div className="flex items-start justify-between gap-2">
