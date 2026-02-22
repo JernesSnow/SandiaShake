@@ -40,18 +40,14 @@ oauth2Client.on("tokens", async (tokens) => {
  * Loads tokens from Supabase and sets them on the oauth2Client.
  * Called once before the first Drive API call per server lifecycle.
  */
-let _loaded = false;
-
 export async function ensureDriveCredentials(): Promise<boolean> {
-  // If credentials are already set (e.g. from callback), skip DB load
-  if (oauth2Client.credentials?.access_token) {
+  // If credentials are set and not expired, skip DB load
+  const creds = oauth2Client.credentials;
+  if (creds?.access_token && creds?.expiry_date && creds.expiry_date > Date.now() + 60_000) {
     return true;
   }
 
-  // Only attempt DB load once per process
-  if (_loaded) return false;
-  _loaded = true;
-
+  // Always reload from DB when token is missing or expired
   try {
     const supabase = createSupabaseAdmin();
     const { data, error } = await supabase
