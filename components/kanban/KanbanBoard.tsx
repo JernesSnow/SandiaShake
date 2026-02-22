@@ -88,8 +88,8 @@ function buildKanbanState(dbTareas: any[], orgName: string): KanbanState {
     tasks[id] = {
       id,
       titulo: t.titulo ?? "",
-      cliente: orgName,
-      asignadoA: "",
+      cliente: t.organizaciones?.nombre ?? "—",
+      asignadoA: t.usuarios?.nombre ?? "—",
       statusId,
       fechaEntrega: t.fecha_entrega ?? undefined,
       mes: t.mes ?? undefined,
@@ -155,6 +155,40 @@ export function KanbanBoard() {
   const [selectedOrgId, setSelectedOrgId] = useState<number | "">("");
   const [loadingTareas, setLoadingTareas] = useState(false);
 
+  const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+      setMounted(true);
+    }, []);
+
+    useEffect(() => {
+  if (!role) return;
+
+  async function fetchOrganizaciones() {
+    try {
+      const endpoint =
+        role === "ADMIN"
+          ? "/api/admin/organizaciones"
+          : "/api/organizacion";
+
+      const res = await fetch(endpoint);
+      const json = await res.json();
+
+      if (res.ok && json?.data) {
+        setOrganizaciones(json.data);
+      } else {
+        setOrganizaciones([]);
+      }
+    } catch {
+      setOrganizaciones([]);
+    }
+  }
+
+  if (role !== "CLIENTE") {
+    fetchOrganizaciones();
+  }
+}, [role]);
+
   // Fetch organizations on mount
   useEffect(() => {
     async function fetchProfile() {
@@ -175,41 +209,55 @@ export function KanbanBoard() {
 
   // Fetch tareas when selected org changes
   useEffect(() => {
-    if (!role) return;
+  if (!role) return;
 
-    async function fetchTareas(url: string) {
-      setLoadingTareas(true);
-      try {
-        const res = await fetch(url);
-        const json = await res.json();
+  async function fetchTareas(url: string) {
+    setLoadingTareas(true);
+    try {
+      const res = await fetch(url);
+      const json = await res.json();
 
-        if (res.ok && json?.data) {
-          setState(buildKanbanState(json.data, ""));
-        } else {
-          setState(emptyState);
-        }
-      } catch {
+      if (res.ok && json?.data) {
+        setState(buildKanbanState(json.data, ""));
+      } else {
         setState(emptyState);
-      } finally {
-        setLoadingTareas(false);
       }
+    } catch {
+      setState(emptyState);
+    } finally {
+      setLoadingTareas(false);
     }
+  }
 
-    // CLIENTE → auto-load without org filter
-    if (role === "CLIENTE") {
+  // ================= CLIENTE =================
+  if (role === "CLIENTE") {
+    fetchTareas("/api/admin/tareas");
+    return;
+  }
+
+  // ================= ADMIN =================
+  if (role === "ADMIN") {
+    if (!selectedOrgId) {
+      // Show ALL tareas
       fetchTareas("/api/admin/tareas");
-      return;
+    } else {
+      // Filter by selected org
+      fetchTareas(`/api/admin/tareas?id_organizacion=${selectedOrgId}`);
     }
+    return;
+  }
 
-    // ADMIN + COLABORADOR → require selected org
+  // ================= COLABORADOR =================
+  if (role === "COLABORADOR") {
     if (!selectedOrgId) {
       setState(emptyState);
       return;
     }
 
     fetchTareas(`/api/admin/tareas?id_organizacion=${selectedOrgId}`);
+  }
 
-  }, [role, selectedOrgId]);
+}, [role, selectedOrgId]);
 
   function onDragEnd(result: DropResult) {
     const { destination, source, draggableId, type } = result;
@@ -390,6 +438,9 @@ export function KanbanBoard() {
     setIsNew(false);
   }
 
+  if (!role) {
+    return null;
+  }
   /* ---------- RENDER ---------- */
 
   return (
@@ -399,20 +450,60 @@ export function KanbanBoard() {
         {role !== "CLIENTE" && (
         <div className="w-full md:w-60">
           <label className={kanbanStyles.label}>Organización</label>
-          <select
-            className={kanbanStyles.select}
-            value={selectedOrgId}
-            onChange={(e) =>
-              setSelectedOrgId(e.target.value ? Number(e.target.value) : "")
-            }
-          >
-            <option value="">Selecciona una organización</option>
-            {organizaciones.map((o) => (
-              <option key={o.id_organizacion} value={o.id_organizacion}>
-                {o.nombre}
-              </option>
-            ))}
-          </select>
+
+          <div className="relative">
+            <select
+              value={selectedOrgId === "" ? "" : selectedOrgId}
+              onChange={(e) => {
+                const value = e.target.value;
+                setSelectedOrgId(value ? Number(value) : "");
+              }}
+              className="
+                w-full
+                bg-[#1f1f1f]
+                border border-[#3a3a3a]
+                text-white
+                rounded-lg
+                px-4
+                py-2.5
+                pr-10
+                text-sm
+                focus:outline-none
+                focus:ring-2
+                focus:ring-[#6cbe45]
+                focus:border-[#6cbe45]
+                transition
+                appearance-none
+              "
+            >
+              {role === "ADMIN" && (
+                <option value="">Todas las organizaciones</option>
+              )}
+
+              {role === "COLABORADOR" && (
+                <option value="">Selecciona una organización</option>
+              )}
+
+              {organizaciones.map((o) => (
+                <option key={o.id_organizacion} value={o.id_organizacion}>
+                  {o.nombre}
+                </option>
+              ))}
+            </select>
+
+            {/* Custom dropdown arrow */}
+            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-[#9ca3af]">
+              <svg
+                className="w-4 h-4"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                viewBox="0 0 24 24"
+              >
+                <path d="M19 9l-7 7-7-7" />
+              </svg>
+            </div>
+          </div>
         </div>
       )}
 
@@ -466,7 +557,7 @@ export function KanbanBoard() {
       )}
 
       {/* Empty state when no org selected */}
-      {!selectedOrgId && !loadingTareas && (
+      {mounted && role === "COLABORADOR" && !selectedOrgId && !loadingTareas && (
         <p className="text-xs text-[#fffef9]/60">
           Selecciona una organización para ver sus tareas.
         </p>
