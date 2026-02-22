@@ -20,36 +20,65 @@ type Body = {
    - CLIENTE → returns their organization (if exists)
    - ADMIN/COLABORADOR → treated as NOT needing org setup
 ========================================================= */
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const perfil = await getSessionProfile();
-
     if (!perfil) {
-      return NextResponse.json(
-        { error: "No autorizado" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
     const admin = createSupabaseAdmin();
+    const { searchParams } = new URL(req.url);
+    const orgIdParam = searchParams.get("id_organizacion");
 
-    /* -------------------------------
-       CLIENTE → must have 1 org
-    -------------------------------- */
+    /* =========================================
+       1️⃣ If id_organizacion is provided
+       ADMIN / COLABORADOR / CLIENTE (guarded)
+    ========================================= */
+    if (orgIdParam) {
+      const orgId = Number(orgIdParam);
+
+      // CLIENTE can only access their own org
+      if (perfil.rol === "CLIENTE") {
+        const { data: link } = await admin
+          .from("organizacion_usuario")
+          .select("id_organizacion")
+          .eq("id_usuario_cliente", perfil.id_usuario)
+          .eq("id_organizacion", orgId)
+          .maybeSingle();
+
+        if (!link) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+      }
+
+      const { data: org, error } = await admin
+        .from("organizaciones")
+        .select("*")
+        .eq("id_organizacion", orgId)
+        .maybeSingle();
+
+      if (error || !org) {
+        return NextResponse.json({ error: "Organización no encontrada" }, { status: 404 });
+      }
+
+      return NextResponse.json({ organizacion: org });
+    }
+
+    /* =========================================
+       2️⃣ Fallback: CLIENTE auto-lookup
+    ========================================= */
     if (perfil.rol === "CLIENTE") {
       const { data: link } = await admin
         .from("organizacion_usuario")
-        .select(`
-          id_organizacion,
-          organizaciones (*)
-        `)
+        .select(`id_organizacion, organizaciones(*)`)
         .eq("id_usuario_cliente", perfil.id_usuario)
         .limit(1)
         .maybeSingle();
 
       if (!link?.organizaciones) {
         return NextResponse.json({
-          hasOrg: false, // CLIENTE without org → show modal
+          hasOrg: false,
           organizacion: null,
         });
       }
@@ -60,12 +89,11 @@ export async function GET() {
       });
     }
 
-    /* -------------------------------
-       ADMIN / COLABORADOR
-       They do NOT require org setup
-    -------------------------------- */
+    /* =========================================
+       3️⃣ ADMIN / COLABORADOR fallback
+    ========================================= */
     return NextResponse.json({
-      hasOrg: true, // 🔥 FIX: previously false
+      hasOrg: true,
       organizacion: null,
     });
 

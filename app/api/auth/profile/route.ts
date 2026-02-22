@@ -11,26 +11,35 @@ export async function GET() {
 
     const {
       data: { user },
+      error: authErr,
     } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (authErr || !user) {
       return NextResponse.json(
-        { error: "No session" },
+        { error: "No autenticado" },
         { status: 401 }
       );
     }
 
     const { data: perfil, error } = await admin
       .from("usuarios")
-      .select("id_usuario, rol, estado")
+      .select("id_usuario, rol, estado, admin_nivel")
       .eq("auth_user_id", user.id)
       .maybeSingle();
 
     if (error) throw error;
+
     if (!perfil) {
       return NextResponse.json(
         { error: "Perfil no encontrado" },
         { status: 404 }
+      );
+    }
+
+    if (perfil.estado !== "ACTIVO") {
+      return NextResponse.json(
+        { error: "Usuario inactivo" },
+        { status: 403 }
       );
     }
 
@@ -56,6 +65,7 @@ export async function GET() {
       id_usuario: perfil.id_usuario,
       rol: perfil.rol,
       estado: perfil.estado,
+      admin_nivel: perfil.admin_nivel,
       organizacion,
     });
 
