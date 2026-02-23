@@ -88,7 +88,7 @@ export default function MorosidadPage() {
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold">Morosidad</h1>
+          <h1 className="text-xl font-bold">Facturas vencidas o pendientes por pagar</h1>
           <p className="text-sm text-[#fffef9]/60">
             Clientes con facturas vencidas y saldo pendiente.
           </p>

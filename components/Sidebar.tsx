@@ -26,6 +26,7 @@ const NAV_ITEMS: NavItem[] = [
       { href: "/facturacion", label: "Facturación" },
       { href: "/facturacion/morosidad", label: "Morosidad" },
       { href: "/facturacion/historial", label: "Reporte de pagos" },
+      { href: "/facturacion/mis-facturas", label: "Mis facturas" },
     ],
    },
   { href: "/colaboradores", label: "Colaboradores" },
