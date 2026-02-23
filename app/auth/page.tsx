@@ -36,7 +36,6 @@ export default function AuthPage() {
       if (signInError) {
         console.error("SIGNIN ERROR:", signInError);
 
-        // Mensaje más amigable para email no confirmado
         if (signInError.message.includes("Email not confirmed")) {
           setError("Por favor confirma tu correo electrónico antes de iniciar sesión. Revisa tu bandeja de entrada.");
           return;

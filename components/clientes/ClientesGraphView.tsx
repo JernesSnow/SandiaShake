@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { User, Briefcase, Search, X, Plus, Check, Users } from "react-feather";
 
 type Client = {
@@ -132,6 +133,7 @@ function Modal({
 }
 
 export function ClientesGraphView() {
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -509,8 +511,7 @@ export function ClientesGraphView() {
   }
 
   function openClientDetails(client: Client) {
-    setSelectedColab(null);
-    setSelectedClient(client);
+    router.push(`/clientes/${client.id}`);
   }
 
   function openColabDetails(colab: Colaborador) {
@@ -599,13 +600,14 @@ export function ClientesGraphView() {
                   }}
                   onMouseLeave={() => setHoveredConnections(new Set())}
                 >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <h3 className="text-sm font-semibold text-[#fffef9] mb-1 break-words">
+                  {/* Top row: name + asignar button */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-semibold text-[#fffef9] mb-0.5 break-words">
                         {client.nombre}
                       </h3>
                       {client.email ? (
-                        <p className="text-xs text-[#fffef9]/60 mb-2 break-all">
+                        <p className="text-xs text-[#fffef9]/60 break-all">
                           {client.email}
                         </p>
                       ) : null}
@@ -618,16 +620,17 @@ export function ClientesGraphView() {
                           e.stopPropagation();
                           openAssignModal(client);
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold bg-[#ee2346] hover:bg-[#d8203f] text-white transition shrink-0"
+                        className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[11px] font-semibold bg-[#ee2346] hover:bg-[#d8203f] text-white transition shrink-0"
                         title="Asignar colaboradores"
                       >
                         <Users size={14} />
-                        Asignar
+                        <span className="hidden sm:inline">Asignar</span>
                       </button>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+                  {/* Bottom row: plan, estado badge, colaboradores count */}
+                  <div className="flex flex-wrap items-center gap-2 mt-3">
                     {client.plan ? (
                       <span className="text-xs text-[#fffef9]/70">
                         Plan: {client.plan}
@@ -638,23 +641,26 @@ export function ClientesGraphView() {
                       </span>
                     )}
 
+                    <span className="text-[#fffef9]/20 hidden sm:inline">·</span>
+
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-medium shrink-0 ${getEstadoClasses(
+                      className={`px-2.5 py-1 rounded-full text-[10px] font-medium shrink-0 ${getEstadoClasses(
                         client.estado
                       )}`}
                     >
                       {client.estado}
                     </span>
-                  </div>
 
-                  {isAdmin && (
-                    <div className="mt-2 pt-2 border-t border-[#4a4748]/40">
-                      <span className="text-xs text-[#fffef9]/50">
-                        {(client.colaboradores ?? []).length} colaborador
-                        {(client.colaboradores ?? []).length !== 1 ? "es" : ""}
-                      </span>
-                    </div>
-                  )}
+                    {isAdmin && (
+                      <>
+                        <span className="text-[#fffef9]/20 hidden sm:inline">·</span>
+                        <span className="text-[11px] text-[#fffef9]/50">
+                          {(client.colaboradores ?? []).length} colaborador
+                          {(client.colaboradores ?? []).length !== 1 ? "es" : ""}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               ))}
 
@@ -732,10 +738,10 @@ export function ClientesGraphView() {
           )}
         </div>
 
-        {/* SVG overlay */}
+        {/* SVG overlay — hidden on mobile where columns stack */}
         {isAdmin && (
           <svg
-            className="absolute inset-0 pointer-events-none"
+            className="absolute inset-0 pointer-events-none hidden md:block"
             style={{ width: "100%", height: "100%" }}
           >
             {connections.map((connection, index) => {

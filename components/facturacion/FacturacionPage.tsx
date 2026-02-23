@@ -28,6 +28,15 @@ type DbFactura = {
   fecha_vencimiento: string | null;
 };
 
+type FacturaTarea = {
+  id_tarea: number;
+  titulo: string;
+  status_kanban: string;
+  prioridad: string;
+  tipo_entregable: string;
+  drive_url?: string | null;
+};
+
 function formatCRC(n: number) {
   return `₡ ${Number(n || 0).toLocaleString("es-CR")}`;
 }
@@ -138,9 +147,14 @@ export function FacturacionPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [createOrgId, setCreateOrgId] = useState<number | "">("");
   const [createPeriodo, setCreatePeriodo] = useState("");
-  const [createTotal, setCreateTotal] = useState("");
   const [createVencimiento, setCreateVencimiento] = useState("");
+  const [createItems, setCreateItems] = useState<Array<{ tipo: string; cantidad: number; precio: number }>>([{ tipo: "", cantidad: 1, precio: 0 }]);
   const [savingCreate, setSavingCreate] = useState(false);
+
+  const createTotal = useMemo(
+    () => createItems.reduce((sum, item) => sum + item.cantidad * item.precio, 0),
+    [createItems]
+  );
 
   const [editOpen, setEditOpen] = useState(false);
   const [editPeriodo, setEditPeriodo] = useState("");
@@ -151,14 +165,11 @@ export function FacturacionPage() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [savingDelete, setSavingDelete] = useState(false);
 
-  
-//prueba
+  const [facturaTareas, setFacturaTareas] = useState<FacturaTarea[]>([]);
+  const [loadingTareas, setLoadingTareas] = useState(false);
+
 const [sendingEmail, setSendingEmail] = useState(false);
 
-
-//fin prueba
-
-//prueba funciones email
 async function enviarNotificacion(tipo: "recordatorio" | "pago") {
   if (!selectedInvoice) return;
 
@@ -184,8 +195,6 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
     setSendingEmail(false);
   }
 }
-
-//fin prueba funciones email
 
   async function fetchFacturas() {
     setLoading(true);
@@ -233,11 +242,46 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
     fetchOrgs();
   }, []);
 
+  // Fetch tareas linked to the selected factura
+  useEffect(() => {
+    if (!selectedId) {
+      setFacturaTareas([]);
+      return;
+    }
+
+    async function fetchTareasForFactura() {
+      setLoadingTareas(true);
+      try {
+        const res = await fetch(`/api/admin/tareas/by-factura?id_factura=${selectedId}`);
+        const json = await res.json();
+        if (res.ok && json?.data) {
+          setFacturaTareas(
+            (json.data as any[]).map((t) => ({
+              id_tarea: t.id_tarea,
+              titulo: t.titulo,
+              status_kanban: t.status_kanban,
+              prioridad: t.prioridad,
+              tipo_entregable: t.tipo_entregable,
+              drive_url: t.google_drive_task_folders?.folder_url ?? null,
+            }))
+          );
+        } else {
+          setFacturaTareas([]);
+        }
+      } catch {
+        setFacturaTareas([]);
+      } finally {
+        setLoadingTareas(false);
+      }
+    }
+    fetchTareasForFactura();
+  }, [selectedId]);
+
   function openCreateModal() {
     setCreateOrgId("");
     setCreatePeriodo("");
-    setCreateTotal("");
     setCreateVencimiento("");
+    setCreateItems([{ tipo: "", cantidad: 1, precio: 0 }]);
     setCreateOpen(true);
   }
 
@@ -250,10 +294,23 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
       alert("Ingresa el periodo.");
       return;
     }
-    const total = Number(createTotal);
-    if (!Number.isFinite(total) || total <= 0) {
-      alert("El total debe ser un número positivo.");
+    if (createItems.length === 0) {
+      alert("Agrega al menos un item.");
       return;
+    }
+    for (const item of createItems) {
+      if (!item.tipo.trim()) {
+        alert("Cada item debe tener un tipo.");
+        return;
+      }
+      if (item.cantidad <= 0) {
+        alert("La cantidad de cada item debe ser mayor a 0.");
+        return;
+      }
+      if (item.precio <= 0) {
+        alert("El precio unitario de cada item debe ser mayor a 0.");
+        return;
+      }
     }
 
     setSavingCreate(true);
@@ -261,7 +318,11 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
       const body: Record<string, unknown> = {
         id_organizacion: Number(createOrgId),
         periodo: createPeriodo.trim(),
-        total,
+        items: createItems.map((item) => ({
+          tipo: item.tipo.trim(),
+          cantidad: item.cantidad,
+          precio_unitario: item.precio,
+        })),
       };
       if (createVencimiento) {
         body.fecha_vencimiento = createVencimiento;
@@ -517,6 +578,7 @@ await enviarNotificacion("pago");
           gap-4
         "
       >
+        
         {/* LEFT: Invoice list */}
         <div
           className="
@@ -533,7 +595,7 @@ await enviarNotificacion("pago");
             </span>
           </div>
 
-          <div className="divide-y divide-[#4a4748]/50 max-h-[60vh] overflow-y-auto">
+          <div className="divide-y divide-[#4a4748]/50 max-h-[60vh] overflow-y-auto dark-scroll">
             {!loading && filteredInvoices.length === 0 && (
               <div className="px-4 py-6 text-xs text-[#fffef9]/60">
                 No hay facturas pendientes de organizaciones.
@@ -707,6 +769,77 @@ await enviarNotificacion("pago");
                   </div>
                 </div>
               </div>
+
+              {/* Tareas linked to this factura */}
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-[#fffef9]/70 mb-2">
+                  Tareas ({facturaTareas.length})
+                </h3>
+
+                {loadingTareas && (
+                  <p className="text-[11px] text-[#fffef9]/50">Cargando tareas...</p>
+                )}
+
+                {!loadingTareas && facturaTareas.length === 0 && (
+                  <p className="text-[11px] text-[#fffef9]/50">
+                    No hay tareas asociadas a esta factura.
+                  </p>
+                )}
+
+                {!loadingTareas && facturaTareas.length > 0 && (
+                  <div className="space-y-2 max-h-[30vh] overflow-y-auto dark-scroll">
+                    {facturaTareas.map((t) => (
+                      <div
+                        key={t.id_tarea}
+                        className="flex items-center justify-between gap-2 rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium text-[#fffef9] truncate">
+                            {t.titulo}
+                          </p>
+                          <p className="text-[10px] text-[#fffef9]/50">
+                            {t.tipo_entregable}
+                          </p>
+                          {t.drive_url && (
+                          <a
+                            href={t.drive_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-[10px] text-[#6cbe45] hover:underline mt-1 inline-block"
+                          >
+                            Abrir carpeta Drive
+                          </a>
+                        )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span
+                            className={cx(
+                              "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+                              t.status_kanban === "pendiente" && "bg-zinc-700/60 text-zinc-200 border border-zinc-500/70",
+                              t.status_kanban === "en_progreso" && "bg-sky-500/15 text-sky-300 border border-sky-400/40",
+                              t.status_kanban === "en_revision" && "bg-amber-500/15 text-amber-300 border border-amber-400/40",
+                              t.status_kanban === "aprobada" && "bg-emerald-500/15 text-emerald-300 border border-emerald-400/40",
+                              t.status_kanban === "archivada" && "bg-zinc-700 text-zinc-300 border border-zinc-500"
+                            )}
+                          >
+                            {t.status_kanban.replace("_", " ")}
+                          </span>
+                          <span
+                            className={cx(
+                              "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+                              t.prioridad === "Alta" && "bg-[#ee2346]/20 text-[#ffb3c2] border border-[#ee2346]/60",
+                              t.prioridad === "Media" && "bg-[#6cbe45]/15 text-[#b9f7a6] border border-[#6cbe45]/50",
+                              t.prioridad === "Baja" && "bg-[#4b5563]/40 text-[#e5e7eb] border border-[#9ca3af]/40"
+                            )}
+                          >
+                            {t.prioridad}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -826,7 +959,7 @@ await enviarNotificacion("pago");
             </>
           }
         >
-          <div className="grid gap-3 text-xs">
+          <div className="grid gap-3 text-xs max-h-[60vh] overflow-y-auto pr-1 dark-scroll">
             <div className="flex flex-col gap-1">
               <label className="text-[11px] text-[#fffef9]/70">Organización</label>
               <select
@@ -857,19 +990,6 @@ await enviarNotificacion("pago");
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">Total (CRC)</label>
-              <input
-                type="number"
-                min={1}
-                step={1}
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
-                value={createTotal}
-                onChange={(e) => setCreateTotal(e.target.value)}
-                placeholder="Ej: 50000"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1">
               <label className="text-[11px] text-[#fffef9]/70">
                 Fecha vencimiento (opcional)
               </label>
@@ -879,6 +999,100 @@ await enviarNotificacion("pago");
                 value={createVencimiento}
                 onChange={(e) => setCreateVencimiento(e.target.value)}
               />
+            </div>
+
+            {/* Line items */}
+            <div className="flex flex-col gap-2 mt-1">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] text-[#fffef9]/70 font-semibold uppercase tracking-wide">
+                  Items / Entregables
+                </label>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setCreateItems([...createItems, { tipo: "", cantidad: 1, precio: 0 }])
+                  }
+                  className="text-[11px] text-[#6cbe45] hover:text-[#5fa93d] font-medium"
+                >
+                  + Agregar item
+                </button>
+              </div>
+
+              {createItems.map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-start gap-2 rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-3"
+                >
+                  <div className="flex-1 flex flex-col gap-1">
+                    <label className="text-[10px] text-[#fffef9]/50">Tipo</label>
+                    <input
+                      type="text"
+                      className="rounded-md bg-[#4a4748] px-2 py-1.5 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                      value={item.tipo}
+                      onChange={(e) => {
+                        const updated = [...createItems];
+                        updated[idx] = { ...updated[idx], tipo: e.target.value };
+                        setCreateItems(updated);
+                      }}
+                      placeholder="Ej: Reel, Gráfico"
+                    />
+                  </div>
+                  <div className="w-20 flex flex-col gap-1">
+                    <label className="text-[10px] text-[#fffef9]/50">Cantidad</label>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      className="rounded-md bg-[#4a4748] px-2 py-1.5 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                      value={item.cantidad || ""}
+                      onChange={(e) => {
+                        const updated = [...createItems];
+                        updated[idx] = { ...updated[idx], cantidad: Number(e.target.value) || 0 };
+                        setCreateItems(updated);
+                      }}
+                    />
+                  </div>
+                  <div className="w-28 flex flex-col gap-1">
+                    <label className="text-[10px] text-[#fffef9]/50">Precio unit.</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step={1}
+                      className="rounded-md bg-[#4a4748] px-2 py-1.5 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                      value={item.precio || ""}
+                      onChange={(e) => {
+                        const updated = [...createItems];
+                        updated[idx] = { ...updated[idx], precio: Number(e.target.value) || 0 };
+                        setCreateItems(updated);
+                      }}
+                      placeholder="₡"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] text-[#fffef9]/50 invisible">X</label>
+                    {createItems.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setCreateItems(createItems.filter((_, i) => i !== idx))
+                        }
+                        className="text-[#ee2346]/70 hover:text-[#ee2346] p-1"
+                        aria-label="Eliminar item"
+                      >
+                        <X size={14} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Auto-calculated total */}
+            <div className="flex flex-col gap-1 mt-1">
+              <label className="text-[11px] text-[#fffef9]/70">Total (CRC)</label>
+              <div className="rounded-md bg-[#4a4748]/60 px-3 py-2 text-xs border border-[#fffef9]/15 text-[#fffef9] font-semibold">
+                {formatCRC(createTotal)}
+              </div>
             </div>
           </div>
         </Modal>

@@ -42,8 +42,8 @@ next-env.d.ts
 
 ./.claude/*
 
-# MCP configuration (personal settings)
-.mcp.json
+mfa.md
 
-# Documentation folder
-docs/
+# credentials / local config
+annular-heading-370002-b3834771f8c9.json
+.mcp.json

@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { Shell } from "@/components/Shell";
 
 type MorosoFactura = {
   id_factura: number;
@@ -82,11 +83,12 @@ export default function MorosidadPage() {
   }, [filtered, selectedOrgId]);
 
   return (
+    <Shell>
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold">Morosidad</h1>
+          <h1 className="text-xl font-bold">Facturas vencidas o pendientes por pagar</h1>
           <p className="text-sm text-[#fffef9]/60">
             Clientes con facturas vencidas y saldo pendiente.
           </p>
@@ -274,5 +276,6 @@ export default function MorosidadPage() {
         </div>
       </div>
     </div>
+    </Shell>
   );
 }

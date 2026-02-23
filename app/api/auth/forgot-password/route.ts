@@ -46,8 +46,6 @@ export async function POST(req: Request) {
     }
 
 
-    const tempPassword = generateTempPassword();
-
     const { error: updateError } =
       await admin.auth.admin.updateUserById(user.id, {
         password: tempPassword,

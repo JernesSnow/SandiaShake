@@ -364,6 +364,7 @@ export function KanbanBoard() {
       for (const r of list) map[String(r.id_tarea)] = Number(r.unread_count ?? 0);
       setUnreadByTaskId(map);
     } catch {
+      // no bloquea
     }
   }
 
@@ -372,7 +373,6 @@ export function KanbanBoard() {
     setConversationTask(task);
     setUnreadByTaskId((prev) => ({ ...prev, [task.id]: 0 }));
   }
-
   async function refreshBoard() {
     try {
       const tRes = await fetch("/api/admin/tareas", { cache: "no-store" });
@@ -520,7 +520,7 @@ export function KanbanBoard() {
 
     persistKanbanStatus(draggableId, finish.id)
       .then(() => {
-        setSaveOkMsg("Estado actualizado");
+        setSaveOkMsg("Estado actualizado correctamente");
         window.setTimeout(() => setSaveOkMsg(""), 1500);
       })
       .catch((err) => {
@@ -598,7 +598,7 @@ export function KanbanBoard() {
 
     deleteTaskInDb(taskId)
       .then(() => {
-        setSaveOkMsg("🗑️ Tarea eliminada");
+        setSaveOkMsg("Tarea eliminada");
         window.setTimeout(() => setSaveOkMsg(""), 1500);
       })
       .catch((err) => {
@@ -648,7 +648,7 @@ export function KanbanBoard() {
             };
           });
 
-          setSaveOkMsg("Tarea creada con éxito");
+          setSaveOkMsg("Tarea creada correctamente");
           window.setTimeout(() => setSaveOkMsg(""), 1500);
         })
         .catch((err) => {
@@ -703,7 +703,7 @@ export function KanbanBoard() {
           ...prev,
           tasks: { ...prev.tasks, [taskInput.id]: updated },
         }));
-        setSaveOkMsg("Cambios guardados correctamente");
+        setSaveOkMsg("✅ Cambios guardados");
         window.setTimeout(() => setSaveOkMsg(""), 1500);
       })
       .catch((err) => {
@@ -718,6 +718,7 @@ export function KanbanBoard() {
 
   return (
     <div className={kanbanStyles.root}>
+      {/* Header + filtros */}
       <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 shadow-[0_12px_40px_rgba(0,0,0,0.25)]">
         <div className="flex flex-col md:flex-row md:items-end gap-3">
           <div className="flex-1">
@@ -958,6 +959,7 @@ export function KanbanBoard() {
         </DragDropContext>
       </div>
 
+      {/* Modals */}
       {editingTask && (
         <TaskModal
           isNew={isNew}

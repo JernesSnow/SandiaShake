@@ -3,6 +3,8 @@ import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 
+/* ---------- HELPERS ---------- */
+
 async function getPerfil() {
   const supabase = await createSupabaseServer();
 
@@ -24,7 +26,7 @@ async function getPerfil() {
 
   const { data: perfil, error } = await admin
     .from("usuarios")
-    .select("rol, estado, id_usuario")
+    .select("rol, estado, id_usuario, auth_user_id")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
@@ -134,7 +136,6 @@ export async function GET(req: Request) {
     const rol = String(perfil!.rol ?? "").toUpperCase();
     const userId = Number(perfil!.id_usuario);
 
-    // ADMIN
     if (rol === "ADMIN") {
       let q = admin
         .from("tareas")

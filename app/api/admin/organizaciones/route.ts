@@ -1,4 +1,5 @@
 // app/api/admin/organizaciones/route.ts
+// app/api/admin/organizaciones/route.ts
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
@@ -22,6 +23,9 @@ async function getPerfil() {
     .maybeSingle();
 
   if (error) {
+    return {
+      error: NextResponse.json({ error: error.message }, { status: 500 }),
+    };
     return {
       error: NextResponse.json({ error: error.message }, { status: 500 }),
     };
@@ -53,6 +57,7 @@ export async function GET() {
     const admin = createSupabaseAdmin();
     const rol = String(perfil!.rol ?? "").toUpperCase();
 
+    // ✅ CAMBIO 1: tareas ahora trae id_colaborador + campos del kanban
     const orgSelect = `
       id_organizacion,
       nombre,
@@ -70,12 +75,18 @@ export async function GET() {
       tareas:tareas (
         id_tarea,
         id_colaborador,
+        id_colaborador,
         titulo,
         descripcion,
         status_kanban,
         prioridad,
         tipo_entregable,
+        status_kanban,
+        prioridad,
+        tipo_entregable,
         fecha_entrega,
+        mes,
+        estado,
         mes,
         estado,
         created_at
@@ -89,6 +100,9 @@ export async function GET() {
         .neq("estado", "ELIMINADO")
         .order("nombre", { ascending: true });
 
+      if (qErr) {
+        return NextResponse.json({ error: qErr.message }, { status: 500 });
+      }
       if (qErr) {
         return NextResponse.json({ error: qErr.message }, { status: 500 });
       }
@@ -117,7 +131,11 @@ export async function GET() {
       if (qErr) {
         return NextResponse.json({ error: qErr.message }, { status: 500 });
       }
+      if (qErr) {
+        return NextResponse.json({ error: qErr.message }, { status: 500 });
+      }
 
+      // ✅ CAMBIO 2: filtra tareas para que el colaborador vea SOLO las asignadas a él
       const mapped = (data ?? [])
         .map((r: any) => r.organizaciones)
         .filter((o: any) => o && o.estado !== "ELIMINADO")
@@ -135,11 +153,29 @@ export async function GET() {
             tareas: tareasAsignadas,
           };
         });
+        .map((o: any) => {
+          const tareas = Array.isArray(o?.tareas) ? o.tareas : [];
 
+          const tareasAsignadas = tareas.filter(
+            (t: any) =>
+              String(t?.id_colaborador ?? "") === String(perfil!.id_usuario) &&
+              String(t?.estado ?? "") !== "ELIMINADO"
+          );
+
+          return {
+            ...o,
+            tareas: tareasAsignadas,
+          };
+        });
+
+      // evita duplicados
       const unique = Array.from(
         new Map(mapped.map((o: any) => [o.id_organizacion, o])).values()
       );
 
+      unique.sort((a: any, b: any) =>
+        String(a.nombre).localeCompare(String(b.nombre))
+      );
       unique.sort((a: any, b: any) =>
         String(a.nombre).localeCompare(String(b.nombre))
       );
