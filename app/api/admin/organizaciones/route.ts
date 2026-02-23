@@ -53,7 +53,6 @@ export async function GET() {
     const admin = createSupabaseAdmin();
     const rol = String(perfil!.rol ?? "").toUpperCase();
 
-    // ✅ CAMBIO 1: tareas ahora trae id_colaborador + campos del kanban
     const orgSelect = `
       id_organizacion,
       nombre,
@@ -119,7 +118,6 @@ export async function GET() {
         return NextResponse.json({ error: qErr.message }, { status: 500 });
       }
 
-      // ✅ CAMBIO 2: filtra tareas para que el colaborador vea SOLO las asignadas a él
       const mapped = (data ?? [])
         .map((r: any) => r.organizaciones)
         .filter((o: any) => o && o.estado !== "ELIMINADO")
@@ -138,7 +136,6 @@ export async function GET() {
           };
         });
 
-      // evita duplicados
       const unique = Array.from(
         new Map(mapped.map((o: any) => [o.id_organizacion, o])).values()
       );
@@ -148,6 +145,44 @@ export async function GET() {
       );
 
       return NextResponse.json({ ok: true, data: unique }, { status: 200 });
+    }
+
+    if (rol === "CLIENTE") {
+      const { data: links, error: lErr } = await admin
+        .from("organizacion_usuario")
+        .select("id_organizacion")
+        .eq("id_usuario_cliente", perfil!.id_usuario)
+        .eq("estado", "ACTIVO");
+
+      if (lErr) {
+        return NextResponse.json({ error: lErr.message }, { status: 500 });
+      }
+
+      const orgIds = (links ?? [])
+        .map((r: any) => Number(r.id_organizacion))
+        .filter((n: any) => Number.isFinite(n));
+
+      if (orgIds.length === 0) {
+        return NextResponse.json({ ok: true, data: [] }, { status: 200 });
+      }
+
+      const { data, error: qErr } = await admin
+        .from("organizaciones")
+        .select(orgSelect)
+        .in("id_organizacion", orgIds)
+        .neq("estado", "ELIMINADO")
+        .order("nombre", { ascending: true });
+
+      if (qErr) {
+        return NextResponse.json({ error: qErr.message }, { status: 500 });
+      }
+
+      const normalized = (data ?? []).map((o: any) => ({
+        ...o,
+        tareas: Array.isArray(o?.tareas) ? o.tareas : [],
+      }));
+
+      return NextResponse.json({ ok: true, data: normalized }, { status: 200 });
     }
 
     return NextResponse.json({ error: "Sin permisos" }, { status: 403 });

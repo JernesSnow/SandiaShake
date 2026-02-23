@@ -10,7 +10,7 @@ type Client = {
   email: string;
   plan: string;
   estado: "Activo" | "Moroso" | "Inactivo";
-  colaboradores: string[]; 
+  colaboradores: string[];
   pais?: string;
   ciudad?: string;
   canton?: string;
@@ -20,7 +20,7 @@ type Client = {
 };
 
 type Colaborador = {
-  id: string; 
+  id: string;
   nombre: string;
   rol: string;
 };
@@ -36,12 +36,12 @@ type Tarea = {
   id_tarea: number | string;
   titulo: string;
   descripcion?: string | null;
-  status_kanban: string; 
+  status_kanban: string;
   prioridad: string;
-  tipo_entregable: string; 
-  fecha_entrega?: string | null; 
+  tipo_entregable: string;
+  fecha_entrega?: string | null;
   mes?: string | null;
-  estado?: string; 
+  estado?: string;
 };
 
 function cx(...classes: Array<string | false | undefined | null>) {
@@ -154,7 +154,12 @@ export function ClientesGraphView() {
   const [clientTasksErr, setClientTasksErr] = useState<string>("");
 
   const [assigningClient, setAssigningClient] = useState<Client | null>(null);
-  const [draftAssigned, setDraftAssigned] = useState<string[]>([]);
+
+  const [draftAssignedIds, setDraftAssignedIds] = useState<string[]>([]);
+
+  const [asigCache, setAsigCache] = useState<
+    Record<string, Array<{ id_asignacion: number; id_organizacion: number; nombre?: string }>>
+  >({});
 
   useEffect(() => {
     (async () => {
@@ -229,9 +234,18 @@ export function ClientesGraphView() {
           const jAsig = await safeJson(rAsig);
           if (!rAsig.ok) continue;
 
-          const orgIds = (jAsig?.data ?? []).map((a: any) =>
-            String(a.id_organizacion)
-          );
+          const rows = (jAsig?.data ?? []) as Array<any>;
+
+          setAsigCache((prev) => ({
+            ...prev,
+            [c.id]: rows.map((a: any) => ({
+              id_asignacion: Number(a.id_asignacion),
+              id_organizacion: Number(a.id_organizacion),
+              nombre: String(a.nombre ?? ""),
+            })),
+          }));
+
+          const orgIds = rows.map((a: any) => String(a.id_organizacion));
 
           for (const orgId of orgIds) {
             const idx = updatedClients.findIndex((x) => x.id === orgId);
@@ -297,11 +311,13 @@ export function ClientesGraphView() {
     })();
   }, [selectedClient?.id]);
 
-  //Filtros
+  
   const filteredClients = useMemo(() => {
     const t = searchTerm.toLowerCase();
     return clients.filter(
-      (c) => c.nombre.toLowerCase().includes(t) || c.email.toLowerCase().includes(t)
+      (c) =>
+        c.nombre.toLowerCase().includes(t) ||
+        c.email.toLowerCase().includes(t)
     );
   }, [clients, searchTerm]);
 
@@ -313,7 +329,6 @@ export function ClientesGraphView() {
       )
     );
   }, [colaboradores, filteredClients, isAdmin]);
-
 
   useEffect(() => {
     if (!isAdmin) {
@@ -369,32 +384,128 @@ export function ClientesGraphView() {
 
   function openAssignModal(client: Client) {
     setAssigningClient(client);
-    setDraftAssigned(client.colaboradores ?? []);
+
+    const assignedNames = client.colaboradores ?? [];
+
+    const ids = colaboradores
+      .filter((c) => assignedNames.includes(c.nombre))
+      .map((c) => c.id);
+
+    setDraftAssignedIds(ids);
   }
 
-  function toggleDraftColab(nombre: string) {
-    setDraftAssigned((prev) =>
-      prev.includes(nombre) ? prev.filter((x) => x !== nombre) : [...prev, nombre]
+  function toggleDraftColabId(id: string) {
+    setDraftAssignedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
     );
   }
 
-  function saveAssignments() {
+  async function saveAssignments() {
     if (!assigningClient) return;
 
-    setClients((prev) =>
-      prev.map((c) =>
-        c.id === assigningClient.id ? { ...c, colaboradores: draftAssigned } : c
-      )
-    );
+    const orgId = Number(assigningClient.id);
+    if (!orgId) return;
 
-    setSelectedClient((prev) =>
-      prev?.id === assigningClient.id
-        ? { ...prev, colaboradores: draftAssigned }
-        : prev
-    );
+    const currentIds = colaboradores
+      .filter((c) => (assigningClient.colaboradores ?? []).includes(c.nombre))
+      .map((c) => c.id);
 
-    setAssigningClient(null);
-    setDraftAssigned([]);
+    const nextIds = draftAssignedIds;
+
+    const toAdd = nextIds.filter((id) => !currentIds.includes(id));
+    const toRemove = currentIds.filter((id) => !nextIds.includes(id));
+
+    try {
+
+      for (const idColab of toAdd) {
+        const r = await fetch("/api/admin/asignaciones", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id_colaborador: Number(idColab),
+            id_organizacion: orgId,
+          }),
+        });
+
+        const j = await safeJson(r);
+        if (!r.ok) {
+          throw new Error(j?.error ?? "No se pudo asignar colaborador");
+        }
+
+        const id_asignacion = Number(j?.data?.id_asignacion);
+        if (id_asignacion) {
+          setAsigCache((prev) => ({
+            ...prev,
+            [idColab]: [
+              ...(prev[idColab] ?? []),
+              { id_asignacion, id_organizacion: orgId },
+            ],
+          }));
+        }
+      }
+
+      for (const idColab of toRemove) {
+        const rows = asigCache[idColab] ?? [];
+        const row = rows.find((a) => Number(a.id_organizacion) === orgId);
+
+        let id_asignacion = row?.id_asignacion;
+
+        if (!id_asignacion) {
+          const rAsig = await fetch(
+            `/api/admin/asignaciones?id_colaborador=${idColab}`
+          );
+          const jAsig = await safeJson(rAsig);
+          if (rAsig.ok) {
+            const found = (jAsig?.data ?? []).find(
+              (a: any) => Number(a.id_organizacion) === orgId
+            );
+            id_asignacion = Number(found?.id_asignacion);
+          }
+        }
+
+        if (!id_asignacion) continue;
+
+        const r = await fetch("/api/admin/asignaciones", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id_asignacion }),
+        });
+
+        const j = await safeJson(r);
+        if (!r.ok) {
+          throw new Error(j?.error ?? "No se pudo eliminar asignación");
+        }
+
+        setAsigCache((prev) => ({
+          ...prev,
+          [idColab]: (prev[idColab] ?? []).filter(
+            (a) => a.id_asignacion !== id_asignacion
+          ),
+        }));
+      }
+
+      const nextNames = colaboradores
+        .filter((c) => nextIds.includes(c.id))
+        .map((c) => c.nombre);
+
+      setClients((prev) =>
+        prev.map((c) =>
+          c.id === assigningClient.id ? { ...c, colaboradores: nextNames } : c
+        )
+      );
+
+      setSelectedClient((prev) =>
+        prev?.id === assigningClient.id
+          ? { ...prev, colaboradores: nextNames }
+          : prev
+      );
+
+      setAssigningClient(null);
+      setDraftAssignedIds([]);
+    } catch (e: any) {
+      console.error(e);
+      alert(e?.message ?? "Error guardando asignaciones");
+    }
   }
 
   function openClientDetails(client: Client) {
@@ -406,7 +517,6 @@ export function ClientesGraphView() {
     setSelectedClient(null);
     setSelectedColab(colab);
   }
-
 
   if (loading) {
     return (
@@ -584,7 +694,9 @@ export function ClientesGraphView() {
                         const set = new Set<string>();
                         filteredClients.forEach((client) => {
                           if (
-                            (client.colaboradores ?? []).includes(colaborador.nombre)
+                            (client.colaboradores ?? []).includes(
+                              colaborador.nombre
+                            )
                           ) {
                             set.add(`${client.id}-${colaborador.nombre}`);
                           }
@@ -611,7 +723,8 @@ export function ClientesGraphView() {
 
                 {activeColaboradores.length === 0 && (
                   <p className="text-sm text-[#fffef9]/60">
-                    No hay colaboradores relacionados con las organizaciones filtradas.
+                    No hay colaboradores relacionados con las organizaciones
+                    filtradas.
                   </p>
                 )}
               </div>
@@ -633,7 +746,9 @@ export function ClientesGraphView() {
 
               const clientRect = clientEl.getBoundingClientRect();
               const colaboradorRect = colaboradorEl.getBoundingClientRect();
-              const container = clientEl.closest(".relative") as HTMLElement | null;
+              const container = clientEl.closest(".relative") as
+                | HTMLElement
+                | null;
               const svgRect = container?.getBoundingClientRect();
               if (!svgRect) return null;
 
@@ -642,7 +757,9 @@ export function ClientesGraphView() {
 
               const x2 = colaboradorRect.left - svgRect.left;
               const y2 =
-                colaboradorRect.top - svgRect.top + colaboradorRect.height / 2;
+                colaboradorRect.top -
+                svgRect.top +
+                colaboradorRect.height / 2;
 
               const key = `${connection.clientId}-${connection.colaboradorNombre}`;
 
@@ -734,7 +851,9 @@ export function ClientesGraphView() {
                   className="rounded-md bg-[#ee2346] hover:bg-[#d8203f] px-3 py-2 text-sm font-semibold text-white transition inline-flex items-center gap-1.5"
                 >
                   <Users size={16} className="shrink-0" />
-                  <span className="hidden sm:inline">Asignar colaboradores</span>
+                  <span className="hidden sm:inline">
+                    Asignar colaboradores
+                  </span>
                   <span className="sm:hidden">Asignar</span>
                 </button>
               )}
@@ -802,7 +921,9 @@ export function ClientesGraphView() {
             <div className="flex items-center justify-between mb-2">
               <div className="text-xs text-[#fffef9]/60">Tareas</div>
               {clientTasksLoading ? (
-                <span className="text-[11px] text-[#fffef9]/50">Cargando…</span>
+                <span className="text-[11px] text-[#fffef9]/50">
+                  Cargando…
+                </span>
               ) : null}
             </div>
 
@@ -842,13 +963,17 @@ export function ClientesGraphView() {
                         </div>
 
                         <div className="mt-1 text-xs text-[#fffef9]/60">
-                          <span className="text-[#fffef9]/50">Entregable:</span>{" "}
+                          <span className="text-[#fffef9]/50">
+                            Entregable:
+                          </span>{" "}
                           {t.tipo_entregable}
                           {t.fecha_entrega ? (
                             <>
                               {" "}
                               •{" "}
-                              <span className="text-[#fffef9]/50">Entrega:</span>{" "}
+                              <span className="text-[#fffef9]/50">
+                                Entrega:
+                              </span>{" "}
                               {fmtDate(t.fecha_entrega)}
                             </>
                           ) : null}
@@ -938,7 +1063,7 @@ export function ClientesGraphView() {
           subtitle={`Cliente: ${assigningClient.nombre}`}
           onClose={() => {
             setAssigningClient(null);
-            setDraftAssigned([]);
+            setDraftAssignedIds([]);
           }}
           footer={
             <>
@@ -946,7 +1071,7 @@ export function ClientesGraphView() {
                 type="button"
                 onClick={() => {
                   setAssigningClient(null);
-                  setDraftAssigned([]);
+                  setDraftAssignedIds([]);
                 }}
                 className="rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm text-[#fffef9]/80 hover:text-white hover:bg-[#3a3738] transition"
               >
@@ -970,12 +1095,12 @@ export function ClientesGraphView() {
 
             <div className="grid gap-2 grid-cols-1 sm:grid-cols-2">
               {colaboradores.map((c) => {
-                const checked = draftAssigned.includes(c.nombre);
+                const checked = draftAssignedIds.includes(c.id);
                 return (
                   <button
                     type="button"
                     key={c.id}
-                    onClick={() => toggleDraftColab(c.nombre)}
+                    onClick={() => toggleDraftColabId(c.id)}
                     className={cx(
                       "rounded-lg border p-3 text-left transition flex items-start justify-between gap-2",
                       checked
@@ -1010,13 +1135,13 @@ export function ClientesGraphView() {
               <span className="text-[#fffef9]/60">
                 Seleccionados:{" "}
                 <span className="text-[#fffef9]/80 font-semibold">
-                  {draftAssigned.length}
+                  {draftAssignedIds.length}
                 </span>
               </span>
 
               <button
                 type="button"
-                onClick={() => setDraftAssigned([])}
+                onClick={() => setDraftAssignedIds([])}
                 className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold border border-[#4a4748]/40 text-[#fffef9]/70 hover:text-white hover:bg-[#3a3738] transition"
               >
                 <Plus size={14} />

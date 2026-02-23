@@ -14,7 +14,6 @@ export async function GET() {
     if (authErr) return NextResponse.json({ error: authErr.message }, { status: 401 });
     if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
 
-    // ✅ leer perfil con ADMIN para evitar RLS
     const admin = createSupabaseAdmin();
     const { data: perfil, error: perfilErr } = await admin
       .from("usuarios")
@@ -28,14 +27,16 @@ export async function GET() {
 
     const rol = String(perfil.rol ?? "").toUpperCase();
     const isAdmin = rol === "ADMIN";
-    const isPrimaryAdmin = perfil.admin_nivel === "PRIMARIO";
+    const isColab = rol === "COLABORADOR";
+    const isCliente = rol === "CLIENTE";
+    const isPrimaryAdmin = isAdmin && perfil.admin_nivel === "PRIMARIO";
 
-    // ✅ si NO es admin, devolvemos payload mínimo (pero 200)
     if (!isAdmin) {
       return NextResponse.json(
         {
           ok: true,
           isAdmin: false,
+          roleFlags: { isAdmin, isColab, isCliente },
           perfil: {
             id_usuario: perfil.id_usuario,
             rol: perfil.rol,
@@ -47,7 +48,6 @@ export async function GET() {
       );
     }
 
-    // ✅ admin: lista usuarios
     let query = admin
       .from("usuarios")
       .select("id_usuario, nombre, correo, rol, admin_nivel, estado, created_at")
@@ -64,6 +64,7 @@ export async function GET() {
       {
         ok: true,
         isAdmin: true,
+        roleFlags: { isAdmin, isColab, isCliente },
         perfil: {
           id_usuario: perfil.id_usuario,
           rol: perfil.rol,

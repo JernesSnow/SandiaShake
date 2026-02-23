@@ -1,4 +1,3 @@
-// app/api/admin/tareas/[id]/route.ts
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
@@ -39,15 +38,32 @@ const ALLOWED_STATUS = new Set(["pendiente", "en_progreso", "en_revision", "apro
 const ALLOWED_PRIO = new Set(["Alta", "Media", "Baja"]);
 const ALLOWED_TIPO = new Set(["Arte", "Reel", "Copy", "Video", "Carrusel", "Otro"]);
 
-type Ctx = { params: Promise<{ id: string }> }; // ✅ params como Promise
+type Ctx = { params: Promise<{ id: string }> };
+
+const selectWithJoins = `
+  id_tarea,
+  id_organizacion,
+  id_colaborador,
+  titulo,
+  descripcion,
+  status_kanban,
+  prioridad,
+  tipo_entregable,
+  fecha_entrega,
+  mes,
+  estado,
+  created_at,
+  updated_at,
+  organizaciones:organizaciones(nombre)
+`;
 
 export async function PATCH(req: Request, ctx: Ctx) {
   try {
     const { perfil, error } = await getPerfil();
     if (error) return error;
 
-    const { id } = await ctx.params;              // ✅ FIX
-    const idTarea = safeId(id);                   // ✅ FIX
+    const { id } = await ctx.params;
+    const idTarea = safeId(id);
     if (!idTarea) return NextResponse.json({ error: "ID de tarea inválido" }, { status: 400 });
 
     const perfilId = safeId(perfil?.id_usuario);
@@ -127,13 +143,13 @@ export async function PATCH(req: Request, ctx: Ctx) {
       if (body?.id_organizacion !== undefined) {
         const orgId = safeId(body.id_organizacion);
         if (!orgId || orgId === "0") errors.push("id_organizacion inválido");
-        else updateData.id_organizacion = orgId;
+        else updateData.id_organizacion = Number(orgId);
       }
 
       if (body?.id_colaborador !== undefined) {
         const colId = safeId(body.id_colaborador);
         if (!colId) errors.push("id_colaborador inválido");
-        else updateData.id_colaborador = colId;
+        else updateData.id_colaborador = Number(colId);
       }
     } else {
       if (body?.id_organizacion !== undefined || body?.id_colaborador !== undefined) {
@@ -153,14 +169,28 @@ export async function PATCH(req: Request, ctx: Ctx) {
     let q = admin.from("tareas").update(updateData).eq("id_tarea", idTarea);
     if (!isAdmin) q = q.eq("id_colaborador", perfilId);
 
-    const { data: updated, error: updErr } = await q
-      .select("id_tarea,id_organizacion,id_colaborador,titulo,descripcion,status_kanban,prioridad,tipo_entregable,fecha_entrega,mes,estado,created_at,updated_at")
+    const { error: updErr } = await q;
+    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+
+    const { data: row, error: rowErr } = await admin
+      .from("tareas")
+      .select(selectWithJoins)
+      .eq("id_tarea", idTarea)
       .maybeSingle();
 
-    if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
-    if (!updated) return NextResponse.json({ error: "No se pudo actualizar" }, { status: 403 });
+    if (rowErr || !row) {
+      return NextResponse.json({ error: rowErr?.message ?? "No se pudo leer la tarea" }, { status: 500 });
+    }
 
-    return NextResponse.json({ ok: true, data: updated }, { status: 200 });
+    const { data: u } = await admin
+      .from("usuarios")
+      .select("id_usuario,nombre")
+      .eq("id_usuario", row.id_colaborador)
+      .maybeSingle();
+
+    const finalRow = { ...row, colaborador: u ? { nombre: u.nombre } : null };
+
+    return NextResponse.json({ ok: true, data: finalRow }, { status: 200 });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Error interno" }, { status: 500 });
   }
@@ -175,8 +205,8 @@ export async function DELETE(_req: Request, ctx: Ctx) {
       return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
     }
 
-    const { id } = await ctx.params;            // ✅ FIX
-    const idTarea = safeId(id);                 // ✅ FIX
+    const { id } = await ctx.params;
+    const idTarea = safeId(id);
     if (!idTarea) return NextResponse.json({ error: "ID de tarea inválido" }, { status: 400 });
 
     const admin = createSupabaseAdmin();

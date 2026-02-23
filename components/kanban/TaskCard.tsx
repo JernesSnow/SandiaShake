@@ -25,20 +25,19 @@ export function TaskCard({ task, onOpenDetails, onOpenChat }: Props) {
         duration-200
         cursor-pointer
       "
-      onClick={() => onOpenDetails?.(task)} // ✅ abrir detalles
+      onClick={() => onOpenDetails?.(task)} 
     >
-      {/* Header */}
+
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-semibold text-sm text-[#2e2e2e] mb-1">
           {task.title}
         </h3>
 
-        {/* ✅ Botón chat */}
         {onOpenChat && (
           <button
             type="button"
             onClick={(e) => {
-              e.stopPropagation(); // 🚫 no abre detalles
+              e.stopPropagation(); 
               onOpenChat(task);
             }}
             className="text-xs flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 hover:bg-gray-100"
@@ -50,19 +49,16 @@ export function TaskCard({ task, onOpenDetails, onOpenChat }: Props) {
         )}
       </div>
 
-      {/* Client & Assigned */}
       <div className="text-xs text-[#666] flex items-center gap-1 mb-2">
         <User size={12} />
         {task.cliente} — {task.asignado}
       </div>
 
-      {/* Fecha */}
       <div className="text-xs text-[#666] flex items-center gap-1 mb-2">
         <Calendar size={12} />
         {task.fecha}
       </div>
 
-      {/* Google Drive */}
       {task.drive && (
         <a
           href={task.drive}
@@ -75,7 +71,6 @@ export function TaskCard({ task, onOpenDetails, onOpenChat }: Props) {
         </a>
       )}
 
-      {/* Priority */}
       {task.prioridad && (
         <span
           className={`

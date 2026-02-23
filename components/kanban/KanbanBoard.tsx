@@ -17,6 +17,8 @@ import {
   Trash2,
   User,
   MessageCircle,
+  CheckCircle,
+  XCircle,
 } from "react-feather";
 import { kanbanStyles } from "./kanbanStyles";
 import TaskConversationModal from "./TaskConversationModal";
@@ -31,7 +33,7 @@ export type StatusId =
   | "archivada";
 
 export type Task = {
-  id: string; // ✅ siempre numérico en string (ej: "12")
+  id: string;
   titulo: string;
   cliente: string;
   asignadoA: string;
@@ -69,19 +71,17 @@ const emptyState: KanbanState = {
     aprobada: { id: "aprobada", titulo: "Aprobada", taskIds: [] },
     archivada: { id: "archivada", titulo: "Archivada", taskIds: [] },
   },
-  columnOrder: [
-    "pendiente",
-    "en_progreso",
-    "en_revision",
-    "aprobada",
-    "archivada",
-  ],
+  columnOrder: ["pendiente", "en_progreso", "en_revision", "aprobada", "archivada"],
 };
 
 /* ---------- CONSTANTS & HELPERS ---------- */
 
 type PriorityFilter = "Todas" | "Alta" | "Media" | "Baja";
 type Role = "ADMIN" | "COLABORADOR" | "CLIENTE" | "DESCONOCIDO";
+
+type OrgOption = { id_organizacion: number; nombre: string };
+type ColabOption = { id_usuario: string; nombre: string };
+type UnreadRow = { id_tarea: number; unread_count: number };
 
 const STATUS_OPTIONS: { id: StatusId; label: string }[] = [
   { id: "pendiente", label: "Pendiente" },
@@ -197,9 +197,7 @@ async function createTaskInDb(task: Task, isAdmin: boolean) {
     mes: task.mes ?? null,
   };
 
-  if (isAdmin) {
-    payload.id_colaborador = task.idColaborador ?? null;
-  }
+  if (isAdmin) payload.id_colaborador = task.idColaborador ?? null;
 
   const res = await fetch("/api/admin/tareas", {
     method: "POST",
@@ -209,6 +207,24 @@ async function createTaskInDb(task: Task, isAdmin: boolean) {
 
   const json = await safeJson(res);
   if (!res.ok) throw new Error(json?.error ?? "No se pudo crear la tarea");
+  return json?.data;
+}
+
+async function decideTaskInDb(
+  taskId: string,
+  accion: "APROBAR" | "RECHAZAR",
+  comentario: string
+) {
+  assertNumericId("decideTaskInDb", taskId);
+
+  const res = await fetch(`/api/admin/tareas/${taskId}/decision`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ accion, comentario }),
+  });
+
+  const json = await safeJson(res);
+  if (!res.ok) throw new Error(json?.error ?? "No se pudo registrar la decisión");
   return json?.data;
 }
 
@@ -245,11 +261,6 @@ function normalizeEntregable(v: any): Task["tipoEntregable"] {
   return undefined;
 }
 
-/**
- * ✅ FIX CRÍTICO:
- * - Usamos SOLO id_tarea
- * - Si no es numérico, descartamos la fila (evita task.id="undefined")
- */
 function apiRowToTask(r: any): Task | null {
   const rawId = r?.id_tarea;
   if (!isNumericId(rawId)) return null;
@@ -258,13 +269,10 @@ function apiRowToTask(r: any): Task | null {
   const statusId = normalizeStatus(r.status_kanban);
 
   const cliente =
-    String(
-      r.organizaciones?.nombre ?? r.organizacion?.nombre ?? r.cliente ?? ""
-    ) || "";
+    String(r.organizaciones?.nombre ?? r.organizacion?.nombre ?? r.cliente ?? "") || "";
 
   const asignadoA =
-    String(r.colaborador?.nombre ?? r.usuarios?.nombre ?? r.asignadoA ?? "") ||
-    "";
+    String(r.colaborador?.nombre ?? r.usuarios?.nombre ?? r.asignadoA ?? "") || "";
 
   return {
     id,
@@ -304,7 +312,6 @@ function buildStateFromApi(rows: any[]): KanbanState {
   for (const r of rows ?? []) {
     const t = apiRowToTask(r);
     if (!t) continue;
-
     next.tasks[t.id] = t;
     next.columns[t.statusId].taskIds.push(t.id);
   }
@@ -313,10 +320,6 @@ function buildStateFromApi(rows: any[]): KanbanState {
 }
 
 /* ---------- MAIN BOARD COMPONENT ---------- */
-
-type OrgOption = { id_organizacion: number; nombre: string };
-type ColabOption = { id_usuario: string; nombre: string };
-type UnreadRow = { id_tarea: number; unread_count: number };
 
 export function KanbanBoard() {
   const [state, setState] = useState<KanbanState>(emptyState);
@@ -338,15 +341,15 @@ export function KanbanBoard() {
 
   const isAdmin = role === "ADMIN";
   const isColab = role === "COLABORADOR";
+  const isCliente = role === "CLIENTE";
+
   const canCreate = isAdmin || isColab;
   const canEdit = isAdmin || isColab;
   const canReassign = isAdmin;
   const canDelete = isAdmin;
 
   const [conversationTask, setConversationTask] = useState<Task | null>(null);
-  const [unreadByTaskId, setUnreadByTaskId] = useState<Record<string, number>>(
-    {}
-  );
+  const [unreadByTaskId, setUnreadByTaskId] = useState<Record<string, number>>({});
 
   async function loadUnreadCounts() {
     try {
@@ -361,7 +364,6 @@ export function KanbanBoard() {
       for (const r of list) map[String(r.id_tarea)] = Number(r.unread_count ?? 0);
       setUnreadByTaskId(map);
     } catch {
-      // no bloquea
     }
   }
 
@@ -369,6 +371,17 @@ export function KanbanBoard() {
     e?.stopPropagation();
     setConversationTask(task);
     setUnreadByTaskId((prev) => ({ ...prev, [task.id]: 0 }));
+  }
+
+  async function refreshBoard() {
+    try {
+      const tRes = await fetch("/api/admin/tareas", { cache: "no-store" });
+      const tJson = await safeJson(tRes);
+      if (!tRes.ok) throw new Error(tJson?.error ?? "No se pudieron cargar tareas");
+      setState(buildStateFromApi(tJson?.data ?? []));
+    } catch (e) {
+      console.error(e);
+    }
   }
 
   useEffect(() => {
@@ -385,8 +398,7 @@ export function KanbanBoard() {
         ]);
 
         const tJson = await safeJson(tRes);
-        if (!tRes.ok)
-          throw new Error(tJson?.error ?? "No se pudieron cargar tareas");
+        if (!tRes.ok) throw new Error(tJson?.error ?? "No se pudieron cargar tareas");
 
         const oJson = await safeJson(oRes);
         if (oRes.ok) {
@@ -405,16 +417,16 @@ export function KanbanBoard() {
         const rolRaw = String(uJson?.perfil?.rol ?? "").toUpperCase();
         const pid = String(uJson?.perfil?.id_usuario ?? "").trim();
         setPerfilId(pid);
+
         if (rolRaw === "ADMIN") setRole("ADMIN");
         else if (rolRaw === "COLABORADOR") setRole("COLABORADOR");
+        else if (rolRaw === "CLIENTE") setRole("CLIENTE");
         else if (rolRaw) setRole(rolRaw as Role);
         else setRole("DESCONOCIDO");
 
         const cJson = await safeJson(cRes);
         if (cRes.ok) {
-          const list = Array.isArray(cJson?.colaboradores)
-            ? cJson.colaboradores
-            : [];
+          const list = Array.isArray(cJson?.colaboradores) ? cJson.colaboradores : [];
           setColabs(
             list
               .map((c: any) => ({
@@ -443,13 +455,9 @@ export function KanbanBoard() {
     const { destination, source, draggableId, type } = result;
     if (!destination) return;
 
-    if (
-      destination.droppableId === source.droppableId &&
-      destination.index === source.index
-    )
+    if (destination.droppableId === source.droppableId && destination.index === source.index)
       return;
 
-    // columnas: solo admin
     if (type === "column") {
       if (!isAdmin) return;
       const newColumnOrder = Array.from(state.columnOrder);
@@ -459,7 +467,6 @@ export function KanbanBoard() {
       return;
     }
 
-    // tareas: admin/colab
     if (!canEdit) return;
 
     if (!isNumericId(draggableId)) {
@@ -470,7 +477,6 @@ export function KanbanBoard() {
     const start = state.columns[source.droppableId as StatusId];
     const finish = state.columns[destination.droppableId as StatusId];
 
-    // reorder en misma columna (UI only)
     if (start.id === finish.id) {
       const newTaskIds = Array.from(start.taskIds);
       newTaskIds.splice(source.index, 1);
@@ -514,7 +520,7 @@ export function KanbanBoard() {
 
     persistKanbanStatus(draggableId, finish.id)
       .then(() => {
-        setSaveOkMsg("✅ Estado actualizado");
+        setSaveOkMsg("Estado actualizado");
         window.setTimeout(() => setSaveOkMsg(""), 1500);
       })
       .catch((err) => {
@@ -528,10 +534,8 @@ export function KanbanBoard() {
     const search = searchClient.trim().toLowerCase();
     const result: Record<string, Task> = {};
     for (const [id, task] of Object.entries(state.tasks)) {
-      const matchesClient =
-        !search || task.cliente.toLowerCase().includes(search);
-      const matchesPriority =
-        priorityFilter === "Todas" || task.prioridad === priorityFilter;
+      const matchesClient = !search || task.cliente.toLowerCase().includes(search);
+      const matchesPriority = priorityFilter === "Todas" || task.prioridad === priorityFilter;
       if (matchesClient && matchesPriority) result[id] = task;
     }
     return result;
@@ -545,7 +549,6 @@ export function KanbanBoard() {
     if (!canCreate) return;
 
     const firstOrg = orgs[0];
-
     const me = colabs.find((c) => String(c.id_usuario) === String(perfilId));
     const defaultColab = me ?? colabs[0];
 
@@ -645,7 +648,7 @@ export function KanbanBoard() {
             };
           });
 
-          setSaveOkMsg("✅ Tarea creada");
+          setSaveOkMsg("Tarea creada con éxito");
           window.setTimeout(() => setSaveOkMsg(""), 1500);
         })
         .catch((err) => {
@@ -700,7 +703,7 @@ export function KanbanBoard() {
           ...prev,
           tasks: { ...prev.tasks, [taskInput.id]: updated },
         }));
-        setSaveOkMsg("✅ Cambios guardados");
+        setSaveOkMsg("Cambios guardados correctamente");
         window.setTimeout(() => setSaveOkMsg(""), 1500);
       })
       .catch((err) => {
@@ -715,77 +718,81 @@ export function KanbanBoard() {
 
   return (
     <div className={kanbanStyles.root}>
-      <div className={kanbanStyles.filtersRow}>
-        <div className="flex-1">
-          <label className={kanbanStyles.label}>Buscar por cliente</label>
-          <div className={kanbanStyles.searchWrapper}>
-            <span className={kanbanStyles.searchIcon}>
-              <Search size={14} />
-            </span>
-            <input
-              type="text"
-              className={kanbanStyles.searchInput}
-              placeholder="Ej: Café La Plaza"
-              value={searchClient}
-              onChange={(e) => setSearchClient(e.target.value)}
-            />
+      <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 shadow-[0_12px_40px_rgba(0,0,0,0.25)]">
+        <div className="flex flex-col md:flex-row md:items-end gap-3">
+          <div className="flex-1">
+            <label className={kanbanStyles.label}>Buscar por cliente</label>
+            <div className={kanbanStyles.searchWrapper}>
+              <span className={kanbanStyles.searchIcon}>
+                <Search size={14} />
+              </span>
+              <input
+                type="text"
+                className={kanbanStyles.searchInput}
+                placeholder="Ej: Café La Plaza"
+                value={searchClient}
+                onChange={(e) => setSearchClient(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="w-full md:w-60">
+            <label className={kanbanStyles.label}>Filtrar por prioridad</label>
+            <select
+              className={kanbanStyles.select}
+              value={priorityFilter}
+              onChange={(e) => setPriorityFilter(e.target.value as PriorityFilter)}
+            >
+              <option value="Todas">Todas</option>
+              <option value="Alta">Alta</option>
+              <option value="Media">Media</option>
+              <option value="Baja">Baja</option>
+            </select>
+          </div>
+
+          <div className="w-full md:w-auto">
+            <button
+              type="button"
+              onClick={openNewTask}
+              disabled={!canCreate}
+              className={`${kanbanStyles.primaryButton} w-full md:w-auto justify-center ${
+                !canCreate ? "opacity-50 cursor-not-allowed" : ""
+              }`}
+              title={
+                !canCreate
+                  ? isCliente
+                    ? "Como cliente no puedes crear tareas"
+                    : "Solo admin/colaborador puede crear tareas"
+                  : "Nueva tarea"
+              }
+            >
+              <Plus size={16} />
+              Nueva tarea
+            </button>
           </div>
         </div>
 
-        <div className="w-full md:w-60">
-          <label className={kanbanStyles.label}>Filtrar por prioridad</label>
-          <select
-            className={kanbanStyles.select}
-            value={priorityFilter}
-            onChange={(e) => setPriorityFilter(e.target.value as PriorityFilter)}
-          >
-            <option value="Todas">Todas</option>
-            <option value="Alta">Alta</option>
-            <option value="Media">Media</option>
-            <option value="Baja">Baja</option>
-          </select>
-        </div>
+        <div className="mt-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+          <div className="text-[11px] text-[#fffef9]/45">
+            Rol: <b className="text-[#fffef9]/70">{role}</b>
+          </div>
 
-        <div className="w-full md:w-auto">
-          <button
-            type="button"
-            onClick={openNewTask}
-            disabled={!canCreate}
-            className={`${kanbanStyles.primaryButton} w-full md:w-auto justify-center ${
-              !canCreate ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-            title={
-              !canCreate
-                ? "Solo admin/colaborador puede crear tareas"
-                : "Nueva tarea"
-            }
-          >
-            <Plus size={16} />
-            Nueva tarea
-          </button>
+          <div className="flex flex-col md:flex-row gap-2">
+            {loading ? (
+              <div className="text-sm text-[#fffef9]/60">Cargando tareas…</div>
+            ) : loadErr ? (
+              <div className="text-sm text-[#ffb3c2]">{loadErr}</div>
+            ) : null}
+
+            {saveOkMsg ? <div className="text-sm text-[#b9f7a6]">{saveOkMsg}</div> : null}
+            {saveErrMsg ? <div className="text-sm text-[#ffb3c2]">{saveErrMsg}</div> : null}
+          </div>
         </div>
       </div>
 
-      {loading ? (
-        <div className="text-sm text-[#fffef9]/60 mt-2">Cargando tareas…</div>
-      ) : loadErr ? (
-        <div className="text-sm text-[#ffb3c2] mt-2">{loadErr}</div>
-      ) : null}
-
-      {saveOkMsg ? (
-        <div className="text-sm text-[#b9f7a6] mt-2">{saveOkMsg}</div>
-      ) : null}
-      {saveErrMsg ? (
-        <div className="text-sm text-[#ffb3c2] mt-2">{saveErrMsg}</div>
-      ) : null}
-
       <div className={kanbanStyles.boardWrapper}>
         <DragDropContext onDragEnd={onDragEnd}>
-          <Droppable
-            droppableId="all-columns"
-            direction="horizontal"
-            type="column"
-          >
+          <Droppable droppableId="all-columns" direction="horizontal" type="column">
             {(provided) => (
               <div
                 className={kanbanStyles.columnsRow}
@@ -809,18 +816,14 @@ export function KanbanBoard() {
                           ref={colProvided.innerRef}
                           {...colProvided.draggableProps}
                           className={`${kanbanStyles.columnWrapperBase} ${
-                            index % 2 === 0
-                              ? kanbanStyles.columnBgEven
-                              : kanbanStyles.columnBgOdd
+                            index % 2 === 0 ? kanbanStyles.columnBgEven : kanbanStyles.columnBgOdd
                           }`}
                         >
                           <div className={kanbanStyles.columnHeader}>
                             <h2
                               className={kanbanStyles.columnTitle}
                               {...colProvided.dragHandleProps}
-                              title={
-                                !isAdmin ? "Solo admin reordena columnas" : undefined
-                              }
+                              title={!isAdmin ? "Solo admin reordena columnas" : undefined}
                             >
                               {column.titulo}
                             </h2>
@@ -866,9 +869,8 @@ export function KanbanBoard() {
                                         >
                                           <div className="flex items-start justify-between gap-2">
                                             <div>
-                                              <p className={kanbanStyles.cardTitle}>
-                                                {task.titulo}
-                                              </p>
+                                              <p className={kanbanStyles.cardTitle}>{task.titulo}</p>
+
                                               <div className={kanbanStyles.cardMetaRow}>
                                                 <span className="inline-flex items-center gap-1">
                                                   <User size={12} />
@@ -884,13 +886,13 @@ export function KanbanBoard() {
                                             <button
                                               type="button"
                                               onClick={(e) => openConversation(task as Task, e)}
-                                              className="relative inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-md border border-white/10 bg-white/5 hover:bg-white/10"
+                                              className="relative inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border border-white/10 bg-white/[0.06] hover:bg-white/[0.10] transition-colors"
                                               title="Abrir conversación"
                                             >
                                               <MessageCircle size={14} />
                                               Chat
                                               {unread > 0 ? (
-                                                <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-[#ee2346] text-white text-[10px] flex items-center justify-center">
+                                                <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-[#ee2346] text-white text-[10px] flex items-center justify-center shadow">
                                                   {unread > 99 ? "99+" : unread}
                                                 </span>
                                               ) : null}
@@ -901,10 +903,7 @@ export function KanbanBoard() {
                                             <div className={kanbanStyles.cardFooterLeft}>
                                               {task.fechaEntrega && (
                                                 <span className={kanbanStyles.cardMetaText}>
-                                                  <Calendar
-                                                    size={12}
-                                                    className="inline mr-1"
-                                                  />
+                                                  <Calendar size={12} className="inline mr-1" />
                                                   {task.fechaEntrega}
                                                 </span>
                                               )}
@@ -977,6 +976,54 @@ export function KanbanBoard() {
             setConversationTask(t);
             setUnreadByTaskId((prev) => ({ ...prev, [t.id]: 0 }));
           }}
+          onClientDecision={async (t, accion, comentario) => {
+            try {
+              setSaveOkMsg("");
+              setSaveErrMsg("");
+
+              const updatedRow = await decideTaskInDb(t.id, accion, comentario);
+              const updatedTask = apiRowToTask(updatedRow);
+              if (!updatedTask) throw new Error("Respuesta inválida del servidor");
+
+              setState((prev) => {
+                const prevTask = prev.tasks[t.id];
+                if (!prevTask) return prev;
+
+                const oldCol = prev.columns[prevTask.statusId];
+                const newCol = prev.columns[updatedTask.statusId];
+
+                const nextCols = { ...prev.columns };
+                if (oldCol.id !== newCol.id) {
+                  nextCols[oldCol.id] = {
+                    ...oldCol,
+                    taskIds: oldCol.taskIds.filter((x) => x !== t.id),
+                  };
+                  nextCols[newCol.id] = {
+                    ...newCol,
+                    taskIds: [...newCol.taskIds, t.id],
+                  };
+                }
+
+                return {
+                  ...prev,
+                  tasks: { ...prev.tasks, [t.id]: updatedTask },
+                  columns: nextCols,
+                };
+              });
+
+              setSaveOkMsg(
+                accion === "APROBAR"
+                  ? "Aprobado por el cliente"
+                  : "Rechazado por el cliente"
+              );
+              window.setTimeout(() => setSaveOkMsg(""), 1800);
+
+              setEditingTask(null);
+              setIsNew(false);
+            } catch (e: any) {
+              setSaveErrMsg(e?.message ?? "No se pudo registrar la decisión");
+            }
+          }}
         />
       )}
 
@@ -987,6 +1034,9 @@ export function KanbanBoard() {
           onClose={() => {
             setConversationTask(null);
             loadUnreadCounts();
+          }}
+          onTaskUpdated={async () => {
+            await refreshBoard();
           }}
         />
       )}
@@ -1007,6 +1057,7 @@ type TaskModalProps = {
   onSave: (task: Task) => void;
   onDelete: (taskId: string) => void;
   onOpenChat: (task: Task) => void;
+  onClientDecision: (task: Task, accion: "APROBAR" | "RECHAZAR", comentario: string) => void;
 };
 
 function TaskModal({
@@ -1020,24 +1071,29 @@ function TaskModal({
   onSave,
   onDelete,
   onOpenChat,
+  onClientDecision,
 }: TaskModalProps) {
   const [form, setForm] = useState<Task>(task);
 
-  useEffect(() => setForm(task), [task]);
+  const [decisionComment, setDecisionComment] = useState("");
+  const [deciding, setDeciding] = useState<"APROBAR" | "RECHAZAR" | "">("");
+
+  useEffect(() => {
+    setForm(task);
+    setDecisionComment("");
+    setDeciding("");
+  }, [task]);
 
   const isAdmin = role === "ADMIN";
   const isColab = role === "COLABORADOR";
+  const isCliente = role === "CLIENTE";
+
   const canEdit = isAdmin || isColab;
   const readOnly = !canEdit;
 
-  // ✅ CAMBIO CLAVE:
-  // - COLABORADOR puede cambiar idOrganizacion al crear
-  // - COLABORADOR NO puede cambiar idColaborador (queda él mismo)
   function updateField<K extends keyof Task>(key: K, value: Task[K]) {
     if (readOnly) return;
-
     if (!isAdmin && key === "idColaborador") return;
-
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -1061,7 +1117,6 @@ function TaskModal({
 
   const canPickColaborador = isNew && isAdmin && colabs.length > 0;
 
-  // ✅ si es colaborador creando: idColaborador fijo a sí mismo
   useEffect(() => {
     if (!isNew) return;
     if (!isColab) return;
@@ -1077,7 +1132,6 @@ function TaskModal({
     });
   }, [isNew, isColab, perfilId, colabs]);
 
-  // ✅ EXTRA: si es colaborador y solo tiene 1 org asignada, autoseleccionarla
   useEffect(() => {
     if (!isNew) return;
     if (!isColab) return;
@@ -1085,7 +1139,6 @@ function TaskModal({
 
     setForm((prev) => {
       const only = orgs[0];
-      // si ya está seteada, no tocar
       if (Number(prev.idOrganizacion) === Number(only.id_organizacion)) return prev;
       return {
         ...prev,
@@ -1094,6 +1147,25 @@ function TaskModal({
       };
     });
   }, [isNew, isColab, orgs]);
+
+  const canClientDecide =
+    isCliente &&
+    !isNew &&
+    (form.statusId === "en_revision" || form.statusId === "aprobada" || form.statusId === "en_progreso");
+
+  const decisionDisabled = deciding !== "" || !decisionComment.trim();
+
+  async function handleClientDecision(accion: "APROBAR" | "RECHAZAR") {
+    const text = decisionComment.trim();
+    if (!text) return;
+
+    setDeciding(accion);
+    try {
+      await onClientDecision(form, accion, text);
+    } finally {
+      setDeciding("");
+    }
+  }
 
   return (
     <div className={kanbanStyles.modalOverlay}>
@@ -1116,7 +1188,7 @@ function TaskModal({
                 <button
                   type="button"
                   onClick={() => onOpenChat(form)}
-                  className="relative inline-flex items-center gap-2 text-[12px] px-3 py-2 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10"
+                  className="relative inline-flex items-center gap-2 text-[12px] px-3 py-2 rounded-xl border border-white/10 bg-white/[0.06] hover:bg-white/[0.10] transition-colors"
                   title="Abrir conversación"
                 >
                   <MessageCircle size={16} />
@@ -1124,11 +1196,7 @@ function TaskModal({
                 </button>
               ) : null}
 
-              <button
-                className={kanbanStyles.modalClose}
-                onClick={onClose}
-                type="button"
-              >
+              <button className={kanbanStyles.modalClose} onClick={onClose} type="button">
                 Cerrar
               </button>
             </div>
@@ -1175,19 +1243,12 @@ function TaskModal({
             ) : (
               <div>
                 <label className={kanbanStyles.label}>Cliente</label>
-                <input
-                  type="text"
-                  className={kanbanStyles.modalInput}
-                  value={form.cliente}
-                  disabled
-                />
+                <input type="text" className={kanbanStyles.modalInput} value={form.cliente} disabled />
               </div>
             )}
 
             <div>
-              <label className={kanbanStyles.label}>
-                Asignado a {canPickColaborador ? "*" : ""}
-              </label>
+              <label className={kanbanStyles.label}>Asignado a</label>
 
               {canPickColaborador ? (
                 <select
@@ -1239,10 +1300,7 @@ function TaskModal({
                 value={form.tipoEntregable ?? "Arte"}
                 disabled={readOnly}
                 onChange={(e) =>
-                  updateField(
-                    "tipoEntregable",
-                    e.target.value as Task["tipoEntregable"]
-                  )
+                  updateField("tipoEntregable", e.target.value as Task["tipoEntregable"])
                 }
               >
                 {TIPO_ENTREGABLE_OPTIONS.map((opt) => (
@@ -1259,9 +1317,7 @@ function TaskModal({
                 className={kanbanStyles.modalInput}
                 value={form.prioridad ?? "Media"}
                 disabled={readOnly}
-                onChange={(e) =>
-                  updateField("prioridad", e.target.value as Task["prioridad"])
-                }
+                onChange={(e) => updateField("prioridad", e.target.value as Task["prioridad"])}
               >
                 <option value="Alta">Alta</option>
                 <option value="Media">Media</option>
@@ -1275,9 +1331,7 @@ function TaskModal({
                 className={kanbanStyles.modalInput}
                 value={form.statusId}
                 disabled={readOnly}
-                onChange={(e) =>
-                  updateField("statusId", e.target.value as StatusId)
-                }
+                onChange={(e) => updateField("statusId", e.target.value as StatusId)}
               >
                 {STATUS_OPTIONS.map((opt) => (
                   <option key={opt.id} value={opt.id}>
@@ -1285,6 +1339,11 @@ function TaskModal({
                   </option>
                 ))}
               </select>
+              {isCliente ? (
+                <p className="text-[11px] text-[#fffef9]/50 mt-1">
+                  Como cliente, el estado cambia solo al aprobar/rechazar.
+                </p>
+              ) : null}
             </div>
 
             <div>
@@ -1299,9 +1358,7 @@ function TaskModal({
             </div>
 
             <div className="md:col-span-2">
-              <label className={kanbanStyles.label}>
-                Carpeta de Google Drive
-              </label>
+              <label className={kanbanStyles.label}>Carpeta de Google Drive</label>
               <input
                 type="url"
                 className={kanbanStyles.modalInput}
@@ -1311,16 +1368,13 @@ function TaskModal({
                 onChange={(e) => updateField("googleDriveUrl", e.target.value)}
               />
               <p className="text-[11px] text-[#fffef9]/50 mt-1">
-                (Futuro) Este campo se mostrará, pero por ahora no se guarda en la
-                BD.
+                (Futuro) Este campo se mostrará, pero por ahora no se guarda en la BD.
               </p>
             </div>
           </div>
 
           <div>
-            <label className={kanbanStyles.label}>
-              Descripción / notas internas
-            </label>
+            <label className={kanbanStyles.label}>Descripción / notas internas</label>
             <textarea
               className={kanbanStyles.modalTextarea}
               value={form.descripcion ?? ""}
@@ -1329,28 +1383,66 @@ function TaskModal({
             />
           </div>
 
+          {canClientDecide ? (
+            <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+              <p className="text-[12px] text-[#fffef9]/80 mb-2">
+                Para <b>aprobar</b> o <b>rechazar</b>, debes dejar un comentario.
+              </p>
+
+              <textarea
+                className={kanbanStyles.modalTextarea}
+                placeholder="Escribe aquí tu comentario obligatorio…"
+                value={decisionComment}
+                onChange={(e) => setDecisionComment(e.target.value)}
+                rows={3}
+              />
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={decisionDisabled}
+                  onClick={() => handleClientDecision("APROBAR")}
+                  className={`${kanbanStyles.modalPrimaryBtn} ${decisionDisabled ? "opacity-60" : ""}`}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <CheckCircle size={16} />
+                    {deciding === "APROBAR" ? "Aprobando…" : "Aprobar"}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  disabled={decisionDisabled}
+                  onClick={() => handleClientDecision("RECHAZAR")}
+                  className={`${kanbanStyles.modalSecondaryBtn} ${decisionDisabled ? "opacity-60" : ""}`}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <XCircle size={16} />
+                    {deciding === "RECHAZAR" ? "Rechazando…" : "Rechazar"}
+                  </span>
+                </button>
+              </div>
+
+              <p className="text-[11px] text-[#fffef9]/50 mt-2">
+                Rechazar devolverá la tarea a <b>En progreso</b>.
+              </p>
+            </div>
+          ) : null}
+
           <div className={kanbanStyles.modalFooter}>
             {!isNew && isAdmin && (
-              <button
-                type="button"
-                onClick={() => onDelete(form.id)}
-                className={kanbanStyles.modalDelete}
-              >
+              <button type="button" onClick={() => onDelete(form.id)} className={kanbanStyles.modalDelete}>
                 <Trash2 size={14} />
                 Eliminar
               </button>
             )}
 
             <div className={kanbanStyles.modalFooterRight}>
-              <button
-                type="button"
-                onClick={onClose}
-                className={kanbanStyles.modalSecondaryBtn}
-              >
+              <button type="button" onClick={onClose} className={kanbanStyles.modalSecondaryBtn}>
                 Cerrar
               </button>
 
-              {canEdit ? (
+              {isAdmin || isColab ? (
                 <button type="submit" className={kanbanStyles.modalPrimaryBtn}>
                   Guardar
                 </button>
