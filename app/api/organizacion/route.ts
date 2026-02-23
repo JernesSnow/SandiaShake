@@ -1,3 +1,5 @@
+export const runtime = "nodejs";
+
 import { NextResponse } from "next/server";
 import { getSessionProfile } from "@/lib/auth/getSessionProfile";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
@@ -13,56 +15,111 @@ type Body = {
   descripcion?: string;
 };
 
-/**
- * GET — Check if the current CLIENTE user has a linked organization.
- * Returns { hasOrg: boolean, correo?: string }
- */
-export async function GET() {
+/* =========================================================
+   GET
+   - CLIENTE → returns their organization (if exists)
+   - ADMIN/COLABORADOR → treated as NOT needing org setup
+========================================================= */
+export async function GET(req: Request) {
   try {
     const perfil = await getSessionProfile();
     if (!perfil) {
       return NextResponse.json({ error: "No autorizado" }, { status: 401 });
     }
 
-    // Non-CLIENTE users don't need an org check
-    if (perfil.rol !== "CLIENTE") {
-      return NextResponse.json({ hasOrg: true });
+    const admin = createSupabaseAdmin();
+    const { searchParams } = new URL(req.url);
+    const orgIdParam = searchParams.get("id_organizacion");
+
+    /* =========================================
+       1️⃣ If id_organizacion is provided
+       ADMIN / COLABORADOR / CLIENTE (guarded)
+    ========================================= */
+    if (orgIdParam) {
+      const orgId = Number(orgIdParam);
+
+      // CLIENTE can only access their own org
+      if (perfil.rol === "CLIENTE") {
+        const { data: link } = await admin
+          .from("organizacion_usuario")
+          .select("id_organizacion")
+          .eq("id_usuario_cliente", perfil.id_usuario)
+          .eq("id_organizacion", orgId)
+          .maybeSingle();
+
+        if (!link) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+      }
+
+      const { data: org, error } = await admin
+        .from("organizaciones")
+        .select("*")
+        .eq("id_organizacion", orgId)
+        .maybeSingle();
+
+      if (error || !org) {
+        return NextResponse.json({ error: "Organización no encontrada" }, { status: 404 });
+      }
+
+      return NextResponse.json({ organizacion: org });
     }
 
-    const admin = createSupabaseAdmin();
+    /* =========================================
+       2️⃣ Fallback: CLIENTE auto-lookup
+    ========================================= */
+    if (perfil.rol === "CLIENTE") {
+      const { data: link } = await admin
+        .from("organizacion_usuario")
+        .select(`id_organizacion, organizaciones(*)`)
+        .eq("id_usuario_cliente", perfil.id_usuario)
+        .limit(1)
+        .maybeSingle();
 
-    // Get user email for pre-filling
-    const { data: usuario } = await admin
-      .from("usuarios")
-      .select("correo")
-      .eq("id_usuario", perfil.id_usuario)
-      .single();
+      if (!link?.organizaciones) {
+        return NextResponse.json({
+          hasOrg: false,
+          organizacion: null,
+        });
+      }
 
-    const { data: orgLink } = await admin
-      .from("organizacion_usuario")
-      .select("id_organizacion")
-      .eq("id_usuario_cliente", perfil.id_usuario)
-      .limit(1)
-      .maybeSingle();
+      return NextResponse.json({
+        hasOrg: true,
+        organizacion: link.organizaciones,
+      });
+    }
 
+    /* =========================================
+       3️⃣ ADMIN / COLABORADOR fallback
+    ========================================= */
     return NextResponse.json({
-      hasOrg: !!orgLink,
-      correo: usuario?.correo ?? null,
+      hasOrg: true,
+      organizacion: null,
     });
-  } catch (e: unknown) {
-    console.error("Error in GET /api/organizacion:", e);
+
+  } catch (e: any) {
+    console.error("GET /api/organizacion error:", e);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Error interno" },
+      { error: e?.message ?? "Error interno" },
       { status: 500 }
     );
   }
 }
 
+/* =========================================================
+   POST
+   - Only CLIENTE can create
+   - One organization per client
+========================================================= */
 export async function POST(req: Request) {
   try {
     const perfil = await getSessionProfile();
+
     if (!perfil) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+      return NextResponse.json(
+        { error: "No autorizado" },
+        { status: 401 }
+      );
     }
 
     if (perfil.rol !== "CLIENTE") {
@@ -84,7 +141,7 @@ export async function POST(req: Request) {
 
     const admin = createSupabaseAdmin();
 
-    // Check if user already has an org
+    /* Prevent multiple orgs */
     const { data: existing } = await admin
       .from("organizacion_usuario")
       .select("id_organizacion")
@@ -99,7 +156,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Insert organization
+    /* Create organization */
     const { data: org, error: orgErr } = await admin
       .from("organizaciones")
       .insert({
@@ -122,7 +179,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Link user to organization
+    /* Link CLIENTE to organization */
     const { error: linkErr } = await admin
       .from("organizacion_usuario")
       .insert({
@@ -131,30 +188,36 @@ export async function POST(req: Request) {
       });
 
     if (linkErr) {
-      console.error("Error linking user to org:", linkErr);
-      // Cleanup: delete the org we just created
+      console.error("Error linking org:", linkErr);
+
+      // Rollback
       await admin
         .from("organizaciones")
         .delete()
         .eq("id_organizacion", org.id_organizacion);
+
       return NextResponse.json(
         { error: linkErr.message },
         { status: 500 }
       );
     }
 
-    // Create Google Drive folder (non-blocking — don't fail the request if Drive is unavailable)
+    /* Create Drive folder (non-blocking) */
     try {
       await createOrgDriveFolder(nombre, org.id_organizacion);
     } catch (driveErr) {
       console.error("[Drive] Failed to create org folder:", driveErr);
     }
 
-    return NextResponse.json({ ok: true, organizacion: org }, { status: 201 });
-  } catch (e: unknown) {
-    console.error("Error in POST /api/organizacion:", e);
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : "Error interno del servidor" },
+      { ok: true, organizacion: org },
+      { status: 201 }
+    );
+
+  } catch (e: any) {
+    console.error("POST /api/organizacion error:", e);
+    return NextResponse.json(
+      { error: e?.message ?? "Error interno del servidor" },
       { status: 500 }
     );
   }

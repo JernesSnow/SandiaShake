@@ -4,6 +4,7 @@ import { getSessionProfile } from "@/lib/auth/getSessionProfile";
 
 export async function GET(req: Request) {
   try {
+
     const perfil = await getSessionProfile();
 
     if (!perfil) {
@@ -19,11 +20,6 @@ export async function GET(req: Request) {
     const idOrgParam = url.searchParams.get("id_organizacion");
     const idOrg = idOrgParam ? Number(idOrgParam) : null;
 
-    /*
-      IMPORTANT:
-      We explicitly specify the FK relationships to avoid:
-      "Could not embed because more than one relationship was found"
-    */
 
     let query = admin
       .from("tareas")
@@ -42,8 +38,32 @@ export async function GET(req: Request) {
       `)
       .eq("estado", "ACTIVO");
 
-    // ADMIN can see all
-    if (perfil.rol !== "ADMIN") {
+    if (perfil.rol === "ADMIN") {
+      if (idOrg) {
+        query = query.eq("id_organizacion", idOrg);
+      }
+    }
+
+    /* ================= CLIENTE ================= */
+
+    else if (perfil.rol === "CLIENTE") {
+      const { data: orgUser, error: orgErr } = await admin
+        .from("organizacion_usuario")
+        .select("id_organizacion")
+        .eq("id_usuario_cliente", perfil.id_usuario)
+        .eq("estado", "ACTIVO")
+        .maybeSingle();
+
+      if (orgErr || !orgUser) {
+        return NextResponse.json({ ok: true, data: [] });
+      }
+
+      query = query.eq("id_organizacion", orgUser.id_organizacion);
+    }
+
+    /* ================= COLABORADOR ================= */
+
+    else if (perfil.rol === "COLABORADOR") {
       const { data: asigs } = await admin
         .from("asignacion_organizacion")
         .select("id_organizacion")
@@ -52,27 +72,16 @@ export async function GET(req: Request) {
 
       const orgIds = (asigs ?? []).map((a) => a.id_organizacion);
 
-      if (idOrg && !orgIds.includes(idOrg)) {
-        return NextResponse.json(
-          { error: "Sin permisos" },
-          { status: 403 }
-        );
-      }
-
-      if (!idOrg && orgIds.length === 0) {
+      if (!orgIds.length) {
         return NextResponse.json({ ok: true, data: [] });
       }
 
-      if (idOrg) {
-        query = query.eq("id_organizacion", idOrg);
-      } else {
-        query = query.in("id_organizacion", orgIds);
-      }
-    } else {
-      if (idOrg) {
-        query = query.eq("id_organizacion", idOrg);
-      }
+      query = idOrg
+        ? query.eq("id_organizacion", idOrg)
+        : query.in("id_organizacion", orgIds);
     }
+
+
 
     const { data, error } = await query.order("created_at", {
       ascending: false,
@@ -86,11 +95,6 @@ export async function GET(req: Request) {
       );
     }
 
-    /*
-      🔥 THIS IS THE IMPORTANT PART
-      Map DB fields → UI fields
-      So your Kanban works correctly
-    */
 
     const formatted = (data ?? []).map((t) => ({
       id_tarea: t.id_tarea,
@@ -107,6 +111,7 @@ export async function GET(req: Request) {
     }));
 
     return NextResponse.json({ ok: true, data: formatted });
+
   } catch (e: any) {
     console.error(e);
     return NextResponse.json(

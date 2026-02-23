@@ -11,20 +11,14 @@ export async function GET(
     const { id: idParam } = await context.params;
     const id = Number(idParam);
 
-    console.log("🔍 Incoming task ID param:", idParam);
-    console.log("🔍 Parsed numeric ID:", id);
-
     if (!id || Number.isNaN(id)) {
-      console.log("❌ Invalid ID");
       return NextResponse.json(
-        { ok: false, error: "ID inválido", debug: { idParam } },
+        { ok: false, error: "ID inválido" },
         { status: 400 }
       );
     }
 
-    /* -------------------------
-       1️⃣ Fetch tarea
-    -------------------------- */
+
     const { data: tarea, error: tareaError } = await admin
       .from("tareas")
       .select(`
@@ -39,9 +33,6 @@ export async function GET(
       .eq("id_tarea", id)
       .maybeSingle();
 
-    console.log("📦 Tarea result:", tarea);
-    console.log("❗ Tarea error:", tareaError);
-
     if (tareaError) {
       return NextResponse.json(
         { ok: false, error: tareaError.message },
@@ -50,28 +41,20 @@ export async function GET(
     }
 
     if (!tarea) {
-      console.log("❌ No tarea found for ID:", id);
       return NextResponse.json(
         { ok: false, error: "Tarea no encontrada" },
         { status: 404 }
       );
     }
 
-    /* -------------------------
-       2️⃣ Fetch folder
-    -------------------------- */
-    const { data: folder, error: folderError } = await admin
+
+    const { data: folder } = await admin
       .from("google_drive_task_folders")
       .select("*")
       .eq("id_tarea", id)
       .maybeSingle();
 
-    console.log("📁 Folder result:", folder);
-    console.log("❗ Folder error:", folderError);
 
-    /* -------------------------
-       3️⃣ Return everything
-    -------------------------- */
     return NextResponse.json(
       {
         ok: true,
@@ -84,17 +67,12 @@ export async function GET(
           fecha_entrega: tarea.fecha_entrega ?? null,
           googleDriveUrl: folder?.folder_url ?? null,
         },
-        debug: {
-          tareaRaw: tarea,
-          folderRaw: folder,
-          folderError,
-        },
       },
       { status: 200 }
     );
 
   } catch (e: any) {
-    console.error("🔥 FATAL ERROR:", e);
+    console.error("Task GET error:", e);
     return NextResponse.json(
       { ok: false, error: e?.message ?? "Error interno" },
       { status: 500 }

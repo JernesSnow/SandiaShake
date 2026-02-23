@@ -59,7 +59,19 @@ export function ColaboradoresPage() {
   useEffect(() => {
     (async () => {
       const res = await fetch("/api/admin/colaboradores");
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        console.error("API ERROR:", err);
+        return;
+      }
+
       const json = await res.json();
+
+      if (!Array.isArray(json.colaboradores)) {
+        console.error("Unexpected response shape:", json);
+        return;
+      }
 
       const mapped: Colaborador[] = json.colaboradores.map((u: any) => ({
         id: String(u.id_usuario),

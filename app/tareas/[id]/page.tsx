@@ -140,6 +140,7 @@ export default function TaskDetailPage() {
   const [errorAprobacion, setErrorAprobacion] = useState<string | null>(null);
 
   const canApprove = me?.rol === "CLIENTE";
+  const canUpload = me?.rol === "ADMIN" || me?.rol === "COLABORADOR";
 
   const folderId = useMemo(() => {
     return extractFolderId(task?.googleDriveUrl ?? null);
@@ -355,7 +356,7 @@ export default function TaskDetailPage() {
         </div>
 
         {/* UPLOAD / DROPZONE */}
-        {folderId && (
+        {folderId && canUpload && (
           <div
             onDragOver={(e) => {
               e.preventDefault();

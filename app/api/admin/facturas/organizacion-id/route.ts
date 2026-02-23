@@ -4,20 +4,12 @@ import { getSessionProfile } from "@/lib/auth/getSessionProfile";
 
 export async function GET(req: Request) {
   try {
-    // 🔐 Auth
     const perfil = await getSessionProfile();
 
     if (!perfil) {
       return NextResponse.json(
         { error: "No autenticado" },
         { status: 401 }
-      );
-    }
-
-    if (perfil.rol !== "ADMIN") {
-      return NextResponse.json(
-        { error: "Sin permisos" },
-        { status: 403 }
       );
     }
 
@@ -34,6 +26,42 @@ export async function GET(req: Request) {
     }
 
     const admin = createSupabaseAdmin();
+
+
+    if (perfil.rol === "CLIENTE") {
+      const { data: link } = await admin
+        .from("organizacion_usuario")
+        .select("id_organizacion")
+        .eq("id_usuario_cliente", perfil.id_usuario)
+        .eq("id_organizacion", idOrganizacion)
+        .maybeSingle();
+
+      if (!link) {
+        return NextResponse.json(
+          { error: "Sin permisos" },
+          { status: 403 }
+        );
+      }
+    }
+
+
+    if (perfil.rol === "COLABORADOR") {
+      const { data: assignment } = await admin
+        .from("asignacion_organizacion")
+        .select("id_asignacion")
+        .eq("id_colaborador", perfil.id_usuario)
+        .eq("id_organizacion", idOrganizacion)
+        .maybeSingle();
+
+      if (!assignment) {
+        return NextResponse.json(
+          { error: "Sin permisos" },
+          { status: 403 }
+        );
+      }
+    }
+
+
 
     const { data, error } = await admin
       .from("facturas")

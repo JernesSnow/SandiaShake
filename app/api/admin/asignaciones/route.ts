@@ -1,192 +1,117 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
-
-/* ================= TYPES ================= */
+import { getSessionProfile } from "@/lib/auth/getSessionProfile";
 
 type PostBody = {
   id_colaborador: number;
   id_organizacion: number;
 };
 
-/* ================= AUTH VALIDATION ================= */
-
-async function getPerfilAdmin() {
-  const supabase = await createSupabaseServer();
-
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
-
-  if (!user) {
-    return {
-      error: NextResponse.json(
-        { error: "No autenticado" },
-        { status: 401 }
-      ),
-    };
-  }
-
-  const { data: perfil, error: perfilErr } = await supabase
-    .from("usuarios")
-    .select("rol, estado, id_usuario")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
-
-  if (perfilErr) {
-    return {
-      error: NextResponse.json(
-        { error: perfilErr.message },
-        { status: 500 }
-      ),
-    };
-  }
-
-  if (!perfil) {
-    return {
-      error: NextResponse.json(
-        { error: "Perfil no configurado" },
-        { status: 403 }
-      ),
-    };
-  }
-
-  if (perfil.estado !== "ACTIVO") {
-    return {
-      error: NextResponse.json(
-        { error: "Usuario inactivo" },
-        { status: 403 }
-      ),
-    };
-  }
-
-  if (perfil.rol !== "ADMIN") {
-    return {
-      error: NextResponse.json(
-        { error: "Sin permisos" },
-        { status: 403 }
-      ),
-    };
-  }
-
-  return { perfil };
-}
-
-/* ================= GET ================= */
+/* =========================================================
+   GET – List collaborators assigned to an organization
+========================================================= */
 
 export async function GET(req: Request) {
   try {
-    const { error } = await getPerfilAdmin();
-    if (error) return error;
+    const perfil = await getSessionProfile();
 
-    const url = new URL(req.url);
-    const idOrganizacion = Number(url.searchParams.get("id_organizacion"));
-    const idColaborador = Number(url.searchParams.get("id_colaborador"));
+    if (!perfil) {
+      return NextResponse.json(
+        { error: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
+    const { searchParams } = new URL(req.url);
+    const orgId = searchParams.get("id_organizacion");
+    const colabId = searchParams.get("id_colaborador");
 
     const admin = createSupabaseAdmin();
 
-    /* ================= CASE 1: ORGANIZATIONS OF A COLABORADOR ================= */
-    if (idColaborador) {
-      const { data: asignaciones, error: qErr } = await admin
+    /* =========================================
+       MODE 1: Get collaborators of an org
+    ========================================= */
+    if (orgId) {
+      const { data, error } = await admin
         .from("asignacion_organizacion")
-        .select("id_asignacion, id_organizacion")
-        .eq("id_colaborador", idColaborador)
+        .select(`
+          id_colaborador,
+          usuarios!fk_asignacion_clientes_colaborador (
+            nombre,
+            correo
+          )
+        `)
+        .eq("id_organizacion", orgId)
         .eq("estado", "ACTIVO");
 
-      if (qErr) {
-        console.error(qErr);
-        return NextResponse.json(
-          { error: qErr.message },
-          { status: 500 }
-        );
-      }
+      if (error) throw error;
 
-      return NextResponse.json(
-        { ok: true, data: asignaciones ?? [] },
-        { status: 200 }
-      );
+      const formatted = (data ?? []).map((a: any) => ({
+        id_colaborador: a.id_colaborador,
+        nombre: a.usuarios?.nombre,
+        correo: a.usuarios?.correo,
+      }));
+
+      return NextResponse.json({ data: formatted });
     }
 
-    /* ================= CASE 2: COLABORADORES OF AN ORGANIZATION ================= */
-    if (idOrganizacion) {
-      const { data: asignaciones, error: qErr } = await admin
+    /* =========================================
+       MODE 2: Get organizations of a collaborator
+    ========================================= */
+    if (colabId) {
+      const { data, error } = await admin
         .from("asignacion_organizacion")
-        .select("id_asignacion, id_colaborador")
-        .eq("id_organizacion", idOrganizacion)
+        .select("id_organizacion")
+        .eq("id_colaborador", colabId)
         .eq("estado", "ACTIVO");
 
-      if (qErr) {
-        console.error(qErr);
-        return NextResponse.json(
-          { error: qErr.message },
-          { status: 500 }
-        );
-      }
+      if (error) throw error;
 
-      if (!asignaciones?.length) {
-        return NextResponse.json(
-          { ok: true, data: [] },
-          { status: 200 }
-        );
-      }
-
-      const ids = asignaciones.map((a) => a.id_colaborador);
-
-      const { data: usuarios, error: uErr } = await admin
-        .from("usuarios")
-        .select("id_usuario, nombre, correo, estado")
-        .in("id_usuario", ids)
-        .eq("estado", "ACTIVO");
-
-      if (uErr) {
-        console.error(uErr);
-        return NextResponse.json(
-          { error: uErr.message },
-          { status: 500 }
-        );
-      }
-
-      const mapped = asignaciones
-        .map((a) => {
-          const user = usuarios?.find(
-            (u) => u.id_usuario === a.id_colaborador
-          );
-
-          if (!user) return null;
-
-          return {
-            id_asignacion: a.id_asignacion,
-            id_colaborador: user.id_usuario,
-            nombre: user.nombre,
-            correo: user.correo,
-          };
-        })
-        .filter(Boolean);
-
-      return NextResponse.json(
-        { ok: true, data: mapped },
-        { status: 200 }
-      );
+      return NextResponse.json({ data });
     }
 
     return NextResponse.json(
-      { error: "Debe enviar id_organizacion o id_colaborador" },
+      { error: "Missing id_organizacion or id_colaborador" },
       { status: 400 }
     );
+
   } catch (e: any) {
-    console.error(e);
+    console.error("Asignaciones GET error:", e);
     return NextResponse.json(
-      { error: e?.message ?? "Error interno" },
+      { error: e?.message ?? "Internal error" },
       { status: 500 }
     );
   }
 }
 
-/* ================= POST ================= */
+/* =========================================================
+   POST – Assign collaborator to organization (ADMIN only)
+========================================================= */
 
 export async function POST(req: Request) {
   try {
-    const { perfil, error } = await getPerfilAdmin();
-    if (error) return error;
+    const perfil = await getSessionProfile();
+
+    if (!perfil) {
+      return NextResponse.json(
+        { error: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
+    if (perfil.estado !== "ACTIVO") {
+      return NextResponse.json(
+        { error: "Usuario inactivo" },
+        { status: 403 }
+      );
+    }
+
+    if (perfil.rol !== "ADMIN") {
+      return NextResponse.json(
+        { error: "Sin permisos" },
+        { status: 403 }
+      );
+    }
 
     const body = (await req.json()) as PostBody;
 
@@ -202,32 +127,33 @@ export async function POST(req: Request) {
 
     const admin = createSupabaseAdmin();
 
-    /* Validate colaborador */
     const { data: colab } = await admin
       .from("usuarios")
       .select("id_usuario, rol, estado")
       .eq("id_usuario", id_colaborador)
       .maybeSingle();
 
-    if (!colab)
+    if (!colab) {
       return NextResponse.json(
         { error: "Colaborador no existe" },
         { status: 404 }
       );
+    }
 
-    if (colab.estado !== "ACTIVO")
+    if (colab.estado !== "ACTIVO") {
       return NextResponse.json(
         { error: "Colaborador inactivo" },
         { status: 403 }
       );
+    }
 
-    if (colab.rol !== "COLABORADOR")
+    if (colab.rol !== "COLABORADOR") {
       return NextResponse.json(
         { error: "El usuario no es colaborador" },
         { status: 400 }
       );
+    }
 
-    /* Prevent duplicates */
     const { data: existing } = await admin
       .from("asignacion_organizacion")
       .select("id_asignacion")
@@ -243,15 +169,14 @@ export async function POST(req: Request) {
       );
     }
 
-    /* Insert */
     const { data: inserted, error: insErr } = await admin
       .from("asignacion_organizacion")
       .insert({
         id_colaborador,
         id_organizacion,
         estado: "ACTIVO",
-        created_by: perfil!.id_usuario,
-        updated_by: perfil!.id_usuario,
+        created_by: perfil.id_usuario,
+        updated_by: perfil.id_usuario,
       })
       .select("id_asignacion")
       .maybeSingle();
@@ -265,12 +190,10 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json(
-      {
-        ok: true,
-        data: inserted,
-      },
+      { ok: true, data: inserted },
       { status: 200 }
     );
+
   } catch (e: any) {
     console.error(e);
     return NextResponse.json(
@@ -280,12 +203,34 @@ export async function POST(req: Request) {
   }
 }
 
-/* ================= DELETE ================= */
+/* =========================================================
+   DELETE – Soft remove collaborator (ADMIN only)
+========================================================= */
 
 export async function DELETE(req: Request) {
   try {
-    const { perfil, error } = await getPerfilAdmin();
-    if (error) return error;
+    const perfil = await getSessionProfile();
+
+    if (!perfil) {
+      return NextResponse.json(
+        { error: "No autenticado" },
+        { status: 401 }
+      );
+    }
+
+    if (perfil.estado !== "ACTIVO") {
+      return NextResponse.json(
+        { error: "Usuario inactivo" },
+        { status: 403 }
+      );
+    }
+
+    if (perfil.rol !== "ADMIN") {
+      return NextResponse.json(
+        { error: "Sin permisos" },
+        { status: 403 }
+      );
+    }
 
     const url = new URL(req.url);
     const idOrganizacion = Number(url.searchParams.get("id_organizacion"));
@@ -304,7 +249,7 @@ export async function DELETE(req: Request) {
       .from("asignacion_organizacion")
       .update({
         estado: "ELIMINADO",
-        updated_by: perfil!.id_usuario,
+        updated_by: perfil.id_usuario,
         updated_at: new Date().toISOString(),
       })
       .eq("id_organizacion", idOrganizacion)
@@ -319,6 +264,7 @@ export async function DELETE(req: Request) {
     }
 
     return NextResponse.json({ ok: true }, { status: 200 });
+
   } catch (e: any) {
     console.error(e);
     return NextResponse.json(

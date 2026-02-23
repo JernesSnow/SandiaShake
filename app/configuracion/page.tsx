@@ -103,17 +103,22 @@ export default function ConfiguracionPage() {
 
   // Google Drive
   const [driveConnected, setDriveConnected] = useState(false);
+  const [driveExpired, setDriveExpired] = useState(false);
   const searchParams = useSearchParams();
 
   useEffect(() => {
     // Check query param from OAuth callback
     if (searchParams.get("drive") === "connected") {
       setDriveConnected(true);
+      setDriveExpired(false);
     }
     // Also verify with server
     fetch("/api/google-drive/status")
       .then((r) => r.json())
-      .then((d) => setDriveConnected(d.connected))
+      .then((d) => {
+        setDriveConnected(d.connected);
+        setDriveExpired(d.expired ?? false);
+      })
       .catch(() => {});
   }, [searchParams]);
 
@@ -916,7 +921,28 @@ useEffect(() => {
           </h2>
 
           <div className="rounded-lg border border-[#4a4748]/40 bg-[#2b2b30] p-4">
-            {driveConnected ? (
+            {driveExpired ? (
+              <>
+                <div className="flex items-center gap-2 mb-3">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ee2346" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="8" x2="12" y2="12" />
+                    <line x1="12" y1="16" x2="12.01" y2="16" />
+                  </svg>
+                  <span className="text-sm font-semibold text-[#ee2346]">Token expirado</span>
+                </div>
+                <p className="text-sm text-gray-300 mb-4">
+                  La conexión con Google Drive ha expirado. Reconecta tu cuenta para seguir usando la integración con Drive.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => window.location.href = "/api/oauth2/connect"}
+                  className="inline-flex items-center gap-2 rounded-md bg-[#ee2346] hover:bg-[#d8203f] px-4 py-2 text-sm font-semibold text-white transition"
+                >
+                  Reconectar Google Drive
+                </button>
+              </>
+            ) : driveConnected ? (
               <>
                 <div className="flex items-center gap-2 mb-3">
                   <CheckCircle size={20} className="text-[#6cbe45]" />

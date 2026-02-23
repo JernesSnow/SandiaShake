@@ -1,42 +1,18 @@
 import { NextResponse } from "next/server";
-import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
-
-async function getPerfilAdmin() {
-  const supabase = await createSupabaseServer();
-  const { data: userData } = await supabase.auth.getUser();
-  const user = userData?.user;
-
-  if (!user) {
-    return {
-      error: NextResponse.json({ error: "No autenticado" }, { status: 401 }),
-    };
-  }
-
-  const { data: perfil } = await supabase
-    .from("usuarios")
-    .select("rol, estado")
-    .eq("auth_user_id", user.id)
-    .maybeSingle();
-
-  if (!perfil || perfil.estado !== "ACTIVO" || perfil.rol !== "ADMIN") {
-    return {
-      error: NextResponse.json({ error: "Sin permisos" }, { status: 403 }),
-    };
-  }
-
-  return { ok: true };
-}
+import { getSessionProfile } from "@/lib/auth/getSessionProfile";
 
 export async function GET() {
   try {
-    const { error } = await getPerfilAdmin();
-    if (error) return error;
+    const perfil = await getSessionProfile();
+
+    if (!perfil) {
+      return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+    }
 
     const admin = createSupabaseAdmin();
 
-    // ✅ NO PLAN LOGIC
-    const { data, error: qErr } = await admin
+    const { data, error } = await admin
       .from("organizaciones")
       .select(`
         id_organizacion,
@@ -50,14 +26,14 @@ export async function GET() {
         correo,
         descripcion
       `)
-      .neq("estado", "ELIMINADO");
+      .neq("estado", "ELIMINADO")
+      .in("id_organizacion", perfil.allowedOrgIds);
 
-    if (qErr) {
-      return NextResponse.json({ error: qErr.message }, { status: 500 });
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true, data }, { status: 200 });
-
+    return NextResponse.json({ ok: true, data });
   } catch (e: any) {
     return NextResponse.json(
       { error: e?.message ?? "Error interno" },
