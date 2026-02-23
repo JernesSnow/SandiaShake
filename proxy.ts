@@ -1,6 +1,36 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
-export function proxy(_req: NextRequest) {
+export async function proxy(_req: NextRequest) {
+
+   const { pathname,origin } = _req.nextUrl;
+
+  const isPublic =
+    pathname.startsWith("/auth") ||
+    pathname.startsWith("/verify-email-mfa") ||
+    pathname.startsWith("/morosidad") ||
+    pathname.startsWith("/_next") ||
+    pathname === "/favicon.ico" ||
+    pathname.startsWith("/api");
+
+  if (isPublic) return NextResponse.next();
+
+
+  const res = await fetch(`${origin}/api/estado-cuenta`, {
+    headers: { cookie: _req.headers.get("cookie") ?? "" },
+    cache: "no-store",
+  });
+
+  if (res.status === 401) {
+    
+    return NextResponse.redirect(new URL("/auth", _req.url));
+  }
+
+  const json = await res.json().catch(() => null);
+
+ if (json?.blocked) {
+  return NextResponse.redirect(new URL("/morosidad", _req.url));
+}
+
   return NextResponse.next();
 }

@@ -28,11 +28,13 @@ const NAV_ITEMS: NavItem[] = [
   {
     href: "/facturacion",
     label: "Facturación",
-    roles: ["ADMIN"],
+
+    roles: ["ADMIN","CLIENTE"],
     children: [
       { href: "/facturacion", label: "Facturación", roles: ["ADMIN"] },
       { href: "/facturacion/morosidad", label: "Morosidad", roles: ["ADMIN"] },
       { href: "/facturacion/historial", label: "Reporte de pagos", roles: ["ADMIN"] },
+      { href: "/facturacion/mis-facturas", label: "Mis facturas", roles: ["ADMIN","CLIENTE"] },
     ],
   },
   { href: "/colaboradores", label: "Colaboradores", roles: ["ADMIN"] },
@@ -98,27 +100,26 @@ export function Sidebar({
      Navigation Filtering
   ========================================================= */
 
-  const filteredNav = useMemo(() => {
+  const filteredNav = useMemo<NavItem[]>(() => {
     if (!userRole) return [];
 
-    const baseItems = NAV_ITEMS.filter(
+      const baseItems: NavItem[] = NAV_ITEMS.filter(
       (item) => !item.roles || item.roles.includes(userRole)
     );
 
     // CLIENTE → Add "Mi organización"
     if (userRole === "CLIENTE" && clienteOrg) {
-      return [
-        ...baseItems,
-        {
-          href: `/clientes/${clienteOrg.id}`,
-          label: "Mi organización",
-          roles: ["CLIENTE"],
-        },
-      ];
-    }
+    const miOrg: NavItem = {
+      href: `/clientes/${clienteOrg.id}`,
+      label: "Mi organización",
+      roles: ["CLIENTE"],
+    };
 
-    return baseItems;
-  }, [userRole, clienteOrg]);
+    return [...baseItems, miOrg];
+  }
+
+  return baseItems;
+}, [userRole, clienteOrg]);
 
   /* =========================================================
      Logout
