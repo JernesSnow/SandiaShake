@@ -36,11 +36,12 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const filtro = (url.searchParams.get("filtro") ?? "todas").toLowerCase();
 
-  // Traer facturas (puedes ordenar por vencimiento o created_at si lo tienes)
+  // Traer facturas 
   let q = admin
     .from("facturas")
     .select("id_factura, periodo, total, saldo, estado_factura, fecha_vencimiento, created_at")
     .eq("id_organizacion", ou.id_organizacion)
+    .neq("estado", "ELIMINADO")
     .order("fecha_vencimiento", { ascending: true, nullsFirst: false });
 
   // Filtros

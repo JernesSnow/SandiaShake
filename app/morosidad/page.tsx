@@ -40,9 +40,20 @@ export default function MorosidadPage() {
         <div className="text-sm text-gray-200">
           <p className="text-gray-300 mb-2">¿Cómo pagar?</p>
           <ul className="list-disc ml-5 space-y-1">
-            <li>SINPE: <b>xxxx-xxxx</b></li>
-            <li>Transferencia: <b>IBAN xxxx</b></li>
-            <li>Enviar comprobante a: <b>facturacion@sandiaconchile.com</b></li>
+            <li>SINPE: <b>{data?.pagoInfo?.sinpe ?? "No disponible"}</b></li>
+            <li>
+              Transferencia:{" "}
+              <b>
+                {data?.pagoInfo?.cuenta ?? "No disponible"}
+              </b>
+            </li>
+            <li>
+              Titular: <b>{data?.pagoInfo?.titular ?? "No disponible"}</b>
+            </li>
+            <li>
+              Enviar comprobante a:{" "}
+              <b>{data?.pagoInfo?.emailComprobante ?? "No disponible"}</b>
+            </li>
           </ul>
         </div>
 

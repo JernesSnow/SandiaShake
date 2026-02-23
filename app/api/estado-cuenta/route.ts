@@ -7,6 +7,18 @@ function jsonError(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
 }
 
+const ymdCR = (d: Date) => {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Costa_Rica",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(d);
+
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
+};
+
 export async function GET() {
   const supabase = await createSupabaseServer();
   const admin = createSupabaseAdmin();
@@ -51,22 +63,34 @@ const { data: org } = await admin
 
 const nombreOrganizacion = org?.nombre ?? null;
   // morosidad vencida + 2 días + saldo>0
-  const { data: facturasMorosas, error } = await admin
-    .from("facturas")
-    .select("id_factura, periodo, saldo, fecha_vencimiento")
-    .eq("id_organizacion", idOrg)
-    .gt("saldo", 0)
-    .not("fecha_vencimiento", "is", null)
-    .lte("fecha_vencimiento", new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString().slice(0,10)); // YYYY-MM-DD
+  const cutoffBloqueo = ymdCR(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000));
+
+const { data: facturasMorosas, error } = await admin
+  .from("facturas")
+  .select("id_factura, periodo, saldo, fecha_vencimiento")
+  .eq("id_organizacion", idOrg)
+  .eq("estado", "ACTIVO")
+  .gt("saldo", 0)
+  .not("fecha_vencimiento", "is", null)
+  .lte("fecha_vencimiento", cutoffBloqueo);
 
   if (error) return jsonError(error.message, 500);
 
   const blocked = (facturasMorosas?.length ?? 0) > 0;
+
+const pagoInfo = {
+  sinpe: process.env.PAGO_SINPE ?? null,
+  cuenta: process.env.PAGO_CUENTA ?? null,
+  banco: process.env.PAGO_BANCO ?? null,
+  titular: process.env.PAGO_TITULAR ?? null,
+  emailComprobante: process.env.PAGO_EMAIL_COMPROBANTE ?? null,
+};
 
   return NextResponse.json({
     blocked,
     id_organizacion: idOrg,
     organizacion_nombre: nombreOrganizacion,
     facturasMorosas: facturasMorosas ?? [],
+    pagoInfo,
   });
 }
