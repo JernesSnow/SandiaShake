@@ -46,11 +46,24 @@ export class OfficeScene extends Phaser.Scene {
 }
 
   create() {
-    this.cameras.main.setBackgroundColor("#f4f4f4");
-    
 
     const w = this.scale.width;
     const h = this.scale.height;
+
+    this.cameras.main.setBackgroundColor("#f4f4f4");
+
+// Pared (arriba)
+this.add.rectangle(w / 2, h * 0.14, w, h * 0.28, 0xe84d5b);
+
+// Piso (abajo)
+this.add.rectangle(w / 2, h * 0.64, w, h * 0.72, 0xf2f2f2);
+
+// Línea pared/piso (zócalo)
+this.add.rectangle(w / 2, h * 0.28, w, 8, 0xffffff);
+
+// Sombrilla suave bajo el zócalo (profundidad)
+this.add.rectangle(w / 2, h * 0.29, w, 6, 0x000000, 0.06);;
+    
 
     const stations: Station[] = [
       { key: "demo", x: w * 0.25, y: h * 0.50,  label: "Demo",          blockW: 220, blockH: 140, interactW: 320, interactH: 240 },
@@ -74,7 +87,7 @@ export class OfficeScene extends Phaser.Scene {
     });
 
 this.player = this.add.image(w * 0.5, h * 0.75, "player");
-this.player.setScale(0.18); // ajusta luego
+this.player.setScale(0.12); // ajustar tamaño del personaje
 this.player.setOrigin(0.5, 0.5);
 
     this.cursors = this.input.keyboard!.createCursorKeys();

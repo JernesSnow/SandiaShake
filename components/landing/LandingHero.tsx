@@ -25,7 +25,7 @@ useEffect(() => {
       <header className="mx-auto max-w-6xl px-5 py-5 flex items-center justify-between">
         <div className="font-bold">Sandía con Chile</div>
         <div className="flex gap-2">
-          <button className="px-4 py-2 rounded-xl border">Login</button>
+          <button className="px-4 py-2 rounded-xl bg-black text-white">Login</button>
           <button className="px-4 py-2 rounded-xl bg-black text-white">Get started</button>
         </div>
       </header>
@@ -53,7 +53,7 @@ useEffect(() => {
                 >
                   Explorar demo
                 </button>
-                <button className="px-5 py-3 rounded-2xl border">Contactar</button>
+                <button className="px-5 py-3 rounded-2xl bg-black text-white">Contactar</button>
               </div>
               {isMobile && (
                 <p className="text-xs text-neutral-500">
