@@ -86,10 +86,17 @@ useEffect(() => {
             <div className="w-full">
             <GameExperience
               onFeature={(k) => {
+                if ((k as any) === "exit") {
+                  setOpen(false);
+                  setFeature(null);
+                  setMode("hero"); // vuelve a la sandía
+                  return;
+                }
+
                 setFeature(k);
                 setOpen(true);
               }}
-                modalOpen={open}
+              modalOpen={open}
             />
           </div>
         </div>
