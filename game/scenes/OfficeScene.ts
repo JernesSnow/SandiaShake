@@ -8,6 +8,7 @@ type Station = {
   x: number;
   y: number;
   label: string;
+  labelY?: number;
 
   // Caja donde NO debe entrar el personaje 
   blockW: number;
@@ -16,6 +17,11 @@ type Station = {
   // Aura para mostrar hint y permitir Enter
   interactW: number;
   interactH: number;
+
+  spriteKey: string;
+  scale: number;
+  yOffset?: number;      // para subir/bajar sin tocar colisión
+  depthOffset?: number;  // para TV en pared etc
 };
 
 export class OfficeScene extends Phaser.Scene {
@@ -32,6 +38,11 @@ export class OfficeScene extends Phaser.Scene {
   private lastMove = new Phaser.Math.Vector2(0, 1);
   private nextAllowedAt = 0;
 
+  private WORLD_W=0;
+  private WORLD_H=0;
+  private floorTop=0;
+  private floorBottom=0;
+
   constructor(emitToUI: EmitFn) {
     super("OfficeScene");
     this.emitToUI = emitToUI;
@@ -42,226 +53,324 @@ export class OfficeScene extends Phaser.Scene {
   }
 
   preload() {
-  this.load.image("player", window.location.origin + "/assets/PersonajePrincipal.png");
+  //this.load.image("player", window.location.origin + "/assets/PersonajePrincipal.png");
+  this.load.image("bg", "/assets/office_bg.png");
+  this.load.image("player", "/assets/PersonajePrincipal.png");
+  this.load.image("demo", "/assets/prop_demo_desk.png");
+  this.load.image("org", "/assets/prop_organizacion_shelf.png");
+  this.load.image("growth", "/assets/prop_crecimiento_board.png");
+  this.load.image("follow", "/assets/prop_seguimiento_tv.png");
+  this.load.image("door", "/assets/prop_exit_door.png");
 }
 
+
   create() {
+  const w = this.scale.width;
+  const h = this.scale.height;
+  
+  // Mundo más ancho
+  this.WORLD_W = w * 1.8;
+  this.WORLD_H = h;
 
-    const w = this.scale.width;
-    const h = this.scale.height;
+  // Solo “piso” caminable
+  this.floorTop = h * 0.70;
+  this.floorBottom = h * 1;
 
-    this.cameras.main.setBackgroundColor("#f4f4f4");
+// Fondo temporal: llena el mundo completo 
+const bg = this.add.image(0, 0, "bg")
+  .setOrigin(0, 0)
+  .setDisplaySize(this.WORLD_W, this.WORLD_H)
+  .setDepth(0);
 
-// Pared (arriba)
-this.add.rectangle(w / 2, h * 0.14, w, h * 0.30, 0xe84d5b);
+  // Cámara: límites del mundo y follow
+  this.cameras.main.setBounds(0, 0, this.WORLD_W, this.WORLD_H);
+  this.cameras.main.setZoom(1);
+  this.cameras.main.setBackgroundColor("#f4f4f4");
 
-// Piso (abajo)
-this.add.rectangle(w / 2, h * 0.64, w, h * 0.72, 0xf2f2f2);
+  // Tele de Seguimiento ARRIBA (decorativa)
+  const followDecor = this.add.image(this.WORLD_W * 0.50, h * 0.22, "follow")
+    .setOrigin(0.5, 0.5)
+    .setScale(0.55);
+  followDecor.setDepth(10); // fondo
 
-// Línea pared/piso (zócalo)
-this.add.rectangle(w / 2, h * 0.28, w, 8, 0xffffff);
+  const DOOR_X = this.WORLD_W * 0.95;
+  const DOOR_BASE_Y = h * 0.62; // donde está la base visual 
 
-// Sombrilla suave bajo el zócalo (profundidad)
-this.add.rectangle(w / 2, h * 0.29, w, 6, 0x000000, 0.06);;
-    
+  const doorDecor = this.add.image(this.WORLD_W * 0.95, h * 0.80, "door")
+  .setOrigin(0.5, 1)
+  .setScale(0.40);
 
-    const stations: Station[] = [
-      { key: "demo", x: w * 0.25, y: h * 0.50,  label: "Demo",          blockW: 220, blockH: 140, interactW: 320, interactH: 240 },
-      { key: "organizacion", x: w * 0.85, y: h * 0.50, label: "Organización", blockW: 180, blockH: 120, interactW: 280, interactH: 220 },
-      { key: "seguimiento", x: w * 0.50, y: h * 0.20, label: "Seguimiento", blockW: 420, blockH: 160, interactW: 520, interactH: 240 },
-      { key: "crecimiento",  x: w * 0.55, y: h * 0.50 , label: "Crecimiento",  blockW: 180, blockH: 120, interactW: 280, interactH: 220 },
-      { key: "exit" as FeatureKey, x: w * 0.93, y: h * 0.20, label: "Salir", blockW: 120, blockH: 190, interactW: 200, interactH: 260 },
-    ];
+doorDecor.setDepth(50); // encima del bg, detrás del player
 
-    // Dibujado placeholder (objeto). Luego lo reemplazo por sprites bonitos.
-    stations.forEach((s) => {
-      const isExit = (s.key as any) === "exit";
+  // Estaciones (repartidas en el mundo ancho)
+  const stations: Station[] = [
+    {
+      key: "demo",
+      x: this.WORLD_W * 0.10,
+      y: h * 0.80,
+      label: "Demo",
+      blockW: 260, blockH: 150,
+      interactW: 360, interactH: 260,
+      spriteKey: "demo",
+      scale: 0.42,
+    },
 
-  if (!isExit) {
-    // estaciones normales
-    this.add.rectangle(s.x, s.y, s.blockW, s.blockH, 0xffffff).setStrokeStyle(2, 0xcccccc);
+    {
+      key: "crecimiento",
+      x: this.WORLD_W * 0.30,
+      y: h * 0.65,
+      label: "Crecimiento",
+      blockW: 220, blockH: 160,
+      interactW: 320, interactH: 260,
+      spriteKey: "growth",
+      scale: 0.42,
+    },
 
-    this.add.text(s.x, s.y - s.blockH / 2 - 18, s.label, {
-      fontFamily: "system-ui, sans-serif",
-      fontSize: "14px",
-      color: "#333",
-      backgroundColor: "rgba(255,255,255,0.85)",
-      padding: { left: 8, right: 8, top: 4, bottom: 4 },
-    }).setOrigin(0.5);
+    {
+      
+      key: "seguimiento",
+      x: this.WORLD_W * 0.62,
+      y: h * 0.82,
+      label: "Seguimiento",
+      blockW: 170, blockH: 140,
+      interactW: 280, interactH: 240,
+      spriteKey: "follow",
+      scale: 0.22,
+      yOffset: 0,
+    },
 
-    return;
+    {
+      key: "organizacion",
+      x: this.WORLD_W * 0.82,
+      y: h * 0.83,
+      label: "Organización",
+      blockW: 240, blockH: 160,
+      interactW: 340, interactH: 260,
+      spriteKey: "org",
+      scale: 0.42,
+    },
+
+    {
+  key: "exit" as FeatureKey,
+  x: DOOR_X,
+  y: this.floorBottom - 300,  // centro del trigger en el piso (ajustable)
+  label: "Salir",
+  blockW: 0,
+  blockH: 0,
+  interactW: 180,
+  interactH: 100,            
+  spriteKey: "door",         
+  scale: 0.40,
+},
+  ];
+
+  // Dibujo props + labels
+  stations.forEach((s) => {
+    if (s.key === ("exit" as any)) return;
+  const propY = s.y + (s.yOffset ?? 0);
+
+  let propDepth = propY;
+
+  if (s.spriteKey !== "__none__") {
+    const prop = this.add.image(s.x, propY, s.spriteKey)
+      .setOrigin(0.5, 1)
+      .setScale(s.scale);
+
+    prop.setDepth(propY);
+    propDepth = prop.depth;
   }
 
-  // ✅ Exit: dibujalo como “puerta” (placeholder simple)
-  const door = this.add.rectangle(s.x, s.y, s.blockW, s.blockH, 0xf8f8f8).setStrokeStyle(2, 0x999999);
-  this.add.rectangle(s.x, s.y + s.blockH * 0.1, s.blockW * 0.75, s.blockH * 0.7, 0xffffff, 0.6); // panel
-  this.add.circle(s.x + s.blockW * 0.25, s.y, 4, 0x666666); // manija
+  const labelY = (s.labelY ?? propY) - (s.blockH / 2) - 18;
 
-  this.add.text(s.x, s.y - s.blockH / 2 - 18, "Salir", {
+  const label = this.add.text(s.x, labelY, s.label, {
     fontFamily: "system-ui, sans-serif",
     fontSize: "14px",
     color: "#333",
     backgroundColor: "rgba(255,255,255,0.85)",
     padding: { left: 8, right: 8, top: 4, bottom: 4 },
   }).setOrigin(0.5);
+
+  label.setDepth(propDepth + 1);
 });
 
-this.player = this.add.image(w * 0.5, h * 0.75, "player");
-this.player.setScale(0.12); // ajustar tamaño del personaje
-this.player.setOrigin(0.5, 0.5);
+  // Player: nace en el piso, centrado
+  this.player = this.add.image(this.WORLD_W * 0.70, h * 0.88, "player") // podemos cambiar las coordenadas donde nace el player
+    .setOrigin(0.5, 1)
+    .setScale(0.16);
 
-    this.cursors = this.input.keyboard!.createCursorKeys();
-    this.keyEnter = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
+  this.player.setDepth(this.player.y + 10);
 
-    // Hint
-    const hint = this.add.text(0, 0, "⏎ Enter", {
-      fontFamily: "system-ui, sans-serif",
-      fontSize: "12px",
-      color: "#111",
-      backgroundColor: "rgba(255,255,255,0.92)",
-      padding: { left: 8, right: 8, top: 4, bottom: 4 },
-    });
-    hint.setOrigin(0.5);
-    hint.setVisible(false);
+  // Cámara sigue al player
+  this.cameras.main.startFollow(this.player, true, 0.08, 0.08);
+  this.cameras.main.setDeadzone(w * 0.25, h * 0.25);
 
-    this.registry.set("hint", hint);
-    this.registry.set("stations", stations);
+  // Input
+  this.cursors = this.input.keyboard!.createCursorKeys();
+  this.keyEnter = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.ENTER);
 
-    // Lock/unlock desde React
-    this.events.on("LOCK", () => { this.locked = true; });
+  // Hint
+  const hint = this.add.text(0, 0, "⏎ Enter", {
+    fontFamily: "system-ui, sans-serif",
+    fontSize: "12px",
+    color: "#111",
+    backgroundColor: "rgba(255,255,255,0.92)",
+    padding: { left: 8, right: 8, top: 4, bottom: 4 },
+  });
+  hint.setOrigin(0.5);
+  hint.setVisible(false);
+  hint.setScrollFactor(0);
+  hint.setDepth(9999); 
 
-    this.events.on("UNLOCK_AND_BUMP", () => {
-      this.locked = false;
+  this.registry.set("hint", hint);
+  this.registry.set("stations", stations);
 
-      // Empuje hacia atrás (opuesto a la última dirección)
-      const bump = this.lastMove.clone().scale(-28);
-      this.player.x += bump.x;
-      this.player.y += bump.y;
+  // Lock/unlock
+  this.events.on("LOCK", () => { this.locked = true; });
 
-      const pad = 18;
-      this.player.x = Phaser.Math.Clamp(this.player.x, pad, this.scale.width - pad);
-      this.player.y = Phaser.Math.Clamp(this.player.y, pad, this.scale.height - pad);
+  this.events.on("UNLOCK_AND_BUMP", () => {
+    this.locked = false;
 
-      // 2.5D (profundidad): recalcular SIEMPRE
-      const base = 0.105;
-      const depth = Phaser.Math.Clamp(this.player.y / h, 0, 1);
-      this.player.setScale(base + depth * 0.03);
+    const bump = this.lastMove.clone().scale(-28);
+    this.player.x += bump.x;
+    this.player.y += bump.y;
 
-      this.nextAllowedAt = this.time.now + 500;
-    });
+    // clamp mundo + piso
+    const padX = 18;
+    this.player.x = Phaser.Math.Clamp(this.player.x, padX, this.WORLD_W - padX);
+    this.player.y = Phaser.Math.Clamp(this.player.y, this.floorTop, this.floorBottom);
 
-    this.emitToUI({ type: "READY" });
-  }
+    // 2.5D scale
+    const base = 0.14;
+    const depth = Phaser.Math.Clamp((this.player.y - this.floorTop) / (this.floorBottom - this.floorTop), 0, 1);
+    this.player.setScale(base + depth * 0.05);
+
+    this.nextAllowedAt = this.time.now + 500;
+  });
+
+  this.emitToUI({ type: "READY" });
+}
 
   update(_t: number, dt: number) {
-    const hint = this.registry.get("hint") as Phaser.GameObjects.Text;
-    const stations = this.registry.get("stations") as Station[];
-    const now = this.time.now;
+  const hint = this.registry.get("hint") as Phaser.GameObjects.Text;
+  const stations = this.registry.get("stations") as Station[];
+  const now = this.time.now;
 
-    // Si modal abierto, no mover y ocultar hint
-    if (this.locked) {
-      hint.setVisible(false);
+  if (this.locked) {
+    hint.setVisible(false);
+    return;
+  }
+
+  const prevX = this.player.x;
+  const prevY = this.player.y;
+
+  const d = dt / 1000;
+  let vx = 0, vy = 0;
+
+  if (this.cursors.left?.isDown) vx -= 1;
+  if (this.cursors.right?.isDown) vx += 1;
+  if (this.cursors.up?.isDown) vy -= 1;
+  if (this.cursors.down?.isDown) vy += 1;
+
+  if (vx !== 0 || vy !== 0) {
+    const len = Math.hypot(vx, vy);
+    vx /= len;
+    vy /= len;
+    this.lastMove.set(vx, vy);
+  }
+
+  const moving = vx !== 0 || vy !== 0;
+
+  // Posición lógica 
+  let nx = this.player.x + vx * this.speed * d;
+  let ny = this.player.y + vy * this.speed * d;
+
+  // Clamp correcto: mundo + piso
+  const padX = 18;
+  nx = Phaser.Math.Clamp(nx, padX, this.WORLD_W - padX);
+  ny = Phaser.Math.Clamp(ny, this.floorTop, this.floorBottom);
+
+  // FOOT (lógico) para colisiones/hover
+  const footX = nx;
+  const footY = ny;
+
+  // Colisión (usa FOOT lógico) 
+  let blocked = false;
+  for (const s of stations) {
+    if (this.insideAABB(footX, footY, s.x, s.y, s.blockW, s.blockH)) {
+      blocked = true;
+      break;
+    }
+  }
+
+  if (blocked) {
+    // volver
+    nx = prevX;
+    ny = prevY;
+  }
+
+  // aplicar posición base
+  this.player.x = nx;
+  this.player.y = ny;
+
+  // flip + animación 
+  if (moving) {
+    if (vx < 0) this.player.setFlipX(false);
+    if (vx > 0) this.player.setFlipX(true);
+
+    const t = this.time.now * 0.02;
+    const bob = Math.sin(t) * 0.25;
+    this.player.y = ny + bob;
+    this.player.rotation = Math.sin(t * 0.5) * 0.01;
+  } else {
+    this.player.rotation = 0;
+  }
+
+  this.player.setDepth(ny + 10);
+
+  const base = 0.14;
+  const depth = Phaser.Math.Clamp(
+    (ny - this.floorTop) / (this.floorBottom - this.floorTop),
+    0,
+    1
+  );
+  this.player.setScale(base + depth * 0.05);
+
+  this.hoveredFeature = null;
+  for (const s of stations) {
+    if (this.insideAABB(footX, footY, s.x, s.y, s.interactW, s.interactH)) {
+      this.hoveredFeature = s.key;
+      break;
+    }
+  }
+
+  // Hint (posicionar basado en ny/foot)
+  if (this.hoveredFeature && now >= this.nextAllowedAt) {
+    hint.setVisible(true);
+    hint.setText((this.hoveredFeature as any) === "exit" ? "⏎ Salir" : "⏎ Enter");
+    hint.setPosition(this.player.x, ny - 28);
+  } else {
+    hint.setVisible(false);
+  }
+
+  // Enter para interactuar
+  if (
+    this.hoveredFeature &&
+    now >= this.nextAllowedAt &&
+    Phaser.Input.Keyboard.JustDown(this.keyEnter)
+  ) {
+    if ((this.hoveredFeature as any) === "exit") {
+      this.locked = true;
+      this.nextAllowedAt = now + 600;
+
+      this.cameras.main.fadeOut(200, 0, 0, 0);
+      this.time.delayedCall(200, () => {
+        this.emitToUI({ type: "FEATURE_TRIGGER", feature: this.hoveredFeature! });
+      });
       return;
     }
 
-    // Guardar posición anterior para colisiones
-    const prevX = this.player.x;
-    const prevY = this.player.y;
-
-    // Movimiento
-    const d = dt / 1000;
-    let vx = 0, vy = 0;
-
-    if (this.cursors.left?.isDown)  vx -= 1;
-    if (this.cursors.right?.isDown) vx += 1;
-    if (this.cursors.up?.isDown)    vy -= 1;
-    if (this.cursors.down?.isDown)  vy += 1;
-
-    if (vx !== 0 || vy !== 0) {
-      const len = Math.hypot(vx, vy);
-      vx /= len; vy /= len;
-      this.lastMove.set(vx, vy);
-    }
-
-    this.player.x += vx * this.speed * d;
-    this.player.y += vy * this.speed * d;
-
-    const moving = vx !== 0 || vy !== 0;
-
-if (moving) {
-  // flip según dirección horizontal
-  if (vx < 0) this.player.setFlipX(false);
-  if (vx > 0) this.player.setFlipX(true);
-
-  // bobbing simple
-  const t = this.time.now * 0.02;
-  this.player.y += Math.sin(t) * 0.25;
-
-  // mini sway
-  this.player.rotation = Math.sin(t * 0.5) * 0.01;
-} else {
-  this.player.rotation = 0;
-}
-
-    // clamp
-    const pad = 18;
-    this.player.x = Phaser.Math.Clamp(this.player.x, pad, this.scale.width - pad);
-    this.player.y = Phaser.Math.Clamp(this.player.y, pad, this.scale.height - pad);
-
-    //Bloqueo: evitar que se suba encima del objeto
-    let blocked = false;
-    for (const s of stations) {
-      if (this.insideAABB(this.player.x, this.player.y, s.x, s.y, s.blockW, s.blockH)) {
-        blocked = true;
-        break;
-      }
-    }
-    if (blocked) {
-      this.player.x = prevX;
-      this.player.y = prevY;
-    }
-
-    // Hover: detectar aura de interacción
-    this.hoveredFeature = null;
-    for (const s of stations) {
-      if (this.insideAABB(this.player.x, this.player.y, s.x, s.y, s.interactW, s.interactH)) {
-        this.hoveredFeature = s.key;
-        break;
-      }
-    }
-
-    // Hint visible solo si hay hover y no cooldown
-
-
-        if (this.hoveredFeature && now >= this.nextAllowedAt) {
-      hint.setVisible(true);
-      hint.setText(this.hoveredFeature === ("exit" as any) ? "⏎ Salir" : "⏎ Enter");
-      hint.setPosition(this.player.x, this.player.y - 28);
-    } else {
-      hint.setVisible(false);
-    }
-
-        // Enter para interactuar
-    if (
-      this.hoveredFeature &&
-      now >= this.nextAllowedAt &&
-      Phaser.Input.Keyboard.JustDown(this.keyEnter)
-    ) {
-      // SALIR
-      if (this.hoveredFeature === ("exit" as any)) {
-        this.locked = true;               // bloquea movimiento
-        this.nextAllowedAt = now + 600;   // evita doble trigger
-
-        this.cameras.main.fadeOut(200, 0, 0, 0);
-        this.time.delayedCall(200, () => {
-          this.emitToUI({ type: "FEATURE_TRIGGER", feature: this.hoveredFeature! });
-        });
-        return;
-      }
-
-      // OTRAS ESTACIONES
-      this.locked = true;
-      this.emitToUI({ type: "FEATURE_TRIGGER", feature: this.hoveredFeature });
-    }
+    this.locked = true;
+    this.emitToUI({ type: "FEATURE_TRIGGER", feature: this.hoveredFeature });
   }
+}
 }
