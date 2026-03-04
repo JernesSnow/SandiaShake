@@ -25,7 +25,7 @@ type Station = {
 };
 
 export class OfficeScene extends Phaser.Scene {
-  private player!: Phaser.GameObjects.Image;
+  private player!: Phaser.GameObjects.Sprite;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private keyEnter!: Phaser.Input.Keyboard.Key;
 
@@ -42,6 +42,9 @@ export class OfficeScene extends Phaser.Scene {
   private WORLD_H=0;
   private floorTop=0;
   private floorBottom=0;
+// Para escalar todo basado en la altura actual vs la base (1080p)
+  private uiScale = 1;
+private readonly BASE_H = 1080;
 
   constructor(emitToUI: EmitFn) {
     super("OfficeScene");
@@ -55,7 +58,11 @@ export class OfficeScene extends Phaser.Scene {
   preload() {
   //this.load.image("player", window.location.origin + "/assets/PersonajePrincipal.png");
   this.load.image("bg", "/assets/office_bg.png");
-  this.load.image("player", "/assets/PersonajePrincipal.png");
+  // Spritesheet (6 frames en 3 columnas x 2 filas)
+  this.load.spritesheet("player", "/assets/player_walk_animation.png", {
+    frameWidth: 341,  
+    frameHeight: 565, 
+  });
   this.load.image("demo", "/assets/prop_demo_desk.png");
   this.load.image("org", "/assets/prop_organizacion_shelf.png");
   this.load.image("growth", "/assets/prop_crecimiento_board.png");
@@ -67,6 +74,8 @@ export class OfficeScene extends Phaser.Scene {
   create() {
   const w = this.scale.width;
   const h = this.scale.height;
+
+  this.uiScale = h / this.BASE_H;
   
   // Mundo más ancho
   this.WORLD_W = w * 1.8;
@@ -87,6 +96,21 @@ const bg = this.add.image(0, 0, "bg")
   this.cameras.main.setZoom(1);
   this.cameras.main.setBackgroundColor("#f4f4f4");
 
+
+  this.anims.create({
+  key: "idle",
+  frames: [{ key: "player", frame: 0 }],
+  frameRate: 1,
+  repeat: -1,
+});
+
+this.anims.create({
+  key: "walk",
+  frames: this.anims.generateFrameNumbers("player", { start: 0, end: 5 }),
+  frameRate: 10,
+  repeat: -1,
+});
+
   // Tele de Seguimiento ARRIBA (decorativa)
   const followDecor = this.add.image(this.WORLD_W * 0.50, h * 0.22, "follow")
     .setOrigin(0.5, 0.5)
@@ -98,7 +122,7 @@ const bg = this.add.image(0, 0, "bg")
 
   const doorDecor = this.add.image(this.WORLD_W * 0.95, h * 0.80, "door")
   .setOrigin(0.5, 1)
-  .setScale(0.40);
+  .setScale(0.40 * this.uiScale);
 
 doorDecor.setDepth(50); // encima del bg, detrás del player
 
@@ -153,7 +177,7 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
     {
   key: "exit" as FeatureKey,
   x: DOOR_X,
-  y: this.floorBottom - 300,  // centro del trigger en el piso (ajustable)
+  y: this.floorBottom - (300 * this.uiScale),  // centro del trigger en el piso (ajustable)
   label: "Salir",
   blockW: 0,
   blockH: 0,
@@ -174,7 +198,7 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
   if (s.spriteKey !== "__none__") {
     const prop = this.add.image(s.x, propY, s.spriteKey)
       .setOrigin(0.5, 1)
-      .setScale(s.scale);
+      .setScale(s.scale * this.uiScale);
 
     prop.setDepth(propY);
     propDepth = prop.depth;
@@ -184,19 +208,26 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
 
   const label = this.add.text(s.x, labelY, s.label, {
     fontFamily: "system-ui, sans-serif",
-    fontSize: "14px",
+    fontSize: `${Math.round(24 * this.uiScale)}px`,
     color: "#333",
     backgroundColor: "rgba(255,255,255,0.85)",
-    padding: { left: 8, right: 8, top: 4, bottom: 4 },
+    padding: {
+  left: Math.round(8 * this.uiScale),
+  right: Math.round(8 * this.uiScale),
+  top: Math.round(4 * this.uiScale),
+  bottom: Math.round(4 * this.uiScale),
+},
   }).setOrigin(0.5);
 
   label.setDepth(propDepth + 1);
 });
 
   // Player: nace en el piso, centrado
-  this.player = this.add.image(this.WORLD_W * 0.70, h * 0.88, "player") // podemos cambiar las coordenadas donde nace el player
-    .setOrigin(0.5, 1)
-    .setScale(0.16);
+  this.player = this.add.sprite(this.WORLD_W * 0.70, h * 0.88, "player", 0)
+  .setOrigin(0.5, 1)
+  .setScale(0.16 * this.uiScale);
+
+  this.player.play("idle");
 
   this.player.setDepth(this.player.y + 10);
 
@@ -211,7 +242,7 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
   // Hint
   const hint = this.add.text(0, 0, "⏎ Enter", {
     fontFamily: "system-ui, sans-serif",
-    fontSize: "12px",
+    fontSize: `${Math.round(14 * this.uiScale)}px`,
     color: "#111",
     backgroundColor: "rgba(255,255,255,0.92)",
     padding: { left: 8, right: 8, top: 4, bottom: 4 },
@@ -240,9 +271,9 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
     this.player.y = Phaser.Math.Clamp(this.player.y, this.floorTop, this.floorBottom);
 
     // 2.5D scale
-    const base = 0.14;
+    const base = 0.90 * this.uiScale;
     const depth = Phaser.Math.Clamp((this.player.y - this.floorTop) / (this.floorBottom - this.floorTop), 0, 1);
-    this.player.setScale(base + depth * 0.05);
+    this.player.setScale(base + depth * (0.05 * this.uiScale));
 
     this.nextAllowedAt = this.time.now + 500;
   });
@@ -280,6 +311,15 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
 
   const moving = vx !== 0 || vy !== 0;
 
+  if (moving) {
+    this.player.rotation = 0;
+  this.player.anims.play("walk", true);
+} else {
+      this.player.rotation = 0;
+  this.player.anims.play("idle", true);
+
+}
+
   // Posición lógica 
   let nx = this.player.x + vx * this.speed * d;
   let ny = this.player.y + vy * this.speed * d;
@@ -296,7 +336,7 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
   // Colisión (usa FOOT lógico) 
   let blocked = false;
   for (const s of stations) {
-    if (this.insideAABB(footX, footY, s.x, s.y, s.blockW, s.blockH)) {
+    if (this.insideAABB(footX, footY, s.x, s.y, s.blockW * this.uiScale, s.blockH * this.uiScale)) {
       blocked = true;
       break;
     }
@@ -316,12 +356,6 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
   if (moving) {
     if (vx < 0) this.player.setFlipX(false);
     if (vx > 0) this.player.setFlipX(true);
-
-    const t = this.time.now * 0.02;
-    const bob = Math.sin(t) * 0.25;
-    this.player.y = ny + bob;
-    this.player.rotation = Math.sin(t * 0.5) * 0.01;
-  } else {
     this.player.rotation = 0;
   }
 
@@ -333,11 +367,12 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
     0,
     1
   );
-  this.player.setScale(base + depth * 0.05);
+  this.player.setScale(base + depth * (0.05 * this.uiScale));
+
 
   this.hoveredFeature = null;
   for (const s of stations) {
-    if (this.insideAABB(footX, footY, s.x, s.y, s.interactW, s.interactH)) {
+    if (this.insideAABB(footX, footY, s.x, s.y, s.interactW * this.uiScale, s.interactH * this.uiScale)) {
       this.hoveredFeature = s.key;
       break;
     }
