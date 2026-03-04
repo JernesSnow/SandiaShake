@@ -271,7 +271,7 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
     this.player.y = Phaser.Math.Clamp(this.player.y, this.floorTop, this.floorBottom);
 
     // 2.5D scale
-    const base = 0.90 * this.uiScale;
+    const base = 0.14 * this.uiScale;
     const depth = Phaser.Math.Clamp((this.player.y - this.floorTop) / (this.floorBottom - this.floorTop), 0, 1);
     this.player.setScale(base + depth * (0.05 * this.uiScale));
 
