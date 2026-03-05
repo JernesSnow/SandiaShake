@@ -44,6 +44,9 @@ export class OfficeScene extends Phaser.Scene {
   private floorBottom=0;
 // Para escalar todo basado en la altura actual vs la base (1080p)
   private uiScale = 1;
+
+  private readonly PLAYER_BASE = 1;       // tamaño general
+private readonly PLAYER_DEPTH_EXTRA = 0.06; // cuánto crece al acercarse
 private readonly BASE_H = 1080;
 
   constructor(emitToUI: EmitFn) {
@@ -60,8 +63,8 @@ private readonly BASE_H = 1080;
   this.load.image("bg", "/assets/office_bg.png");
   // Spritesheet (6 frames en 3 columnas x 2 filas)
   this.load.spritesheet("player", "/assets/player_walk_animation.png", {
-    frameWidth: 341,  
-    frameHeight: 565, 
+    frameWidth: 1536 / 4.9,  
+    frameHeight: 1024 /2, 
   });
   this.load.image("demo", "/assets/prop_demo_desk.png");
   this.load.image("org", "/assets/prop_organizacion_shelf.png");
@@ -69,7 +72,6 @@ private readonly BASE_H = 1080;
   this.load.image("follow", "/assets/prop_seguimiento_tv.png");
   this.load.image("door", "/assets/prop_exit_door.png");
 }
-
 
   create() {
   const w = this.scale.width;
@@ -104,11 +106,25 @@ const bg = this.add.image(0, 0, "bg")
   repeat: -1,
 });
 
+
 this.anims.create({
   key: "walk",
-  frames: this.anims.generateFrameNumbers("player", { start: 0, end: 5 }),
-  frameRate: 10,
-  repeat: -1,
+  frames: [
+    { key: "player", frame: 0 },
+    { key: "player", frame: 0 },
+
+    { key: "player", frame: 1 },
+    { key: "player", frame: 1 },
+
+    { key: "player", frame: 0 },
+    { key: "player", frame: 0 },
+
+    { key: "player", frame: 2 },
+    { key: "player", frame: 2 },
+
+  ],
+  frameRate: 8,
+  repeat: -1
 });
 
   // Tele de Seguimiento ARRIBA (decorativa)
@@ -225,7 +241,7 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
   // Player: nace en el piso, centrado
   this.player = this.add.sprite(this.WORLD_W * 0.70, h * 0.88, "player", 0)
   .setOrigin(0.5, 1)
-  .setScale(0.16 * this.uiScale);
+  .setScale(this.PLAYER_BASE * this.uiScale);
 
   this.player.play("idle");
 
@@ -363,12 +379,14 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
 
   const base = 0.14;
   const depth = Phaser.Math.Clamp(
-    (ny - this.floorTop) / (this.floorBottom - this.floorTop),
-    0,
-    1
-  );
-  this.player.setScale(base + depth * (0.05 * this.uiScale));
+  (ny - this.floorTop) / (this.floorBottom - this.floorTop),
+  0,
+  1
+);
 
+this.player.setScale(
+  (this.PLAYER_BASE + depth * this.PLAYER_DEPTH_EXTRA) * this.uiScale
+);
 
   this.hoveredFeature = null;
   for (const s of stations) {
