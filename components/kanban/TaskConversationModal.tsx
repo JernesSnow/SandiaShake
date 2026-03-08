@@ -70,8 +70,12 @@ export default function TaskConversationModal({
 
   function getDecisionMeta(text: string) {
     const t = String(text ?? "");
-    if (t.startsWith("APROBADO:")) return { kind: "APROBADO" as const, label: "APROBADO" };
-    if (t.startsWith("RECHAZADO:")) return { kind: "RECHAZADO" as const, label: "RECHAZADO" };
+    if (t.startsWith("APROBADO:")) {
+      return { kind: "APROBADO" as const, label: "APROBADO" };
+    }
+    if (t.startsWith("RECHAZADO:")) {
+      return { kind: "RECHAZADO" as const, label: "RECHAZADO" };
+    }
     return null;
   }
 
@@ -90,8 +94,7 @@ export default function TaskConversationModal({
       else if (rolRaw === "COLABORADOR") setRole("COLABORADOR");
       else if (rolRaw === "CLIENTE") setRole("CLIENTE");
       else setRole("DESCONOCIDO");
-    } catch {
-    }
+    } catch {}
   }
 
   async function markAsRead() {
@@ -101,8 +104,7 @@ export default function TaskConversationModal({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({}),
       });
-    } catch {
-    }
+    } catch {}
   }
 
   async function load() {
@@ -114,7 +116,9 @@ export default function TaskConversationModal({
         cache: "no-store",
       });
       const json = await safeJson(res);
-      if (!res.ok) throw new Error(json?.error ?? "No se pudieron cargar los comentarios");
+      if (!res.ok) {
+        throw new Error(json?.error ?? "No se pudieron cargar los comentarios");
+      }
 
       const list = Array.isArray(json?.data) ? (json.data as CommentRow[]) : [];
       setRows(list);
@@ -152,13 +156,15 @@ export default function TaskConversationModal({
       });
 
       const json = await safeJson(res);
-      if (!res.ok) throw new Error(json?.error ?? "No se pudo enviar el comentario");
+      if (!res.ok) {
+        throw new Error(json?.error ?? "No se pudo enviar el comentario");
+      }
 
       if (json?.data) setRows((prev) => [...prev, json.data]);
       setMsg("");
 
       markAsRead();
-      await load(); 
+      await load();
     } catch (e: any) {
       setErr(e?.message ?? "Error al enviar mensaje");
     } finally {
@@ -184,7 +190,10 @@ export default function TaskConversationModal({
       });
 
       const json = await safeJson(res);
-      if (!res.ok) throw new Error(json?.error ?? "No se pudo registrar la decisión");
+      if (!res.ok) {
+        throw new Error(json?.error ?? "No se pudo registrar la decisión");
+      }
+
       setMsg("");
       await load();
 
@@ -215,19 +224,16 @@ export default function TaskConversationModal({
     const meta = getDecisionMeta(r.comentario);
 
     const container = mine ? "justify-end" : "justify-start";
-    const bubbleBase =
-      "max-w-[78%] rounded-2xl px-4 py-3 border shadow-sm";
-    const bubbleMine =
-      "bg-white/10 border-white/10 text-[#fffef9]/95";
-    const bubbleOther =
-      "bg-black/25 border-white/10 text-[#fffef9]/95";
+    const bubbleBase = "max-w-[78%] rounded-2xl px-4 py-3 border shadow-sm";
+    const bubbleMine = "bg-white/10 border-white/10 text-[#fffef9]/95";
+    const bubbleOther = "bg-black/25 border-white/10 text-[#fffef9]/95";
 
     const badge =
       meta?.kind === "APROBADO"
         ? "bg-[#6cbe45]/15 text-[#b9f7a6] border border-[#6cbe45]/40"
         : meta?.kind === "RECHAZADO"
-        ? "bg-[#ee2346]/15 text-[#ffb3c2] border border-[#ee2346]/40"
-        : "";
+          ? "bg-[#ee2346]/15 text-[#ffb3c2] border border-[#ee2346]/40"
+          : "";
 
     return (
       <div className={`flex ${container} py-2`}>
@@ -244,14 +250,14 @@ export default function TaskConversationModal({
           </div>
 
           {meta ? (
-            <div className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] ${badge}`}>
+            <div
+              className={`mt-2 inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] ${badge}`}
+            >
               {meta.kind === "APROBADO" ? "✅" : "❌"} {meta.label}
             </div>
           ) : null}
 
-          <div className="mt-2 text-sm whitespace-pre-wrap">
-            {r.comentario}
-          </div>
+          <div className="mt-2 text-sm whitespace-pre-wrap">{r.comentario}</div>
         </div>
       </div>
     );
@@ -270,7 +276,11 @@ export default function TaskConversationModal({
             ) : null}
           </div>
 
-          <button className={kanbanStyles.modalClose} onClick={onClose} type="button">
+          <button
+            className={kanbanStyles.modalClose}
+            onClick={onClose}
+            type="button"
+          >
             <span className="inline-flex items-center gap-2">
               <X size={16} /> Cerrar
             </span>
@@ -279,7 +289,9 @@ export default function TaskConversationModal({
 
         <div className="px-4 pb-4">
           {loading ? (
-            <div className="text-sm text-[#fffef9]/60 mt-2">Cargando conversación…</div>
+            <div className="text-sm text-[#fffef9]/60 mt-2">
+              Cargando conversación…
+            </div>
           ) : err ? (
             <div className="text-sm text-[#ffb3c2] mt-2">{err}</div>
           ) : emptyText ? (
@@ -353,16 +365,17 @@ export default function TaskConversationModal({
                     {deciding === "RECHAZAR" ? "Rechazando…" : "Rechazar"}
                   </span>
                 </button>
-
-                <p className="text-[11px] text-[#fffef9]/50 md:ml-auto md:self-center">
-                  Rechazar devuelve a <b>En progreso</b>.
-                </p>
               </div>
             ) : null}
           </div>
 
           <div className="mt-2">
-            <button type="button" onClick={load} className={kanbanStyles.modalSecondaryBtn} disabled={loading}>
+            <button
+              type="button"
+              onClick={load}
+              className={kanbanStyles.modalSecondaryBtn}
+              disabled={loading}
+            >
               Recargar
             </button>
           </div>

@@ -233,25 +233,27 @@ export async function POST(req: Request, ctx: Ctx) {
         const comentarioActualId = createdComment.id_comentario;
         const dedupe_key = `2rej_chat_task:${idTarea}:c:${comentarioActualId}`;
 
-        const { error: outboxErr } = await admin.from("email_outbox").insert({
-          event_type: "TWO_CONSECUTIVE_REJECTIONS_CHAT",
-          dedupe_key,
-          payload: {
-            id_tarea: idTarea,
-            id_comentario: comentarioActualId,
-            id_colaborador: updatedTask.id_colaborador,
-            id_organizacion: updatedTask.id_organizacion,
-            accion,
-            created_at: now,
-          },
-        });
+        const { error: notiErr } = await admin
+          .from("tareas_notificaciones")
+          .insert({
+            event_type: "TWO_CONSECUTIVE_REJECTIONS_CHAT",
+            dedupe_key,
+            payload: {
+              id_tarea: idTarea,
+              id_comentario: comentarioActualId,
+              id_colaborador: updatedTask.id_colaborador,
+              id_organizacion: updatedTask.id_organizacion,
+              accion,
+              created_at: now,
+            },
+          });
 
         if (
-          outboxErr &&
-          !String(outboxErr.message).toLowerCase().includes("duplicate")
+          notiErr &&
+          !String(notiErr.message).toLowerCase().includes("duplicate")
         ) {
           return NextResponse.json(
-            { error: outboxErr.message },
+            { error: notiErr.message },
             { status: 500 }
           );
         }
