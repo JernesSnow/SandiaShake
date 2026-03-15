@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Shell } from "../../components/Shell";
 import {
   Search,
@@ -304,10 +304,12 @@ function PurchaseModal({
   course,
   onClose,
   onNext,
+  loading = false,
 }: {
   course: Course;
   onClose: () => void;
   onNext: () => void;
+  loading?: boolean;
 }) {
   const priceDisplay = formatPrice(course.precio);
 
@@ -328,10 +330,11 @@ function PurchaseModal({
           <button
             type="button"
             onClick={onNext}
-            className="inline-flex items-center gap-2 rounded-md bg-[#ee2346] hover:bg-[#d8203f] px-3 py-2 text-xs font-semibold text-white"
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-md bg-[#ee2346] hover:bg-[#d8203f] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
           >
             <ShoppingCart size={14} />
-            Proceder al pago
+            {loading ? "Procesando…" : "Proceder al pago"}
           </button>
         </>
       }
@@ -382,88 +385,175 @@ function PurchaseModal({
 }
 
 /* -------------------------
-   PAYMENT MODAL — Step 2: Placeholder payment
+   PAYMENT MODAL — Step 2: OnvoPay
 --------------------------*/
-function PaymentPlaceholderModal({
-  course,
+type PaymentInfo = {
+  paymentIntentId: string;
+  curso: Pick<Course, "titulo" | "chat_url" | "precio" | "duracion_label" | "nivel" | "categoria">;
+};
+
+function OnvoPayModal({
+  paymentInfo,
   onClose,
-  onConfirm,
-  loading,
+  onPaid,
 }: {
-  course: Course;
+  paymentInfo: PaymentInfo;
   onClose: () => void;
-  onConfirm: () => void;
-  loading: boolean;
+  onPaid: () => void;
 }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    function loadSdk(): Promise<void> {
+      return new Promise((resolve, reject) => {
+        // Use the correct SDK URL from OnvoPay docs
+        const SCRIPT_SRC = "https://sdk.onvopay.com/sdk.js";
+        if (document.querySelector(`script[src="${SCRIPT_SRC}"]`)) {
+          // Already loaded
+          if ((window as any).onvo) { resolve(); return; }
+        }
+        const script = document.createElement("script");
+        script.src = SCRIPT_SRC;
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error("No se pudo cargar el SDK de OnvoPay."));
+        document.head.appendChild(script);
+      });
+    }
+
+    async function mount() {
+      try {
+        await loadSdk();
+        if (cancelled) return;
+
+        const onvo = (window as any).onvo;
+        if (!onvo) throw new Error("SDK de OnvoPay no disponible.");
+
+        if (!cancelled) setLoading(false);
+
+        onvo.pay({
+          publicKey: process.env.NEXT_PUBLIC_ONVOPAY_PUBLIC_KEY!,
+          paymentIntentId: paymentInfo.paymentIntentId,
+          paymentType: "one_time",
+          locale: "es",
+          onSuccess: (data: any) => {
+            if (cancelled) return;
+            // Per docs: check status field — succeeded = paid, requires_payment_method = declined
+            if (data?.status === "succeeded") {
+              onPaid();
+            } else if (data?.status === "requires_action") {
+              // 3DS handled automatically by SDK
+            } else {
+              setError("El pago fue declinado. Por favor intentá con otro método de pago.");
+            }
+          },
+          onError: (data: any) => {
+            if (!cancelled) setError(data?.message ?? "Error al procesar el pago.");
+          },
+        }).render("#onvo-pay-container");
+
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message ?? "No se pudo cargar la pasarela de pago.");
+      }
+    }
+
+    mount();
+    return () => { cancelled = true; };
+  }, [paymentInfo, onPaid]);
+
   return (
     <Modal
       title="Pago del curso"
-      subtitle={course.titulo}
+      subtitle={paymentInfo.curso.titulo}
+      onClose={onClose}
+    >
+      <div className="space-y-4">
+        {/* Order summary */}
+        <div className="rounded-lg bg-[#2b2b30] border border-[#fffef9]/10 p-3 flex items-center justify-between">
+          <span className="text-sm text-[#fffef9]/80">{paymentInfo.curso.titulo}</span>
+          <span className="text-sm font-semibold text-[#6cbe45]">
+            {formatPrice(paymentInfo.curso.precio) ?? "Gratis"}
+          </span>
+        </div>
+
+        {/* OnvoPay form */}
+        {error ? (
+          <div className="rounded-lg bg-[#ee2346]/10 border border-[#ee2346]/30 p-4 text-xs text-[#ee2346] text-center">
+            {error}
+          </div>
+        ) : (
+          <div className="relative min-h-[260px]">
+            {loading && (
+              <div className="absolute inset-0 flex items-center justify-center text-xs text-[#fffef9]/50">
+                Cargando pasarela de pago…
+              </div>
+            )}
+            <div id="onvo-pay-container" ref={containerRef} />
+          </div>
+        )}
+
+        <p className="text-xs text-[#fffef9]/40 text-center">
+          Pago seguro procesado por OnvoPay · PCI DSS Level 1
+        </p>
+      </div>
+    </Modal>
+  );
+}
+
+/* -------------------------
+   SUCCESS MODAL — Step 3
+--------------------------*/
+function PaymentSuccessModal({
+  curso,
+  onClose,
+  onWhatsApp,
+}: {
+  curso: PaymentInfo["curso"];
+  onClose: () => void;
+  onWhatsApp: () => void;
+}) {
+  return (
+    <Modal
+      title="¡Pago exitoso!"
+      subtitle={curso.titulo}
       onClose={onClose}
       footer={
         <>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={loading}
-            className="rounded-md border border-[#fffef9]/20 px-3 py-2 text-xs text-[#fffef9]/80 bg-[#4a4748] hover:bg-[#3d3b3c] disabled:opacity-50"
-          >
-            Cancelar
+          <button type="button" onClick={onClose}
+            className="rounded-md border border-[#fffef9]/20 px-3 py-2 text-xs text-[#fffef9]/80 bg-[#4a4748] hover:bg-[#3d3b3c]">
+            Cerrar
           </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={loading}
-            className="inline-flex items-center gap-2 rounded-md bg-[#6cbe45] hover:bg-[#5aa63d] px-3 py-2 text-xs font-semibold text-white disabled:opacity-50"
-          >
+          <button type="button" onClick={onWhatsApp}
+            className="inline-flex items-center gap-2 rounded-md bg-[#6cbe45] hover:bg-[#5aa63d] px-3 py-2 text-xs font-semibold text-white">
             <MessageCircle size={14} />
-            {loading ? "Procesando…" : "Confirmar y contactar por WhatsApp"}
+            Ir a WhatsApp
           </button>
         </>
       }
     >
-      <div className="space-y-4">
-        {/* Placeholder payment area */}
-        <div className="rounded-xl border-2 border-dashed border-[#fffef9]/20 bg-[#2b2b30] p-8 flex flex-col items-center justify-center gap-3 text-center">
-          <div className="w-12 h-12 rounded-full bg-[#ee2346]/15 border border-[#ee2346]/30 flex items-center justify-center">
-            <ShoppingCart size={22} className="text-[#ee2346]" />
-          </div>
-          <p className="text-sm font-semibold text-[#fffef9]">
-            Aquí se registraría el pago con pasarela de pago!
-          </p>
-          <p className="text-xs text-[#fffef9]/50">
-            Integración con OnvoPay / Tilopay — pendiente de definir.
+      <div className="flex flex-col items-center gap-4 py-4 text-center">
+        <div className="w-14 h-14 rounded-full bg-[#6cbe45]/15 border border-[#6cbe45]/40 flex items-center justify-center">
+          <ShoppingCart size={24} className="text-[#6cbe45]" />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-[#fffef9]">¡Tu pago fue procesado con éxito!</p>
+          <p className="text-xs text-[#fffef9]/60 mt-1">
+            Hacé clic en "Ir a WhatsApp" para coordinar la fecha del curso con el equipo de SandíaShake.
           </p>
         </div>
-
-        {/* Order summary */}
-        <div className="rounded-lg bg-[#2b2b30] border border-[#fffef9]/10 p-4 space-y-2">
-          <p className="text-xs font-medium text-[#fffef9]/60 mb-3">Resumen del pedido</p>
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-[#fffef9]/80">{course.titulo}</span>
-            <span className="font-semibold text-[#fffef9]">{formatPrice(course.precio) ?? "Gratis"}</span>
+        <div className="rounded-lg bg-[#2b2b30] border border-[#fffef9]/10 p-4 w-full text-left space-y-1">
+          <div className="flex justify-between text-sm">
+            <span className="text-[#fffef9]/60">Curso</span>
+            <span className="font-semibold text-[#fffef9]">{curso.titulo}</span>
           </div>
-          {course.duracion_label && (
-            <div className="flex items-center justify-between text-xs text-[#fffef9]/50">
-              <span>Duración</span>
-              <span>{course.duracion_label}</span>
-            </div>
-          )}
-          {course.nivel && (
-            <div className="flex items-center justify-between text-xs text-[#fffef9]/50">
-              <span>Nivel</span>
-              <span>{course.nivel}</span>
-            </div>
-          )}
-          <div className="border-t border-[#fffef9]/10 pt-2 mt-2 flex items-center justify-between text-sm font-semibold">
-            <span className="text-[#fffef9]">Total</span>
-            <span className="text-[#6cbe45]">{formatPrice(course.precio) ?? "Gratis"}</span>
+          <div className="flex justify-between text-sm">
+            <span className="text-[#fffef9]/60">Total pagado</span>
+            <span className="font-semibold text-[#6cbe45]">{formatPrice(curso.precio) ?? "—"}</span>
           </div>
         </div>
-
-        <p className="text-xs text-[#fffef9]/50 leading-relaxed">
-          Una vez confirmado, serás redirigido a WhatsApp para coordinar la fecha y recibir los detalles del curso con el equipo de SandíaShake.
-        </p>
       </div>
     </Modal>
   );
@@ -482,7 +572,8 @@ export default function CursosPage() {
   const [levelFilter, setLevelFilter] = useState("Todos");
   const [categoryFilter, setCategoryFilter] = useState("Todas");
   const [purchasingCourse, setPurchasingCourse] = useState<Course | null>(null);
-  const [payingCourse, setPayingCourse] = useState<Course | null>(null);
+  const [paymentInfo, setPaymentInfo] = useState<PaymentInfo | null>(null);
+  const [successCurso, setSuccessCurso] = useState<PaymentInfo["curso"] | null>(null);
   const [purchasing, setPurchasing] = useState(false);
 
   // admin UX state
@@ -575,46 +666,49 @@ export default function CursosPage() {
     }
   }
 
-  // Client: step 1 → step 2
-  function handleProceedToPayment() {
+  // Client: step 1 → create OnvoPay intent → step 2
+  async function handleProceedToPayment() {
     if (!purchasingCourse) return;
-    setPayingCourse(purchasingCourse);
-    setPurchasingCourse(null);
-  }
-
-  // Client: step 2 → record intent + redirect to WhatsApp with course details
-  async function handlePaymentConfirm() {
-    if (!payingCourse) return;
     setPurchasing(true);
     try {
       const res = await fetch("/api/cursos/comprar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id_curso: payingCourse.id_curso }),
+        body: JSON.stringify({ id_curso: purchasingCourse.id_curso }),
       });
       const data = await res.json();
-      if (!res.ok) return alert(data.error ?? "Error al procesar");
-
-      // Build WhatsApp URL with course details in the message
-      const baseUrl = (data.chat_url as string).split("?")[0];
-      const lines = [
-        `Hola SandíaShake, acabo de realizar el pago del curso *${payingCourse.titulo}*.`,
-        ``,
-        `📚 Curso: ${payingCourse.titulo}`,
-        payingCourse.precio > 0 ? `💰 Precio: ${formatPrice(payingCourse.precio)}` : null,
-        payingCourse.duracion_label ? `⏱ Duración: ${payingCourse.duracion_label}` : null,
-        payingCourse.nivel ? `📊 Nivel: ${payingCourse.nivel}` : null,
-        payingCourse.categoria ? `🏷 Categoría: ${payingCourse.categoria}` : null,
-        ``,
-        `Me gustaría coordinar los detalles y la fecha. ¡Gracias!`,
-      ].filter((l) => l !== null).join("\n");
-
-      const whatsappUrl = `${baseUrl}?text=${encodeURIComponent(lines)}`;
-      setPayingCourse(null);
-      window.open(whatsappUrl, "_blank", "noreferrer");
+      if (!res.ok) return alert(data.error ?? "Error al iniciar el pago");
+      setPurchasingCourse(null);
+      setPaymentInfo({ paymentIntentId: data.paymentIntentId, curso: data.curso });
     } finally {
       setPurchasing(false);
     }
+  }
+
+  // Client: payment succeeded → show success screen
+  const handlePaid = useCallback(() => {
+    if (!paymentInfo) return;
+    setPaymentInfo(null);
+    setSuccessCurso(paymentInfo.curso);
+  }, [paymentInfo]);
+
+  // Client: go to WhatsApp with course details pre-filled
+  function handleGoToWhatsApp() {
+    if (!successCurso) return;
+    const baseUrl = successCurso.chat_url.split("?")[0];
+    const lines = [
+      `Hola SandíaShake, acabo de realizar el pago del curso *${successCurso.titulo}*.`,
+      ``,
+      `📚 Curso: ${successCurso.titulo}`,
+      successCurso.precio > 0 ? `💰 Precio: ${formatPrice(successCurso.precio)}` : null,
+      successCurso.duracion_label ? `⏱ Duración: ${successCurso.duracion_label}` : null,
+      successCurso.nivel ? `📊 Nivel: ${successCurso.nivel}` : null,
+      successCurso.categoria ? `🏷 Categoría: ${successCurso.categoria}` : null,
+      ``,
+      `Me gustaría coordinar los detalles y la fecha. ¡Gracias!`,
+    ].filter((l) => l !== null).join("\n");
+    setSuccessCurso(null);
+    window.open(`${baseUrl}?text=${encodeURIComponent(lines)}`, "_blank", "noreferrer");
   }
 
   function openNewCourse() {
@@ -921,16 +1015,25 @@ export default function CursosPage() {
           course={purchasingCourse}
           onClose={() => setPurchasingCourse(null)}
           onNext={handleProceedToPayment}
+          loading={purchasing}
         />
       )}
 
-      {/* STEP 2 — Payment placeholder */}
-      {payingCourse && (
-        <PaymentPlaceholderModal
-          course={payingCourse}
-          onClose={() => setPayingCourse(null)}
-          onConfirm={handlePaymentConfirm}
-          loading={purchasing}
+      {/* STEP 2 — OnvoPay payment form */}
+      {paymentInfo && (
+        <OnvoPayModal
+          paymentInfo={paymentInfo}
+          onClose={() => setPaymentInfo(null)}
+          onPaid={handlePaid}
+        />
+      )}
+
+      {/* STEP 3 — Success + WhatsApp */}
+      {successCurso && (
+        <PaymentSuccessModal
+          curso={successCurso}
+          onClose={() => setSuccessCurso(null)}
+          onWhatsApp={handleGoToWhatsApp}
         />
       )}
 

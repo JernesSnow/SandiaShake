@@ -35,10 +35,10 @@ export async function POST(req: Request) {
 
     const admin = createSupabaseAdmin();
 
-    // Verify course exists and is active
+    // Always read price from DB — never trust the client
     const { data: curso, error: cursoErr } = await admin
       .from("cursos")
-      .select("id_curso, titulo, chat_url, precio")
+      .select("id_curso, titulo, subtitulo, chat_url, precio, duracion_label, nivel, categoria")
       .eq("id_curso", id_curso)
       .eq("estado", "ACTIVO")
       .eq("visible", true)
@@ -48,7 +48,35 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Curso no encontrado" }, { status: 404 });
     }
 
-    // Find client's organization if they have one
+    const secretKey = process.env.ONVOPAY_SECRET_KEY;
+    if (!secretKey) {
+      return NextResponse.json({ error: "Pasarela de pago no configurada" }, { status: 500 });
+    }
+
+    // Create OnvoPay payment intent — amount in centavos (precio × 100) per their docs
+    const intentRes = await fetch("https://api.onvopay.com/v1/payment-intents", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${secretKey}`,
+      },
+      body: JSON.stringify({
+        currency: "CRC",
+        amount: Math.round(curso.precio * 100),
+        description: curso.titulo,
+      }),
+    });
+
+    if (!intentRes.ok) {
+      const err = await intentRes.text();
+      console.error("OnvoPay error:", err);
+      return NextResponse.json({ error: "Error al crear el pago. Intenta de nuevo." }, { status: 502 });
+    }
+
+    const intent = await intentRes.json();
+    const paymentIntentId = intent.id;
+
+    // Find client's organization
     let id_organizacion: number | null = null;
     if (perfil.rol === "CLIENTE") {
       const { data: orgLink } = await admin
@@ -60,7 +88,7 @@ export async function POST(req: Request) {
       id_organizacion = orgLink?.id_organizacion ?? null;
     }
 
-    // Record purchase intent
+    // Record purchase intent with OnvoPay intent ID
     if (id_organizacion) {
       await admin.from("curso_organizacion").upsert(
         {
@@ -68,6 +96,7 @@ export async function POST(req: Request) {
           id_curso,
           id_usuario: perfil.id_usuario,
           estado_pago: "PENDIENTE",
+          onvopay_intent_id: paymentIntentId,
           estado: "ACTIVO",
           created_by: perfil.id_usuario,
           updated_by: perfil.id_usuario,
@@ -78,8 +107,15 @@ export async function POST(req: Request) {
 
     return NextResponse.json({
       ok: true,
-      chat_url: curso.chat_url,
-      titulo: curso.titulo,
+      paymentIntentId,
+      curso: {
+        titulo: curso.titulo,
+        chat_url: curso.chat_url,
+        precio: curso.precio,
+        duracion_label: curso.duracion_label,
+        nivel: curso.nivel,
+        categoria: curso.categoria,
+      },
     });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Error interno" }, { status: 500 });
