@@ -1,6 +1,6 @@
 // app/tareas/page.tsx
-import { Shell } from "../../components/Shell";
-import { KanbanBoard } from "../../components/kanban/KanbanBoard";
+import { Shell } from "@/components/Shell";
+import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 
 export default function TareasPage() {
   return (

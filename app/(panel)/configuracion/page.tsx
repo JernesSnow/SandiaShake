@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Shell } from "../../components/Shell";
+import { Shell } from "@/components/Shell";
 import PlanesEntregablesSection from "@/components/configuracion/PlanesEntregablesSection";
 
 import {

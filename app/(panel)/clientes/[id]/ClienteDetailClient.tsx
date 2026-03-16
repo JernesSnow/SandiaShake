@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Shell } from "../../../components/Shell";
+import { Shell } from "@/components/Shell";
 import { Folder, Plus, Trash2, Users } from "react-feather";
 
 /* ================= TYPES ================= */

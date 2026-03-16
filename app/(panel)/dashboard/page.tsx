@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseClient } from "@/lib/supabase/client";
 
-import { Shell } from "../../components/Shell";
+import { Shell } from "@/components/Shell";
 import KPI from "./KPI";
 import TareasChart from "./TareasChart";
 import EntregablesChart from "./EntregablesChart";

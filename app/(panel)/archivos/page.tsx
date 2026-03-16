@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import { Shell } from "../../components/Shell";
+import { Shell } from "@/components/Shell";
 import {
   Folder,
   File,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Shell } from "../../components/Shell";
+import { Shell } from "@/components/Shell";
 import {
   Search,
   Filter,
