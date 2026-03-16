@@ -120,18 +120,33 @@ export async function POST(req: Request) {
     if (errD) throw errD;
 
     /* --------------------------------
-       LOAD ONLY SERVICES USED
+      LOAD SERVICES AND PLAN SERVICES
     -------------------------------- */
 
     const servicioIds = [
       ...new Set(
         items
+          .filter((it: any) => it.tipo === "SERVICIO")
+          .map((it: any) => it?.referencia_id)
+          .filter(Boolean)
+      ),
+    ];
+
+    const planIds = [
+      ...new Set(
+        items
+          .filter((it: any) => it.tipo === "PLAN")
           .map((it: any) => it?.referencia_id)
           .filter(Boolean)
       ),
     ];
 
     let servicioMap = new Map<number, string>();
+    let planServiciosMap = new Map<number, any[]>();
+
+    /* ------------------------------
+      Load individual services
+    ------------------------------ */
 
     if (servicioIds.length) {
       const { data: servicios } = await admin
@@ -144,6 +159,36 @@ export async function POST(req: Request) {
       );
     }
 
+    /* ------------------------------
+      Load plan services
+    ------------------------------ */
+
+    if (planIds.length) {
+      const { data: planes } = await admin
+        .from("plan_servicio")
+        .select(`
+          id_plan,
+          cantidad,
+          servicios_catalogo (
+            id_servicio,
+            nombre
+          )
+        `)
+        .in("id_plan", planIds);
+
+      (planes || []).forEach((p: any) => {
+        const list = planServiciosMap.get(p.id_plan) || [];
+
+        list.push({
+          id_servicio: p.servicios_catalogo.id_servicio,
+          nombre: p.servicios_catalogo.nombre,
+          cantidad: p.cantidad ?? 1,
+        });
+
+        planServiciosMap.set(p.id_plan, list);
+      });
+    }
+
     /* --------------------------------
        GENERATE TAREAS
     -------------------------------- */
@@ -151,28 +196,70 @@ export async function POST(req: Request) {
     const tareasInsert: any[] = [];
 
     items.forEach((item: any) => {
-      const qty = Math.max(1, Number(item?.cantidad ?? 1));
 
-      const nombreServicio =
-        servicioMap.get(item?.referencia_id) ||
-        item?.concepto ||
-        "Servicio sin nombre";
+      /* ------------------------------
+        SINGLE SERVICE
+      ------------------------------ */
 
-      for (let i = 0; i < qty; i++) {
-        tareasInsert.push({
-          id_organizacion,
-          id_colaborador: perfil.id_usuario,
-          titulo: nombreServicio,
-          descripcion: `Generado desde factura ${factura.id_factura}`,
-          tipo_entregable: "Otro",
-          prioridad: "Media",
-          fecha_entrega: item?.fecha_entrega ?? null,
-          mes: periodo,
-          id_factura: factura.id_factura,
-          created_by: perfil.id_usuario,
-          updated_by: perfil.id_usuario,
-        });
+      if (item.tipo === "SERVICIO") {
+
+        const qty = Math.max(1, Number(item?.cantidad ?? 1));
+
+        const nombreServicio =
+          servicioMap.get(item?.referencia_id) ||
+          item?.concepto ||
+          "Servicio";
+
+        for (let i = 0; i < qty; i++) {
+          tareasInsert.push({
+            id_organizacion,
+            id_colaborador: perfil.id_usuario,
+            titulo: nombreServicio,
+            descripcion: `Generado desde factura ${factura.id_factura}`,
+            tipo_entregable: "Otro",
+            prioridad: "Media",
+            fecha_entrega: item?.fecha_entrega ?? null,
+            mes: periodo,
+            id_factura: factura.id_factura,
+            created_by: perfil.id_usuario,
+            updated_by: perfil.id_usuario,
+          });
+        }
+
       }
+
+      /* ------------------------------
+        PLAN SERVICES
+      ------------------------------ */
+
+      if (item.tipo === "PLAN") {
+
+        const serviciosPlan = planServiciosMap.get(item.referencia_id) || [];
+
+        serviciosPlan.forEach((servicio: any) => {
+
+          for (let i = 0; i < servicio.cantidad; i++) {
+
+            tareasInsert.push({
+              id_organizacion,
+              id_colaborador: perfil.id_usuario,
+              titulo: servicio.nombre,
+              descripcion: `Servicio incluido en plan (Factura ${factura.id_factura})`,
+              tipo_entregable: "Otro",
+              prioridad: "Media",
+              fecha_entrega: item?.fecha_entrega ?? null,
+              mes: periodo,
+              id_factura: factura.id_factura,
+              created_by: perfil.id_usuario,
+              updated_by: perfil.id_usuario,
+            });
+
+          }
+
+        });
+
+      }
+
     });
 
     if (tareasInsert.length) {
