@@ -3,7 +3,11 @@ import { NextResponse } from "next/server";
 
 export async function proxy(_req: NextRequest) {
 
-   const { pathname,origin } = _req.nextUrl;
+   const { pathname} = _req.nextUrl;
+
+   const proto = _req.headers.get("x-forwarded-proto") ?? "http";
+const host = _req.headers.get("host") ?? "localhost:3000";
+const baseUrl = `${proto}://${host}`;
 
   const isPublic =
     pathname === "/" ||
@@ -26,7 +30,7 @@ const cookie = _req.headers.get("cookie") ?? "";
     return NextResponse.redirect(new URL("/auth", _req.url));
   }
 
-  const res = await fetch(`${origin}/api/estado-cuenta`, {
+  const res = await fetch(`${baseUrl}/api/estado-cuenta`, {
     headers: { cookie: _req.headers.get("cookie") ?? "" },
     cache: "no-store",
   });
