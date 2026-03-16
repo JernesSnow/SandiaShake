@@ -4,38 +4,45 @@ import { useEffect, useMemo, useState } from "react";
 import { Search, CheckCircle, AlertTriangle, Clock, X } from "react-feather";
 
 type FacturaEstado =
-  | "PENDIENTE"
-  | "PARCIAL"
-  | "PAGADA"
-  | "VENCIDA"
-  | "ANULADA";
+| "PENDIENTE"
+| "PARCIAL"
+| "PAGADA"
+| "VENCIDA"
+| "ANULADA";
 
 type MetodoPago = "SINPE" | "TRANSFERENCIA" | "OTRO";
 
 type OrgOption = {
-  id_organizacion: number;
-  nombre: string;
+id_organizacion: number;
+nombre: string;
+};
+
+type ServicioCatalogo = {
+id_servicio: number;
+nombre: string;
+precio_publico: number | null;
 };
 
 type DbFactura = {
-  id_factura: number;
-  id_organizacion: number;
-  organizacion_nombre: string;
-  periodo: string;
-  total: number;
-  saldo: number;
-  estado_factura: FacturaEstado;
-  fecha_vencimiento: string | null;
+id_factura: number;
+id_organizacion: number;
+organizacion_nombre: string;
+periodo: string;
+total: number;
+saldo: number;
+estado_factura: FacturaEstado;
+fecha_vencimiento: string | null;
 };
 
 type FacturaTarea = {
-  id_tarea: number;
-  titulo: string;
-  status_kanban: string;
-  prioridad: string;
-  tipo_entregable: string;
-  drive_url?: string | null;
+id_tarea: number;
+titulo: string;
+status_kanban: string;
+prioridad: string;
+tipo_entregable: string;
+drive_url?: string | null;
 };
+
 
 function formatCRC(n: number) {
   return `₡ ${Number(n || 0).toLocaleString("es-CR")}`;
@@ -97,7 +104,7 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 px-4 flex items-center justify-center">
-      <div className="w-full max-w-xl rounded-xl bg-[#333132] border border-[#4a4748]/40 shadow-lg overflow-hidden">
+      <div className="w-[85vw] max-w-6xl rounded-xl bg-[#333132] border border-[#4a4748]/40 shadow-lg overflow-hidden">
         <div className="px-5 py-4 border-b border-[#4a4748]/30 flex items-start justify-between gap-3">
           <div>
             <h3 className="text-white font-semibold">{title}</h3>
@@ -148,7 +155,26 @@ export function FacturacionPage() {
   const [createOrgId, setCreateOrgId] = useState<number | "">("");
   const [createPeriodo, setCreatePeriodo] = useState("");
   const [createVencimiento, setCreateVencimiento] = useState("");
-  const [createItems, setCreateItems] = useState<Array<{ tipo: string; cantidad: number; precio: number }>>([{ tipo: "", cantidad: 1, precio: 0 }]);
+  const [servicios, setServicios] = useState<ServicioCatalogo[]>([]);
+  const [createFechaEntrega, setCreateFechaEntrega] = useState("");
+
+  const [createItems, setCreateItems] = useState<
+  Array<{
+    referencia_id: number | "";
+    concepto: string;
+    cantidad: number;
+    precio: number;
+    fecha_entrega: string;
+  }>
+
+  > ([{
+      referencia_id: "",
+      concepto: "",
+      cantidad: 1,
+      precio: 0,
+      fecha_entrega: createFechaEntrega
+    }]);
+
   const [savingCreate, setSavingCreate] = useState(false);
 
   const createTotal = useMemo(
@@ -224,6 +250,30 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
   }, []);
 
   useEffect(() => {
+    fetchServicios();
+  }, []);
+
+  async function fetchServicios() {
+  try {
+  const res = await fetch("/api/admin/servicios");
+  const json = await res.json();
+
+  if (res.ok && json?.data) {
+    setServicios(
+      (json.data as any[]).map((s) => ({
+        id_servicio: s.id_servicio,
+        nombre: s.nombre,
+        precio_publico: s.precio_publico ?? 0,
+      }))
+    );
+  }
+
+  } catch {
+  /* ignore */
+  }
+  }
+
+  useEffect(() => {
     async function fetchOrgs() {
       try {
         const res = await fetch("/api/admin/organizaciones");
@@ -281,7 +331,15 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
     setCreateOrgId("");
     setCreatePeriodo("");
     setCreateVencimiento("");
-    setCreateItems([{ tipo: "", cantidad: 1, precio: 0 }]);
+    setCreateItems([
+      {
+        referencia_id: "",
+        concepto: "",
+        cantidad: 1,
+        precio: 0,
+        fecha_entrega: createFechaEntrega
+      }
+    ]);
     setCreateOpen(true);
   }
 
@@ -299,8 +357,8 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
       return;
     }
     for (const item of createItems) {
-      if (!item.tipo.trim()) {
-        alert("Cada item debe tener un tipo.");
+      if (!item.concepto.trim()) {
+        alert("Cada item debe tener un servicio.");
         return;
       }
       if (item.cantidad <= 0) {
@@ -316,14 +374,17 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
     setSavingCreate(true);
     try {
       const body: Record<string, unknown> = {
-        id_organizacion: Number(createOrgId),
-        periodo: createPeriodo.trim(),
-        items: createItems.map((item) => ({
-          tipo: item.tipo.trim(),
-          cantidad: item.cantidad,
-          precio_unitario: item.precio,
-        })),
-      };
+      id_organizacion: Number(createOrgId),
+      periodo: createPeriodo.trim(),
+      items: createItems.map((item) => ({
+        tipo: "SERVICIO",
+        referencia_id: item.referencia_id ? Number(item.referencia_id) : null,
+        concepto: item.concepto,
+        cantidad: Number(item.cantidad),
+        precio_unitario: Number(item.precio),
+        fecha_entrega: item.fecha_entrega || createFechaEntrega || null,
+      })),
+    };
       if (createVencimiento) {
         body.fecha_vencimiento = createVencimiento;
       }
@@ -948,6 +1009,7 @@ await enviarNotificacion("pago");
               >
                 Cancelar
               </button>
+
               <button
                 type="button"
                 onClick={submitCreate}
@@ -959,9 +1021,14 @@ await enviarNotificacion("pago");
             </>
           }
         >
-          <div className="grid gap-3 text-xs max-h-[60vh] overflow-y-auto pr-1 dark-scroll">
+          <div className="grid gap-3 text-xs max-h-[65vh] overflow-y-auto pr-1 dark-scroll">
+
+            {/* ORGANIZACION */}
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">Organización</label>
+              <label className="text-[11px] text-[#fffef9]/70">
+                Organización
+              </label>
+
               <select
                 className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
                 value={createOrgId}
@@ -970,6 +1037,7 @@ await enviarNotificacion("pago");
                 }
               >
                 <option value="">Selecciona una organización</option>
+
                 {organizaciones.map((o) => (
                   <option key={o.id_organizacion} value={o.id_organizacion}>
                     {o.nombre}
@@ -978,39 +1046,88 @@ await enviarNotificacion("pago");
               </select>
             </div>
 
+
+            {/* PERIODO */}
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">Periodo</label>
+              <label className="text-[11px] text-[#fffef9]/70">
+                Periodo
+              </label>
+
               <input
                 type="text"
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
                 value={createPeriodo}
                 onChange={(e) => setCreatePeriodo(e.target.value)}
-                placeholder="Ej: Febrero 2026"
+                placeholder="Mes 20XX"
+                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
               />
             </div>
 
+
+            {/* FECHA VENCIMIENTO */}
             <div className="flex flex-col gap-1">
               <label className="text-[11px] text-[#fffef9]/70">
                 Fecha vencimiento (opcional)
               </label>
+
               <input
                 type="date"
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
                 value={createVencimiento}
                 onChange={(e) => setCreateVencimiento(e.target.value)}
+                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
               />
             </div>
 
-            {/* Line items */}
-            <div className="flex flex-col gap-2 mt-1">
+
+            {/* GLOBAL FECHA ENTREGA */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] text-[#fffef9]/70">
+                Fecha entrega (tareas)
+              </label>
+
+              <input
+                type="date"
+                value={createFechaEntrega}
+                onChange={(e) => {
+                  const newDate = e.target.value
+                  setCreateFechaEntrega(newDate)
+
+                  setCreateItems((items) =>
+                    items.map((it) => ({
+                      ...it,
+                      fecha_entrega: it.fecha_entrega || newDate
+                    }))
+                  )
+                }}
+                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+              />
+
+              <span className="text-[10px] text-[#fffef9]/50">
+                Se usará como la fecha de vencimiento predeterminada para las tareas creadas.
+              </span>
+            </div>
+
+
+            {/* ITEMS */}
+            <div className="flex flex-col gap-2 mt-2">
+
               <div className="flex items-center justify-between">
                 <label className="text-[11px] text-[#fffef9]/70 font-semibold uppercase tracking-wide">
                   Items / Entregables
                 </label>
+
                 <button
                   type="button"
                   onClick={() =>
-                    setCreateItems([...createItems, { tipo: "", cantidad: 1, precio: 0 }])
+                    setCreateItems([
+                      ...createItems,
+                      {
+                        referencia_id: "",
+                        concepto: "",
+                        cantidad: 1,
+                        precio: 0,
+                        fecha_entrega: createFechaEntrega
+                      }
+                    ])
                   }
                   className="text-[11px] text-[#6cbe45] hover:text-[#5fa93d] font-medium"
                 >
@@ -1018,58 +1135,124 @@ await enviarNotificacion("pago");
                 </button>
               </div>
 
+
               {createItems.map((item, idx) => (
                 <div
                   key={idx}
                   className="flex items-start gap-2 rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-3"
                 >
+
+                  {/* SERVICIO */}
                   <div className="flex-1 flex flex-col gap-1">
-                    <label className="text-[10px] text-[#fffef9]/50">Tipo</label>
-                    <input
-                      type="text"
-                      className="rounded-md bg-[#4a4748] px-2 py-1.5 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
-                      value={item.tipo}
+                    <label className="text-[10px] text-[#fffef9]/50">
+                      Servicio
+                    </label>
+
+                    <select
+                      value={item.referencia_id}
                       onChange={(e) => {
-                        const updated = [...createItems];
-                        updated[idx] = { ...updated[idx], tipo: e.target.value };
-                        setCreateItems(updated);
+                        const id = Number(e.target.value)
+                        const servicio = servicios.find((s) => s.id_servicio === id)
+
+                        const updated = [...createItems]
+
+                        updated[idx] = {
+                          ...updated[idx],
+                          referencia_id: id,
+                          concepto: servicio?.nombre ?? "",
+                          precio: servicio?.precio_publico ?? 0,
+                        }
+
+                        setCreateItems(updated)
                       }}
-                      placeholder="Ej: Reel, Gráfico"
-                    />
+                      className="rounded-md bg-[#4a4748] px-2 py-1.5 text-xs border border-[#fffef9]/15"
+                    >
+                      <option value="">Selecciona servicio</option>
+
+                      {servicios.map((s) => (
+                        <option key={s.id_servicio} value={s.id_servicio}>
+                          {s.nombre}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
+
+                  {/* CANTIDAD */}
                   <div className="w-20 flex flex-col gap-1">
-                    <label className="text-[10px] text-[#fffef9]/50">Cantidad</label>
+                    <label className="text-[10px] text-[#fffef9]/50">
+                      Cantidad
+                    </label>
+
                     <input
                       type="number"
                       min={1}
-                      step={1}
-                      className="rounded-md bg-[#4a4748] px-2 py-1.5 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
                       value={item.cantidad || ""}
                       onChange={(e) => {
-                        const updated = [...createItems];
-                        updated[idx] = { ...updated[idx], cantidad: Number(e.target.value) || 0 };
-                        setCreateItems(updated);
+                        const updated = [...createItems]
+                        updated[idx] = {
+                          ...updated[idx],
+                          cantidad: Number(e.target.value) || 0
+                        }
+                        setCreateItems(updated)
                       }}
+                      className="rounded-md bg-[#4a4748] px-2 py-1.5 text-xs border border-[#fffef9]/15"
                     />
                   </div>
+
+
+                  {/* PRECIO */}
                   <div className="w-28 flex flex-col gap-1">
-                    <label className="text-[10px] text-[#fffef9]/50">Precio unit.</label>
+                    <label className="text-[10px] text-[#fffef9]/50">
+                      Precio
+                    </label>
+
                     <input
                       type="number"
                       min={0}
-                      step={1}
-                      className="rounded-md bg-[#4a4748] px-2 py-1.5 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
                       value={item.precio || ""}
                       onChange={(e) => {
-                        const updated = [...createItems];
-                        updated[idx] = { ...updated[idx], precio: Number(e.target.value) || 0 };
-                        setCreateItems(updated);
+                        const updated = [...createItems]
+                        updated[idx] = {
+                          ...updated[idx],
+                          precio: Number(e.target.value) || 0
+                        }
+                        setCreateItems(updated)
                       }}
                       placeholder="₡"
+                      className="rounded-md bg-[#4a4748] px-2 py-1.5 text-xs border border-[#fffef9]/15"
                     />
                   </div>
+
+
+                  {/* FECHA ENTREGA ITEM */}
+                  <div className="w-36 flex flex-col gap-1">
+                    <label className="text-[10px] text-[#fffef9]/50">
+                      Fecha entrega
+                    </label>
+
+                    <input
+                      type="date"
+                      value={item.fecha_entrega || ""}
+                      onChange={(e) => {
+                        const updated = [...createItems]
+                        updated[idx] = {
+                          ...updated[idx],
+                          fecha_entrega: e.target.value
+                        }
+                        setCreateItems(updated)
+                      }}
+                      className="rounded-md bg-[#4a4748] px-2 py-1.5 text-xs border border-[#fffef9]/15"
+                    />
+                  </div>
+
+
+                  {/* DELETE ITEM */}
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-[#fffef9]/50 invisible">X</label>
+                    <label className="text-[10px] text-[#fffef9]/50 invisible">
+                      X
+                    </label>
+
                     {createItems.length > 1 && (
                       <button
                         type="button"
@@ -1077,23 +1260,28 @@ await enviarNotificacion("pago");
                           setCreateItems(createItems.filter((_, i) => i !== idx))
                         }
                         className="text-[#ee2346]/70 hover:text-[#ee2346] p-1"
-                        aria-label="Eliminar item"
                       >
                         <X size={14} />
                       </button>
                     )}
                   </div>
+
                 </div>
               ))}
             </div>
 
-            {/* Auto-calculated total */}
+
+            {/* TOTAL */}
             <div className="flex flex-col gap-1 mt-1">
-              <label className="text-[11px] text-[#fffef9]/70">Total (CRC)</label>
+              <label className="text-[11px] text-[#fffef9]/70">
+                Total (CRC)
+              </label>
+
               <div className="rounded-md bg-[#4a4748]/60 px-3 py-2 text-xs border border-[#fffef9]/15 text-[#fffef9] font-semibold">
                 {formatCRC(createTotal)}
               </div>
             </div>
+
           </div>
         </Modal>
       )}

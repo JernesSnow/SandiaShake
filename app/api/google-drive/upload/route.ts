@@ -7,15 +7,29 @@ import oauth2Client, { ensureDriveCredentials } from "@/lib/google-drive/auth";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServer } from "@/lib/supabase/server";
 
+/* --------------------------------
+   POST /api/google-drive/upload
+-------------------------------- */
+
 export async function POST(req: Request) {
   try {
+
+    /* -----------------------------
+       Ensure OAuth credentials
+    ------------------------------ */
+
     const ok = await ensureDriveCredentials();
+
     if (!ok) {
       return NextResponse.json(
         { error: "Drive credentials not configured" },
         { status: 400 }
       );
     }
+
+    /* -----------------------------
+       Resolve current user
+    ------------------------------ */
 
     const supabase = await createSupabaseServer();
 
@@ -33,10 +47,9 @@ export async function POST(req: Request) {
 
     const admin = createSupabaseAdmin();
 
-
     const { data: dbUser, error: userError } = await admin
       .from("usuarios")
-      .select("id_usuario, rol")
+      .select("id_usuario")
       .eq("auth_user_id", user.id)
       .eq("estado", "ACTIVO")
       .maybeSingle();
@@ -48,38 +61,33 @@ export async function POST(req: Request) {
       );
     }
 
-    if (dbUser.rol === "CLIENTE") {
-      return NextResponse.json(
-        { error: "Clients cannot upload files" },
-        { status: 403 }
-      );
-    }
-
     const currentUserId = dbUser.id_usuario;
 
+    /* -----------------------------
+       Parse FormData
+    ------------------------------ */
 
-    const formData = await req.formData();
-    const file = formData.get("file") as File | null;
-    const folderId = formData.get("folderId") as string | null;
-    const tareaId = formData.get("tareaId") as string | null;
+    const form = await req.formData();
+
+    const file = form.get("file") as File | null;
+    const folderId = form.get("folderId") as string | null;
+    const tareaId = form.get("tareaId") as string | null;
 
     if (!file || !folderId || !tareaId) {
       return NextResponse.json(
         {
-          error: "Missing required fields",
-          debug: {
-            hasFile: Boolean(file),
-            folderId,
-            tareaId,
-          },
+          error: "Missing file, tareaId or folderId",
+          debug: { file: !!file, folderId, tareaId }
         },
         { status: 400 }
       );
     }
 
+    /* -----------------------------
+       Prepare Drive upload
+    ------------------------------ */
 
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    const buffer = Buffer.from(await file.arrayBuffer());
     const stream = Readable.from(buffer);
 
     const drive = google.drive({
@@ -87,8 +95,11 @@ export async function POST(req: Request) {
       auth: oauth2Client,
     });
 
+    /* -----------------------------
+       Upload file
+    ------------------------------ */
 
-    const uploaded = await drive.files.create({
+    const upload = await drive.files.create({
       requestBody: {
         name: file.name,
         parents: [folderId],
@@ -100,14 +111,17 @@ export async function POST(req: Request) {
       fields: "id,name,mimeType,size",
     });
 
-    const fileId = uploaded.data.id;
+    const driveFile = upload.data;
 
-    if (!fileId) {
+    if (!driveFile.id) {
       throw new Error("Drive upload failed");
     }
 
+    /* -----------------------------
+       Determine next version
+    ------------------------------ */
 
-    const { data: lastVersion } = await admin
+    const { data: last } = await admin
       .from("entregables")
       .select("version_num")
       .eq("id_tarea", Number(tareaId))
@@ -115,10 +129,11 @@ export async function POST(req: Request) {
       .limit(1)
       .maybeSingle();
 
-    const nextVersion = lastVersion
-      ? lastVersion.version_num + 1
-      : 1;
+    const nextVersion = (last?.version_num ?? 0) + 1;
 
+    /* -----------------------------
+       Insert deliverable
+    ------------------------------ */
 
     const { data: entregable, error } = await admin
       .from("entregables")
@@ -126,33 +141,38 @@ export async function POST(req: Request) {
         id_tarea: Number(tareaId),
         version_num: nextVersion,
         drive_folder_url: `https://drive.google.com/drive/folders/${folderId}`,
-        drive_file_id: fileId,
-        drive_file_name: uploaded.data.name,
-        drive_mime_type: uploaded.data.mimeType,
-        drive_file_size: uploaded.data.size
-          ? Number(uploaded.data.size)
-          : null,
+        drive_file_id: driveFile.id,
+        drive_file_name: driveFile.name,
+        drive_mime_type: driveFile.mimeType,
+        drive_file_size: driveFile.size ? Number(driveFile.size) : null,
         estado_aprobacion: "PENDIENTE",
         creado_por: currentUserId,
+        estado: "ACTIVO",
       })
       .select()
-      .single();
+      .maybeSingle();
 
     if (error) {
       console.error("Entregable insert error:", error);
       throw new Error("File uploaded but entregable record failed");
     }
 
+    /* -----------------------------
+       Return response
+    ------------------------------ */
+
     return NextResponse.json({
       ok: true,
-      fileId,
+      fileId: driveFile.id,
       entregableId: entregable.id_entregable,
       version: entregable.version_num,
       estado: entregable.estado_aprobacion,
     });
 
   } catch (e: any) {
+
     console.error("UPLOAD ERROR:", e);
+
     return NextResponse.json(
       { error: e?.message ?? "Upload failed" },
       { status: 500 }
