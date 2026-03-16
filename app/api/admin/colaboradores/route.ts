@@ -73,19 +73,37 @@ export async function GET() {
       return NextResponse.json({ error: qErr.message }, { status: 500 });
     }
 
-    /* ---------- CHILLI MOVEMENTS ---------- */
+    /* ---------- CHILLI MOVEMENTS (EARNED) ---------- */
 
-    const { data: chilli } = await admin
+    const { data: earned } = await admin
       .from("chilli_movimientos")
       .select("id_colaborador, puntos")
       .eq("estado", "ACTIVO");
 
+    /* ---------- REDEEMED POINTS (SPENT) ---------- */
+    /* IMPORTANT: we subtract ALL redeemed rewards except cancelled ones */
+
+    const { data: spent } = await admin
+      .from("canje_premio")
+      .select("id_colaborador, puntos_usados, estado")
+      .neq("estado", "ELIMINADO");
+
     const chilliMap = new Map<number, number>();
 
-    for (const c of chilli ?? []) {
+    /* ADD EARNED POINTS */
+
+    for (const c of earned ?? []) {
       const id = Number(c.id_colaborador);
       const prev = chilliMap.get(id) ?? 0;
       chilliMap.set(id, prev + Number(c.puntos));
+    }
+
+    /* SUBTRACT REDEEMED POINTS */
+
+    for (const s of spent ?? []) {
+      const id = Number(s.id_colaborador);
+      const prev = chilliMap.get(id) ?? 0;
+      chilliMap.set(id, prev - Number(s.puntos_usados));
     }
 
     /* ---------- TASK STATS ---------- */
@@ -111,13 +129,8 @@ export async function GET() {
 
       stats.total++;
 
-      if (t.status_kanban === "aprobada") {
-        stats.aprobadas++;
-      }
-
-      if (t.status_kanban === "pendiente") {
-        stats.pendientes++;
-      }
+      if (t.status_kanban === "aprobada") stats.aprobadas++;
+      if (t.status_kanban === "pendiente") stats.pendientes++;
     }
 
     /* ---------- MERGE DATA ---------- */
@@ -212,7 +225,6 @@ export async function POST(req: Request) {
 
     if (dbErr) {
       await admin.auth.admin.deleteUser(auth_user_id);
-
       return NextResponse.json({ error: dbErr.message }, { status: 500 });
     }
 

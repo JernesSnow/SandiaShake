@@ -1,184 +1,328 @@
 "use client";
 
-import { Award, Gift, Bell } from "react-feather";
+import { useEffect, useState } from "react";
+import { Gift, Plus, Edit2, Trash2 } from "react-feather";
 
-/* ------------------ PROPS ------------------ */
-
-type Props = {
-  chilliAutoAward: boolean;
-  setChilliAutoAward: (v: boolean) => void;
-  chilliPointsOnTime: number;
-  setChilliPointsOnTime: (v: number) => void;
-
-  rewardEnabled: boolean;
-  setRewardEnabled: (v: boolean) => void;
-  rewardCatalogVisible: boolean;
-  setRewardCatalogVisible: (v: boolean) => void;
-
-  notifDailyDigest: boolean;
-  setNotifDailyDigest: (v: boolean) => void;
-  notifDueSoon: boolean;
-  setNotifDueSoon: (v: boolean) => void;
-  notifMorosidad: boolean;
-  setNotifMorosidad: (v: boolean) => void;
+type Premio = {
+  id_premio: number;
+  nombre: string;
+  descripcion: string;
+  puntos_costo: number;
+  visible: boolean;
 };
 
-/* ------------------ COMPONENT ------------------ */
+export default function RewardsSection() {
+  const [premios, setPremios] = useState<Premio[]>([]);
+  const [loading, setLoading] = useState(false);
 
-export default function RewardsSection({
-  chilliAutoAward,
-  setChilliAutoAward,
-  chilliPointsOnTime,
-  setChilliPointsOnTime,
-  rewardEnabled,
-  setRewardEnabled,
-  rewardCatalogVisible,
-  setRewardCatalogVisible,
-  notifDailyDigest,
-  setNotifDailyDigest,
-  notifDueSoon,
-  setNotifDueSoon,
-  notifMorosidad,
-  setNotifMorosidad,
-}: Props) {
+  const [editing, setEditing] = useState<Premio | null>(null);
+  const [isNew, setIsNew] = useState(false);
+
+  const [form, setForm] = useState({
+    nombre: "",
+    descripcion: "",
+    puntos_costo: 0,
+  });
+
+  /* ---------------- LOAD PREMIOS ---------------- */
+
+  async function loadPremios() {
+    setLoading(true);
+
+    const res = await fetch("/api/admin/premios", {
+      credentials: "include",
+    });
+
+    const json = await res.json();
+
+    if (res.ok) {
+      setPremios(json.premios ?? []);
+    }
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadPremios();
+  }, []);
+
+  /* ---------------- CREATE ---------------- */
+
+  async function createPremio() {
+    const res = await fetch("/api/admin/premios", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(form),
+    });
+
+    if (!res.ok) {
+      const j = await res.json();
+      alert(j.error);
+      return;
+    }
+
+    await loadPremios();
+    closeModal();
+  }
+
+  /* ---------------- UPDATE ---------------- */
+
+  async function updatePremio() {
+    const res = await fetch("/api/admin/premios", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id_premio: editing?.id_premio,
+        ...form,
+      }),
+    });
+
+    if (!res.ok) {
+      const j = await res.json();
+      alert(j.error);
+      return;
+    }
+
+    await loadPremios();
+    closeModal();
+  }
+
+  /* ---------------- DELETE ---------------- */
+
+  async function deletePremio(id: number) {
+    if (!confirm("Eliminar premio?")) return;
+
+    const res = await fetch(`/api/admin/premios?id_premio=${id}`, {
+      method: "DELETE",
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      const j = await res.json();
+      alert(j.error);
+      return;
+    }
+
+    loadPremios();
+  }
+
+  /* ---------------- MODAL ---------------- */
+
+  function openCreate() {
+    setIsNew(true);
+    setEditing(null);
+
+    setForm({
+      nombre: "",
+      descripcion: "",
+      puntos_costo: 0,
+    });
+  }
+
+  function openEdit(p: Premio) {
+    setIsNew(false);
+    setEditing(p);
+
+    setForm({
+      nombre: p.nombre,
+      descripcion: p.descripcion ?? "",
+      puntos_costo: p.puntos_costo,
+    });
+  }
+
+  function closeModal() {
+    setEditing(null);
+    setIsNew(false);
+  }
+
+  /* ---------------- UI ---------------- */
+
   return (
     <div className="bg-[#333132] rounded-xl border border-[#4a4748]/40 shadow mb-6">
       <div className="p-6">
-        <h2 className="text-lg font-semibold text-white mb-4 flex items-center gap-2">
-          <Award size={18} className="text-[#ee2346]" />
-          Chilli Points, premios y notificaciones
-        </h2>
 
-        <div className="grid gap-4 md:grid-cols-2">
-          {/* Chilli points */}
-          <div className="rounded-lg border border-[#4a4748]/40 bg-[#2b2b30] p-4">
-            <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-              <Gift size={16} className="text-[#ee2346]" />
-              Chilli Points
-            </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+            <Gift size={18} className="text-[#fbbf24]" />
+            Catálogo de Premios
+          </h2>
 
-            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={chilliAutoAward}
-                onChange={(e) => setChilliAutoAward(e.target.checked)}
-                className="rounded border-[#3a3a40] bg-[#1a1a1d] text-[#6cbe45] focus:ring-[#6cbe45]"
-              />
-              Otorgación automática por entregas puntuales
-            </label>
-
-            <div className="mt-3">
-              <label className="text-sm font-medium text-gray-400 mb-2 block">
-                Puntos por entrega puntual
-              </label>
-              <input
-                type="number"
-                min={0}
-                value={chilliPointsOnTime}
-                onChange={(e) =>
-                  setChilliPointsOnTime(Number(e.target.value))
-                }
-                className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45]"
-              />
-              <p className="text-[11px] text-gray-400 mt-2">
-                Recomendación: 5–15 por entregable según dificultad.
-              </p>
-            </div>
-          </div>
-
-          {/* Rewards */}
-          <div className="rounded-lg border border-[#4a4748]/40 bg-[#2b2b30] p-4">
-            <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-              <Gift size={16} className="text-[#7dd3fc]" />
-              Premios
-            </h3>
-
-            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={rewardEnabled}
-                onChange={(e) => setRewardEnabled(e.target.checked)}
-                className="rounded border-[#3a3a40] bg-[#1a1a1d] text-[#6cbe45] focus:ring-[#6cbe45]"
-              />
-              Habilitar canje de premios
-            </label>
-
-            <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer mt-2">
-              <input
-                type="checkbox"
-                checked={rewardCatalogVisible}
-                onChange={(e) =>
-                  setRewardCatalogVisible(e.target.checked)
-                }
-                className="rounded border-[#3a3a40] bg-[#1a1a1d] text-[#6cbe45] focus:ring-[#6cbe45]"
-              />
-              Mostrar catálogo de premios a colaboradores
-            </label>
-
-            <p className="text-[11px] text-gray-400 mt-3">
-              El CRUD del catálogo de premios puede ir en el módulo de
-              “Configuración” o “Colaboradores”.
-            </p>
-          </div>
-
-          {/* Notifications */}
-          <div className="rounded-lg border border-[#4a4748]/40 bg-[#2b2b30] p-4 md:col-span-2">
-            <h3 className="text-white font-semibold mb-3 flex items-center gap-2">
-              <Bell size={16} className="text-[#6cbe45]" />
-              Notificaciones
-            </h3>
-
-            <div className="grid gap-2 md:grid-cols-3">
-              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={notifDailyDigest}
-                  onChange={(e) =>
-                    setNotifDailyDigest(e.target.checked)
-                  }
-                  className="rounded border-[#3a3a40] bg-[#1a1a1d] text-[#6cbe45] focus:ring-[#6cbe45]"
-                />
-                Resumen diario
-              </label>
-
-              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={notifDueSoon}
-                  onChange={(e) =>
-                    setNotifDueSoon(e.target.checked)
-                  }
-                  className="rounded border-[#3a3a40] bg-[#1a1a1d] text-[#6cbe45] focus:ring-[#6cbe45]"
-                />
-                Alertas por vencimiento
-              </label>
-
-              <label className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={notifMorosidad}
-                  onChange={(e) =>
-                    setNotifMorosidad(e.target.checked)
-                  }
-                  className="rounded border-[#3a3a40] bg-[#1a1a1d] text-[#6cbe45] focus:ring-[#6cbe45]"
-                />
-                Morosidad / bloqueo
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-5 flex justify-end">
           <button
-            type="button"
-            onClick={() =>
-              alert("Guardar configuraciones (pendiente)")
-            }
-            className="px-6 py-2 rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] text-white text-sm font-semibold transition"
+            onClick={openCreate}
+            className="inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold bg-[#ee2346] hover:bg-[#d8203f] text-white"
           >
-            Guardar configuraciones
+            <Plus size={16} />
+            Nuevo premio
           </button>
         </div>
+
+        {/* TABLE */}
+
+        <div className="overflow-x-auto rounded-lg border border-[#4a4748]/40">
+          <table className="w-full text-sm">
+            <thead className="bg-[#2b2b30] text-gray-300">
+              <tr>
+                <th className="text-left px-4 py-3">Nombre</th>
+                <th className="text-left px-4 py-3">Descripción</th>
+                <th className="text-left px-4 py-3">Costo</th>
+                <th className="text-right px-4 py-3">Acciones</th>
+              </tr>
+            </thead>
+
+            <tbody className="bg-[#333132] text-gray-200">
+              {premios.map((p) => (
+                <tr key={p.id_premio} className="border-t border-[#4a4748]/30">
+                  <td className="px-4 py-3">{p.nombre}</td>
+                  <td className="px-4 py-3 text-gray-300">{p.descripcion}</td>
+                  <td className="px-4 py-3 text-[#fbbf24] font-semibold">
+                    {p.puntos_costo} pts
+                  </td>
+
+                  <td className="px-4 py-3">
+                    <div className="flex justify-end gap-2">
+
+                      <button
+                        onClick={() => openEdit(p)}
+                        className="inline-flex items-center gap-1 rounded-md border border-[#4a4748]/40 px-2 py-1 text-[12px] text-gray-200 hover:bg-[#3a3738]"
+                      >
+                        <Edit2 size={14} /> Editar
+                      </button>
+
+                      <button
+                        onClick={() => deletePremio(p.id_premio)}
+                        className="inline-flex items-center gap-1 rounded-md border border-[#ee2346]/40 bg-[#ee2346]/10 px-2 py-1 text-[12px] text-[#ee2346]"
+                      >
+                        <Trash2 size={14} /> Eliminar
+                      </button>
+
+                    </div>
+                  </td>
+                </tr>
+              ))}
+
+              {!loading && premios.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-6 text-center text-gray-400">
+                    No hay premios registrados.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* MODAL */}
+
+        {(editing || isNew) && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4 backdrop-blur-sm">
+
+          <div className="w-full max-w-md rounded-xl bg-[#333132] border border-[#4a4748]/40 shadow-xl">
+
+            {/* HEADER */}
+            <div className="px-6 py-4 border-b border-[#4a4748]/30 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-white font-semibold">
+                <Gift size={18} className="text-[#fbbf24]" />
+                {isNew ? "Crear nuevo premio" : "Editar premio"}
+              </div>
+
+              <button
+                onClick={closeModal}
+                className="text-gray-400 hover:text-white text-sm"
+              >
+                Cerrar
+              </button>
+            </div>
+
+            {/* BODY */}
+            <div className="p-6 space-y-5">
+
+              {/* NOMBRE */}
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block">
+                  Nombre del premio
+                </label>
+                <input
+                  placeholder="Ej: Gift Card Amazon"
+                  value={form.nombre}
+                  onChange={(e) =>
+                    setForm({ ...form, nombre: e.target.value })
+                  }
+                  className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45]"
+                />
+              </div>
+
+              {/* DESCRIPCION */}
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block">
+                  Descripción
+                </label>
+                <textarea
+                  rows={3}
+                  placeholder="Describe el premio..."
+                  value={form.descripcion}
+                  onChange={(e) =>
+                    setForm({ ...form, descripcion: e.target.value })
+                  }
+                  className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#6cbe45]"
+                />
+              </div>
+
+              {/* PUNTOS */}
+              <div>
+                <label className="text-sm text-gray-400 mb-1 block">
+                  Costo en Chilli Points
+                </label>
+
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min={0}
+                    placeholder="Ej: 500"
+                    value={form.puntos_costo}
+                    onChange={(e) =>
+                      setForm({
+                        ...form,
+                        puntos_costo: Number(e.target.value),
+                      })
+                    }
+                    className="w-full rounded-md border border-[#3a3a40] bg-[#1a1a1d] text-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#fbbf24]"
+                  />
+
+                  <span className="text-[#fbbf24] font-semibold text-sm">
+                    pts
+                  </span>
+                </div>
+
+                <p className="text-[11px] text-gray-400 mt-1">
+                  Cantidad de Chilli Points necesarios para canjear este premio.
+                </p>
+              </div>
+
+            </div>
+
+            {/* FOOTER */}
+            <div className="px-6 py-4 border-t border-[#4a4748]/30 flex justify-end gap-3">
+
+              <button
+                onClick={closeModal}
+                className="px-4 py-2 rounded-md border border-[#4a4748]/40 text-gray-300 hover:bg-[#3a3738] text-sm"
+              >
+                Cancelar
+              </button>
+
+              <button
+                onClick={isNew ? createPremio : updatePremio}
+                className="px-5 py-2 rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] text-white text-sm font-semibold transition"
+              >
+                Guardar premio
+              </button>
+
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </div>
   );
