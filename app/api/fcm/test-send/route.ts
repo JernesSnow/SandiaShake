@@ -76,7 +76,10 @@ for (const row of tokenRows) {
           token: row.token,
           notification: {
             title: "SandiaShake",
-            body: "Push de prueba enviada correctamente",
+            body: "Cuenta con una factura pendiente por pagar",
+          },
+          data: {
+            url: "/facturacion/mis-facturas",
           },
           webpush: {
             notification: {
