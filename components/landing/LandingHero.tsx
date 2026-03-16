@@ -4,8 +4,11 @@ import { useEffect, useState } from "react";
 import type { FeatureKey } from "@/game/types";
 import GameExperience from "./GameExperience";
 import { FeatureModal } from "./FeatureModal";
+import { useRouter } from "next/navigation";
 
 export default function LandingHero() {
+
+  const router = useRouter();
   const [mode, setMode] = useState<"hero" | "map">("hero");
   const [open, setOpen] = useState(false);
   const [feature, setFeature] = useState<FeatureKey | null>(null);
@@ -25,8 +28,11 @@ useEffect(() => {
       <header className="mx-auto max-w-6xl px-5 py-5 flex items-center justify-between">
         <div className="font-bold">Sandía con Chile</div>
         <div className="flex gap-2">
-          <button className="px-4 py-2 rounded-xl bg-black text-white">Login</button>
-          <button className="px-4 py-2 rounded-xl bg-black text-white">Get started</button>
+          <button className="px-4 py-2 rounded-xl bg-black text-white" onClick={() => router.push("/auth")}
+            >Login
+          </button>
+          <button className="px-4 py-2 rounded-xl bg-black text-white" onClick={() => router.push("/signup")}
+            >Get started</button>
         </div>
       </header>
 
