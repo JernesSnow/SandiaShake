@@ -1,16 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import {
-  X,
-  Edit2,
-  Trash2,
-  Heart,
-  Activity,
-  CheckCircle,
-} from "react-feather";
-
-
+import { useEffect, useState } from "react";
+import { X, Edit2, Trash2, Heart } from "react-feather";
 
 type MentalState = "Estable" | "Atento" | "En riesgo";
 type EstadoCuenta = "Activo" | "Suspendido";
@@ -35,7 +26,6 @@ type Colaborador = {
   chilliPoints: number;
 };
 
-
 function estadoBadge(estado: EstadoCuenta) {
   return estado === "Activo"
     ? "bg-[#6cbe45]/20 text-[#6cbe45]"
@@ -48,13 +38,24 @@ function mentalBadge(mental: MentalState) {
   return "bg-[#ee2346]/20 text-[#ee2346]";
 }
 
-
+function mapRol(rol: string): RolColaborador {
+  switch (rol) {
+    case "ADMIN":
+      return "Admin";
+    case "DISENADOR":
+      return "Diseñador";
+    case "EDITOR":
+      return "Editor";
+    case "COMMUNITY_MANAGER":
+      return "Community Manager";
+    default:
+      return "Ejecutivo de cuenta";
+  }
+}
 
 export function ColaboradoresPage() {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
   const [perfil, setPerfil] = useState<Colaborador | null>(null);
-
-
 
   useEffect(() => {
     (async () => {
@@ -80,22 +81,22 @@ export function ColaboradoresPage() {
         rol: u.rol === "ADMIN" ? "Admin" : "Ejecutivo de cuenta",
         estadoCuenta: u.estado === "ACTIVO" ? "Activo" : "Suspendido",
         mentalState: "Estable",
-        totalTareas: 0,
-        tareasPendientes: 0,
-        tareasAprobadas: 0,
-        chilliPoints: 0,
+
+        totalTareas: u.totalTareas ?? 0,
+        tareasPendientes: u.tareasPendientes ?? 0,
+        tareasAprobadas: u.tareasAprobadas ?? 0,
+        chilliPoints: u.chilliPoints ?? 0,
       }));
 
       setColaboradores(mapped);
     })();
   }, []);
 
-
   return (
     <div className="space-y-6 text-white">
       <h1 className="text-xl font-semibold">Equipo</h1>
 
-    
+      {/* CARDS */}
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {colaboradores.map((c) => (
           <button
@@ -104,7 +105,7 @@ export function ColaboradoresPage() {
             className="group text-left rounded-xl border border-[#4a4748]/40 bg-[#333132] p-5 hover:border-[#ee2346]/60 transition"
           >
             <div className="flex items-center gap-4">
-           
+
               <div className="h-12 w-12 rounded-full bg-gradient-to-br from-[#ee2346] to-[#7dd3fc] flex items-center justify-center text-lg font-bold">
                 {c.nombre.charAt(0)}
               </div>
@@ -112,13 +113,19 @@ export function ColaboradoresPage() {
               <div>
                 <div className="font-semibold">{c.nombre}</div>
                 <div className="text-xs text-gray-400">{c.rol}</div>
+
+                {/* 🌶 chilli preview */}
+                <div className="text-xs text-[#ee2346] mt-1 flex items-center gap-1">
+                  🌶 {c.chilliPoints} puntos
+                </div>
               </div>
+
             </div>
           </button>
         ))}
       </div>
 
-
+      {/* MODAL */}
       {perfil && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center px-4">
           <div className="w-full max-w-lg rounded-xl bg-[#333132] border border-[#4a4748]/40 shadow-xl relative">
@@ -129,7 +136,6 @@ export function ColaboradoresPage() {
             >
               <X />
             </button>
-
 
             <div className="p-6 flex gap-4">
               <div className="h-14 w-14 rounded-full bg-gradient-to-br from-[#ee2346] to-[#7dd3fc] flex items-center justify-center text-xl font-bold">
@@ -148,6 +154,7 @@ export function ColaboradoresPage() {
                   >
                     {perfil.estadoCuenta}
                   </span>
+
                   <span
                     className={`px-2 py-0.5 text-xs rounded-full ${mentalBadge(
                       perfil.mentalState
@@ -160,33 +167,33 @@ export function ColaboradoresPage() {
               </div>
             </div>
 
-         
+            {/* STATS */}
             <div className="grid grid-cols-4 gap-3 px-6 pb-6 text-center">
+
               <div className="bg-[#2b2b30] rounded-lg p-3">
                 <div className="text-lg font-bold">{perfil.totalTareas}</div>
                 <div className="text-xs text-gray-400">Tareas</div>
               </div>
+
               <div className="bg-[#2b2b30] rounded-lg p-3">
-                <div className="text-lg font-bold">
-                  {perfil.tareasAprobadas}
-                </div>
+                <div className="text-lg font-bold">{perfil.tareasAprobadas}</div>
                 <div className="text-xs text-gray-400">Aprobadas</div>
               </div>
+
               <div className="bg-[#2b2b30] rounded-lg p-3">
-                <div className="text-lg font-bold">
-                  {perfil.tareasPendientes}
-                </div>
+                <div className="text-lg font-bold">{perfil.tareasPendientes}</div>
                 <div className="text-xs text-gray-400">Pendientes</div>
               </div>
+
               <div className="bg-[#2b2b30] rounded-lg p-3">
-                <div className="text-lg font-bold">
-                  {perfil.chilliPoints}
+                <div className="text-lg font-bold text-[#ee2346] flex justify-center items-center gap-1">
+                  🌶 {perfil.chilliPoints}
                 </div>
                 <div className="text-xs text-gray-400">Chilli</div>
               </div>
+
             </div>
 
-            
             <div className="flex justify-end gap-2 px-6 pb-6">
               <button className="inline-flex items-center gap-2 rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm hover:bg-[#3a3738]">
                 <Edit2 size={14} /> Editar
@@ -196,6 +203,7 @@ export function ColaboradoresPage() {
                 <Trash2 size={14} /> Desactivar
               </button>
             </div>
+
           </div>
         </div>
       )}

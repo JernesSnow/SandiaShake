@@ -13,6 +13,7 @@ async function requireAdmin() {
   if (authErr) {
     return { error: NextResponse.json({ error: authErr.message }, { status: 401 }) };
   }
+
   if (!user) {
     return { error: NextResponse.json({ error: "No autenticado" }, { status: 401 }) };
   }
@@ -26,12 +27,15 @@ async function requireAdmin() {
   if (perfilErr) {
     return { error: NextResponse.json({ error: perfilErr.message }, { status: 500 }) };
   }
+
   if (!perfil) {
     return { error: NextResponse.json({ error: "Tu perfil no está configurado" }, { status: 403 }) };
   }
+
   if (perfil.estado !== "ACTIVO") {
     return { error: NextResponse.json({ error: "Usuario inactivo" }, { status: 403 }) };
   }
+
   if (perfil.rol !== "ADMIN") {
     return { error: NextResponse.json({ error: "Sin permisos" }, { status: 403 }) };
   }
@@ -56,18 +60,86 @@ export async function GET() {
 
     const admin = createSupabaseAdmin();
 
-    const { data, error: qErr } = await admin
+    /* ---------- USERS ---------- */
+
+    const { data: usuarios, error: qErr } = await admin
       .from("usuarios")
       .select("id_usuario, nombre, correo, rol, estado, created_at")
-      .eq("rol", "COLABORADOR")
-      .neq("estado", "ELIMINADO")
+      .in("rol", ["ADMIN", "COLABORADOR"])
+      .eq("estado", "ACTIVO")
       .order("id_usuario", { ascending: false });
 
     if (qErr) {
       return NextResponse.json({ error: qErr.message }, { status: 500 });
     }
 
-    return NextResponse.json({ colaboradores: data ?? [] }, { status: 200 });
+    /* ---------- CHILLI MOVEMENTS ---------- */
+
+    const { data: chilli } = await admin
+      .from("chilli_movimientos")
+      .select("id_colaborador, puntos")
+      .eq("estado", "ACTIVO");
+
+    const chilliMap = new Map<number, number>();
+
+    for (const c of chilli ?? []) {
+      const id = Number(c.id_colaborador);
+      const prev = chilliMap.get(id) ?? 0;
+      chilliMap.set(id, prev + Number(c.puntos));
+    }
+
+    /* ---------- TASK STATS ---------- */
+
+    const { data: tareas } = await admin
+      .from("tareas")
+      .select("id_colaborador,status_kanban,estado")
+      .eq("estado", "ACTIVO");
+
+    const tareasMap = new Map<
+      number,
+      { total: number; aprobadas: number; pendientes: number }
+    >();
+
+    for (const t of tareas ?? []) {
+      const id = Number(t.id_colaborador);
+
+      if (!tareasMap.has(id)) {
+        tareasMap.set(id, { total: 0, aprobadas: 0, pendientes: 0 });
+      }
+
+      const stats = tareasMap.get(id)!;
+
+      stats.total++;
+
+      if (t.status_kanban === "aprobada") {
+        stats.aprobadas++;
+      }
+
+      if (t.status_kanban === "pendiente") {
+        stats.pendientes++;
+      }
+    }
+
+    /* ---------- MERGE DATA ---------- */
+
+    const colaboradores = (usuarios ?? []).map((u) => {
+      const stats = tareasMap.get(u.id_usuario) ?? {
+        total: 0,
+        aprobadas: 0,
+        pendientes: 0,
+      };
+
+      return {
+        ...u,
+        chilliPoints: chilliMap.get(u.id_usuario) ?? 0,
+        totalTareas: stats.total,
+        tareasAprobadas: stats.aprobadas,
+        tareasPendientes: stats.pendientes,
+      };
+    });
+
+    return NextResponse.json({ colaboradores }, { status: 200 });
+
   } catch (e: any) {
     return NextResponse.json(
       { error: e?.message ?? "Error interno" },
@@ -76,7 +148,7 @@ export async function GET() {
   }
 }
 
-/* ===================== POST (CREATE) ===================== */
+/* ===================== POST ===================== */
 
 export async function POST(req: Request) {
   try {
@@ -84,6 +156,7 @@ export async function POST(req: Request) {
     if (error) return error;
 
     const body = await req.json().catch(() => null);
+
     if (!body) {
       return NextResponse.json({ error: "Body inválido" }, { status: 400 });
     }
@@ -115,6 +188,7 @@ export async function POST(req: Request) {
     }
 
     const auth_user_id = createdAuth.user?.id;
+
     if (!auth_user_id) {
       return NextResponse.json(
         { error: "Auth user creado sin id" },
@@ -130,14 +204,15 @@ export async function POST(req: Request) {
         rol: "COLABORADOR",
         estado: "ACTIVO",
         auth_user_id,
-        created_by: perfil.id_usuario,
-        updated_by: perfil.id_usuario,
+        created_by: perfil!.id_usuario,
+        updated_by: perfil!.id_usuario,
       })
       .select("id_usuario, nombre, correo, rol, estado, created_at")
       .single();
 
     if (dbErr) {
       await admin.auth.admin.deleteUser(auth_user_id);
+
       return NextResponse.json({ error: dbErr.message }, { status: 500 });
     }
 
@@ -148,6 +223,7 @@ export async function POST(req: Request) {
       },
       { status: 201 }
     );
+
   } catch (e: any) {
     return NextResponse.json(
       { error: e?.message ?? "Error interno creando colaborador" },
@@ -164,11 +240,13 @@ export async function PATCH(req: Request) {
     if (error) return error;
 
     const body = await req.json().catch(() => null);
+
     if (!body) {
       return NextResponse.json({ error: "Body inválido" }, { status: 400 });
     }
 
     const id_usuario = Number(body.id_usuario);
+
     if (!Number.isFinite(id_usuario) || id_usuario <= 0) {
       return NextResponse.json(
         { error: "id_usuario es obligatorio" },
@@ -184,40 +262,30 @@ export async function PATCH(req: Request) {
 
     const admin = createSupabaseAdmin();
 
-    const { data: current, error: curErr } = await admin
+    const { data: current } = await admin
       .from("usuarios")
       .select("id_usuario, rol, auth_user_id, correo")
       .eq("id_usuario", id_usuario)
       .maybeSingle();
 
-    if (curErr || !current) {
+    if (!current) {
       return NextResponse.json(
-        { error: "Colaborador no encontrado" },
+        { error: "Usuario no encontrado" },
         { status: 404 }
       );
     }
 
-    if (current.rol !== "COLABORADOR") {
-      return NextResponse.json(
-        { error: "Solo puedes editar COLABORADOR" },
-        { status: 400 }
-      );
-    }
-
-    if (correo && correo !== current.correo && current.auth_user_id) {
-      const { error: aErr } =
-        await admin.auth.admin.updateUserById(current.auth_user_id, {
-          email: correo,
-        });
-      if (aErr) {
-        return NextResponse.json({ error: aErr.message }, { status: 400 });
-      }
-    }
-
     const patch: any = {};
+
     if (nombre) patch.nombre = nombre;
     if (correo) patch.correo = correo;
     if (estado) patch.estado = estado;
+
+    if (correo && correo !== current.correo && current.auth_user_id) {
+      await admin.auth.admin.updateUserById(current.auth_user_id, {
+        email: correo,
+      });
+    }
 
     const { data: updated, error: upErr } = await admin
       .from("usuarios")
@@ -231,6 +299,7 @@ export async function PATCH(req: Request) {
     }
 
     return NextResponse.json({ ok: true, colaborador: updated }, { status: 200 });
+
   } catch (e: any) {
     return NextResponse.json(
       { error: e?.message ?? "Error interno" },
@@ -260,21 +329,14 @@ export async function DELETE(req: Request) {
 
     const { data: current } = await admin
       .from("usuarios")
-      .select("id_usuario, rol, auth_user_id")
+      .select("id_usuario, auth_user_id")
       .eq("id_usuario", id_usuario)
       .maybeSingle();
 
     if (!current) {
       return NextResponse.json(
-        { error: "Colaborador no encontrado" },
+        { error: "Usuario no encontrado" },
         { status: 404 }
-      );
-    }
-
-    if (current.rol !== "COLABORADOR") {
-      return NextResponse.json(
-        { error: "Solo puedes eliminar COLABORADOR" },
-        { status: 400 }
       );
     }
 
@@ -288,6 +350,7 @@ export async function DELETE(req: Request) {
     }
 
     return NextResponse.json({ ok: true }, { status: 200 });
+
   } catch (e: any) {
     return NextResponse.json(
       { error: e?.message ?? "Error interno" },
