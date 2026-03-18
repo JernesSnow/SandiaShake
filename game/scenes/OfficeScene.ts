@@ -30,7 +30,7 @@ export class OfficeScene extends Phaser.Scene {
   private keyEnter!: Phaser.Input.Keyboard.Key;
 
   private emitToUI: EmitFn;
-  private speed = 180;
+  private speed = 360;
 
   private hoveredFeature: FeatureKey | null = null;
   private locked = false;
