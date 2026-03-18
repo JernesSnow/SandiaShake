@@ -1,0 +1,192 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createSupabaseClient } from "@/lib/supabase/client";
+
+import { Shell } from "@/components/Shell";
+import KPI from "./KPI";
+import TareasChart from "./TareasChart";
+import EntregablesChart from "./EntregablesChart";
+import SaludMental from "./SaludMental";
+import Rendimiento from "./Rendimiento";
+import ChilliPoints from "./ChilliPoints";
+import { requestNotificationPermissionAndToken } from "@/lib/firebase/messaging";
+
+import { CheckSquare, FileText, Users, User } from "react-feather";
+
+export default function DashboardPage() {
+  const supabase = createSupabaseClient();
+  const router = useRouter();
+
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function guard() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.replace("/auth");
+        return;
+      }
+
+      const { data: perfil } = await supabase
+        .from("usuarios")
+        .select("force_password_change, temp_password")
+        .eq("auth_user_id", user.id)
+        .single();
+
+
+      if (!perfil) {
+        router.replace("/auth");
+        return;
+      }
+
+      if (perfil.force_password_change === true || perfil.temp_password === true) {
+        router.replace("/force-password-change");
+        return;
+      }
+
+      if (!cancelled) setReady(true);
+    }
+
+    guard();
+    return () => {
+      cancelled = true;
+    };
+  }, [router, supabase]);
+
+  if (!ready) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#262425] text-white text-sm">
+        Verificando sesión…
+      </div>
+    );
+  }
+
+  return (
+    <Shell>
+      <h1 className="text-xl font-semibold mb-6 text-white">Dashboard</h1>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+        <KPI icon={<CheckSquare size={26} />} label="Tareas activas" value={14} />
+        <KPI icon={<FileText size={26} />} label="Entregables esta semana" value={5} />
+        <KPI icon={<Users size={26} />} label="Clientes activos" value={12} />
+        <KPI icon={<User size={26} />} label="Colaboradores activos" value={8} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <TareasChart />
+        <EntregablesChart />
+        <SaludMental />
+        <Rendimiento />
+        <ChilliPoints />
+      </div>
+
+    <button
+  type="button"
+  onClick={async () => {
+    try {
+      const res = await fetch("/api/fcm/test-send", {
+        method: "POST",
+      });
+
+      const data = await res.json();
+      console.log("FCM test-send response:", data);
+      alert(JSON.stringify(data, null, 2));
+    } catch (err) {
+      console.error(err);
+      alert("Error enviando push");
+    }
+  }}
+  className="mb-4 rounded bg-green-600 px-4 py-2 text-white"
+>
+  Probar envío push
+</button>
+
+<button
+  type="button"
+  onClick={async () => {
+    try {
+      const hasNotification = typeof window !== "undefined" && "Notification" in window;
+      const permission = hasNotification ? Notification.permission : "no-api";
+      alert(`Notification API: ${hasNotification}\nPermiso actual: ${permission}`);
+      console.log("Notification API:", hasNotification);
+      console.log("Permiso actual:", permission);
+    } catch (e) {
+      console.error(e);
+      alert("Error revisando Notification API");
+    }
+  }}
+  className="mb-4 rounded bg-orange-600 px-4 py-2 text-white"
+>
+  Diagnóstico notificaciones
+</button>
+
+<button
+  type="button"
+  onClick={async () => {
+    try {
+      const token = await requestNotificationPermissionAndToken();
+      console.log("TOKEN TELEFONO:", token);
+      alert(token ? "Token generado" : "No se generó token");
+    } catch (e) {
+      console.error(e);
+      alert("Error generando token");
+    }
+  }}
+  className="mb-4 rounded bg-blue-600 px-4 py-2 text-white"
+>
+  Generar token push
+</button>
+
+<button
+  type="button"
+  onClick={async () => {
+    try {
+      if (!("Notification" in window)) {
+        alert("Este navegador no soporta Notification API");
+        return;
+      }
+
+      const permission = await Notification.requestPermission();
+      alert(`Permiso después de pedirlo: ${permission}`);
+
+      if (permission !== "granted") return;
+
+      const token = await requestNotificationPermissionAndToken();
+      console.log("TOKEN TELEFONO:", token);
+
+      if (!token) {
+        alert("No se generó token");
+        return;
+      }
+
+      const res = await fetch("/api/fcm/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      const data = await res.json();
+      console.log("Respuesta register:", data);
+
+      alert(`Token generado y enviado al backend.\nRegistro ok: ${res.ok}`);
+    } catch (e) {
+      console.error(e);
+      alert("Error generando o guardando token");
+    }
+  }}
+  className="mb-4 rounded bg-blue-600 px-4 py-2 text-white"
+>
+  Registrar push en este dispositivo
+</button>
+    </Shell>
+  );
+}

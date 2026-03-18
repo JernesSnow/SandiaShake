@@ -19,6 +19,13 @@ const ymdCR = (d: Date) => {
   return `${get("year")}-${get("month")}-${get("day")}`;
 };
 
+const diffDaysCR = (fromYYYYMMDD: string, toYYYYMMDD: string) => {
+  const from = new Date(fromYYYYMMDD + "T00:00:00-06:00");
+  const to = new Date(toYYYYMMDD + "T00:00:00-06:00");
+  const diffMs = from.getTime() - to.getTime();
+  return Math.round(diffMs / (1000 * 60 * 60 * 24));
+};
+
 export async function GET() {
   const supabase = await createSupabaseServer();
   const admin = createSupabaseAdmin();
@@ -53,6 +60,22 @@ export async function GET() {
 
   const idOrg = ou.id_organizacion;
 
+const todayStr = ymdCR(new Date());
+const maxPreAvisoStr = ymdCR(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+const minAvisoStr = ymdCR(new Date(Date.now() - 1 * 24 * 60 * 60 * 1000));
+
+const { data: facturasBanner, error: bannerErr } = await admin
+  .from("facturas")
+  .select("id_factura, periodo, saldo, fecha_vencimiento")
+  .eq("id_organizacion", idOrg)
+  .eq("estado", "ACTIVO")
+  .gt("saldo", 0)
+  .not("fecha_vencimiento", "is", null)
+  .gte("fecha_vencimiento", minAvisoStr)
+  .lte("fecha_vencimiento", maxPreAvisoStr)
+  .order("fecha_vencimiento", { ascending: true });
+
+if (bannerErr) return jsonError(bannerErr.message, 500);
 
   // Traer nombre real de la organización
 const { data: org } = await admin
@@ -62,6 +85,54 @@ const { data: org } = await admin
   .maybeSingle();
 
 const nombreOrganizacion = org?.nombre ?? null;
+
+const facturaBanner = (facturasBanner ?? [])[0] ?? null;
+
+let banner = {
+  show: false,
+  type: "info" as "info" | "warning" | "danger",
+  diasRestantes: null as number | null,
+  fechaVencimiento: null as string | null,
+  saldoPendiente: null as number | null,
+  periodo: null as string | null,
+  idFactura: null as number | null,
+  mensaje: "",
+};
+
+if (facturaBanner?.fecha_vencimiento) {
+  const vence = String(facturaBanner.fecha_vencimiento).slice(0, 10);
+  const diasRestantes = diffDaysCR(vence, todayStr);
+
+  if ([7, 3, 0, -1].includes(diasRestantes)) {
+    let type: "info" | "warning" | "danger" = "info";
+    let mensaje = "";
+
+    if (diasRestantes === 7) {
+      type = "info";
+      mensaje = "Tu membresía vence en 7 días.";
+    } else if (diasRestantes === 3) {
+      type = "warning";
+      mensaje = "Tu membresía vence en 3 días.";
+    } else if (diasRestantes === 0) {
+      type = "warning";
+      mensaje = "Tu membresía vence hoy.";
+    } else if (diasRestantes === -1) {
+      type = "danger";
+      mensaje = "Tu membresía está vencida.";
+    }
+
+    banner = {
+      show: true,
+      type,
+      diasRestantes,
+      fechaVencimiento: vence,
+      saldoPendiente: Number(facturaBanner.saldo ?? 0),
+      periodo: facturaBanner.periodo ?? null,
+      idFactura: facturaBanner.id_factura ?? null,
+      mensaje,
+    };
+  }
+}
   // morosidad vencida + 2 días + saldo>0
   const cutoffBloqueo = ymdCR(new Date(Date.now() - 2 * 24 * 60 * 60 * 1000));
 
@@ -91,6 +162,7 @@ const pagoInfo = {
     id_organizacion: idOrg,
     organizacion_nombre: nombreOrganizacion,
     facturasMorosas: facturasMorosas ?? [],
+    banner,
     pagoInfo,
   });
 }
