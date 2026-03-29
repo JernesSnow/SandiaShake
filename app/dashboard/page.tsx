@@ -11,6 +11,7 @@ import EntregablesChart from "./EntregablesChart";
 import SaludMental from "./SaludMental";
 import Rendimiento from "./Rendimiento";
 import ChilliPoints from "./ChilliPoints";
+import SaludMentalModal from "../../components/SaludMentalModal";
 
 import { CheckSquare, FileText, Users, User } from "react-feather";
 
@@ -19,6 +20,7 @@ export default function DashboardPage() {
   const router = useRouter();
 
   const [ready, setReady] = useState(false);
+  const [showBienestar, setShowBienestar] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,7 +37,7 @@ export default function DashboardPage() {
 
       const { data: perfil } = await supabase
         .from("usuarios")
-        .select("force_password_change, temp_password")
+        .select("force_password_change, temp_password, rol")
         .eq("auth_user_id", user.id)
         .single();
 
@@ -50,7 +52,17 @@ export default function DashboardPage() {
         return;
       }
 
-      if (!cancelled) setReady(true);
+      if (!cancelled) {
+        setReady(true);
+
+        if (perfil.rol === "COLABORADOR") {
+          const res = await fetch("/api/bienestar/hoy");
+          const data = await res.json();
+          if (data.aplica && !data.registrado) {
+            setShowBienestar(true);
+          }
+        }
+      }
     }
 
     guard();
@@ -68,6 +80,8 @@ export default function DashboardPage() {
   }
 
   return (
+    <>
+      {showBienestar && <SaludMentalModal onClose={() => setShowBienestar(false)} />}
     <Shell>
       <h1 className="text-xl font-semibold mb-6 text-white">Dashboard</h1>
 
@@ -86,5 +100,6 @@ export default function DashboardPage() {
         <ChilliPoints />
       </div>
     </Shell>
+    </>
   );
 }
