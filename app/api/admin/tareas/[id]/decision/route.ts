@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { grantChilliPointsIfNotExists } from "@/lib/chilli-points";
 
 type Perfil = {
   id_usuario: number;
@@ -206,6 +207,34 @@ export async function POST(req: Request, ctx: Ctx) {
         { error: "No se pudo actualizar la tarea" },
         { status: 500 }
       );
+    }
+
+    /* =========================================
+       CHILLI RULE
+       +4 points if first approval with 1 entregable
+    ========================================= */
+
+    if (accion === "APROBAR") {
+      try {
+        const { count } = await admin
+          .from("entregables")
+          .select("id_entregable", { count: "exact", head: true })
+          .eq("id_tarea", idTarea)
+          .neq("estado", "ELIMINADO");
+
+        if (count === 1 && updatedTask.id_colaborador) {
+          const motivo = `PRIMERA_APROBACION_UNICA:TAREA:${idTarea}`;
+
+          await grantChilliPointsIfNotExists(admin, {
+            id_colaborador: updatedTask.id_colaborador,
+            puntos: 4,
+            motivo,
+            id_tarea: idTarea,
+          });
+        }
+      } catch (err) {
+        console.error("Chilli approval rule error:", err);
+      }
     }
 
     if (accion === "RECHAZAR") {

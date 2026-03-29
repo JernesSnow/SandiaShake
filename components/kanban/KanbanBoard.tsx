@@ -22,6 +22,7 @@ import {
 } from "react-feather";
 import { kanbanStyles } from "./kanbanStyles";
 import TaskConversationModal from "./TaskConversationModal";
+import TaskDeliverablesSection from "./TaskDeliverablesSection";
 
 /* ---------- TYPES & STATE ---------- */
 
@@ -71,7 +72,13 @@ const emptyState: KanbanState = {
     aprobada: { id: "aprobada", titulo: "Aprobada", taskIds: [] },
     archivada: { id: "archivada", titulo: "Archivada", taskIds: [] },
   },
-  columnOrder: ["pendiente", "en_progreso", "en_revision", "aprobada", "archivada"],
+  columnOrder: [
+    "pendiente",
+    "en_progreso",
+    "en_revision",
+    "aprobada",
+    "archivada",
+  ],
 };
 
 /* ---------- CONSTANTS & HELPERS ---------- */
@@ -264,35 +271,24 @@ function normalizeEntregable(v: any): Task["tipoEntregable"] {
 function apiRowToTask(r: any): Task | null {
   const rawId = r?.id_tarea;
   if (!isNumericId(rawId)) return null;
-  const id = String(rawId).trim();
-
-  const statusId = normalizeStatus(r.status_kanban);
-
-  const cliente =
-    String(r.organizaciones?.nombre ?? r.organizacion?.nombre ?? r.cliente ?? "") || "";
-
-  const asignadoA =
-    String(r.colaborador?.nombre ?? r.usuarios?.nombre ?? r.asignadoA ?? "") || "";
 
   return {
-    id,
+    id: String(rawId),
     titulo: String(r.titulo ?? ""),
-    cliente,
-    asignadoA,
-    statusId,
+    cliente: String(r.organizaciones?.nombre ?? ""),
+    asignadoA: String(r.colaborador?.nombre ?? ""),
+    statusId: normalizeStatus(r.status_kanban),
+
     fechaEntrega: r.fecha_entrega ?? undefined,
     mes: r.mes ?? undefined,
     tipoEntregable: normalizeEntregable(r.tipo_entregable),
     prioridad: normalizePrioridad(r.prioridad),
+
+    idOrganizacion: r.id_organizacion ?? undefined,
+    idColaborador: r.id_colaborador ?? undefined,
+
+    googleDriveUrl: r.drive_folder_url ?? undefined,
     descripcion: r.descripcion ?? undefined,
-    idOrganizacion:
-      r.id_organizacion !== undefined && r.id_organizacion !== null
-        ? Number(r.id_organizacion)
-        : undefined,
-    idColaborador:
-      r.id_colaborador !== undefined && r.id_colaborador !== null
-        ? String(r.id_colaborador)
-        : undefined,
   };
 }
 
@@ -322,9 +318,11 @@ function buildStateFromApi(rows: any[]): KanbanState {
 /* ---------- MAIN BOARD COMPONENT ---------- */
 
 export function KanbanBoard() {
+  const [mounted, setMounted] = useState(false);
   const [state, setState] = useState<KanbanState>(emptyState);
   const [searchClient, setSearchClient] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>("Todas");
+  const [priorityFilter, setPriorityFilter] =
+    useState<PriorityFilter>("Todas");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isNew, setIsNew] = useState(false);
 
@@ -339,6 +337,15 @@ export function KanbanBoard() {
   const [role, setRole] = useState<Role>("DESCONOCIDO");
   const [perfilId, setPerfilId] = useState<string>("");
 
+  const [conversationTask, setConversationTask] = useState<Task | null>(null);
+  const [unreadByTaskId, setUnreadByTaskId] = useState<Record<string, number>>(
+    {}
+  );
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const isAdmin = role === "ADMIN";
   const isColab = role === "COLABORADOR";
   const isCliente = role === "CLIENTE";
@@ -348,12 +355,17 @@ export function KanbanBoard() {
   const canReassign = isAdmin;
   const canDelete = isAdmin;
 
-  const [conversationTask, setConversationTask] = useState<Task | null>(null);
-  const [unreadByTaskId, setUnreadByTaskId] = useState<Record<string, number>>({});
+  function openReport() {
+  if (isCliente) {
+    window.open("/api/reportes/cliente/pdf");
+  } else {
+    window.open("/api/reportes/admin/pdf");
+  }
+}
 
   async function loadUnreadCounts() {
     try {
-      const res = await fetch("/api/admin/tareas/comentarios/unread", {
+      const res = await fetch("/api/admin/tareas/[id]/comentarios/unread", {
         cache: "no-store",
       });
       const json = await safeJson(res);
@@ -361,7 +373,9 @@ export function KanbanBoard() {
 
       const list: UnreadRow[] = Array.isArray(json?.data) ? json.data : [];
       const map: Record<string, number> = {};
-      for (const r of list) map[String(r.id_tarea)] = Number(r.unread_count ?? 0);
+      for (const r of list) {
+        map[String(r.id_tarea)] = Number(r.unread_count ?? 0);
+      }
       setUnreadByTaskId(map);
     } catch {
       // no bloquea
@@ -373,11 +387,14 @@ export function KanbanBoard() {
     setConversationTask(task);
     setUnreadByTaskId((prev) => ({ ...prev, [task.id]: 0 }));
   }
+
   async function refreshBoard() {
     try {
       const tRes = await fetch("/api/admin/tareas", { cache: "no-store" });
       const tJson = await safeJson(tRes);
-      if (!tRes.ok) throw new Error(tJson?.error ?? "No se pudieron cargar tareas");
+      if (!tRes.ok) {
+        throw new Error(tJson?.error ?? "No se pudieron cargar tareas");
+      }
       setState(buildStateFromApi(tJson?.data ?? []));
     } catch (e) {
       console.error(e);
@@ -398,7 +415,9 @@ export function KanbanBoard() {
         ]);
 
         const tJson = await safeJson(tRes);
-        if (!tRes.ok) throw new Error(tJson?.error ?? "No se pudieron cargar tareas");
+        if (!tRes.ok) {
+          throw new Error(tJson?.error ?? "No se pudieron cargar tareas");
+        }
 
         const oJson = await safeJson(oRes);
         if (oRes.ok) {
@@ -409,9 +428,13 @@ export function KanbanBoard() {
                 id_organizacion: Number(o.id_organizacion),
                 nombre: String(o.nombre ?? ""),
               }))
-              .filter((o: any) => Number.isFinite(o.id_organizacion) && o.nombre)
+              .filter(
+                (o: any) => Number.isFinite(o.id_organizacion) && o.nombre
+              )
           );
-        } else setOrgs([]);
+        } else {
+          setOrgs([]);
+        }
 
         const uJson = await safeJson(uRes);
         const rolRaw = String(uJson?.perfil?.rol ?? "").toUpperCase();
@@ -426,7 +449,9 @@ export function KanbanBoard() {
 
         const cJson = await safeJson(cRes);
         if (cRes.ok) {
-          const list = Array.isArray(cJson?.colaboradores) ? cJson.colaboradores : [];
+          const list = Array.isArray(cJson?.colaboradores)
+            ? cJson.colaboradores
+            : [];
           setColabs(
             list
               .map((c: any) => ({
@@ -435,7 +460,9 @@ export function KanbanBoard() {
               }))
               .filter((c: any) => c.id_usuario && c.nombre)
           );
-        } else setColabs([]);
+        } else {
+          setColabs([]);
+        }
 
         setState(buildStateFromApi(tJson?.data ?? []));
         loadUnreadCounts();
@@ -455,8 +482,12 @@ export function KanbanBoard() {
     const { destination, source, draggableId, type } = result;
     if (!destination) return;
 
-    if (destination.droppableId === source.droppableId && destination.index === source.index)
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
       return;
+    }
 
     if (type === "column") {
       if (!isAdmin) return;
@@ -533,16 +564,25 @@ export function KanbanBoard() {
   const filteredTasks = useMemo(() => {
     const search = searchClient.trim().toLowerCase();
     const result: Record<string, Task> = {};
+
     for (const [id, task] of Object.entries(state.tasks)) {
-      const matchesClient = !search || task.cliente.toLowerCase().includes(search);
-      const matchesPriority = priorityFilter === "Todas" || task.prioridad === priorityFilter;
-      if (matchesClient && matchesPriority) result[id] = task;
+      const matchesClient =
+        !search || task.cliente.toLowerCase().includes(search);
+      const matchesPriority =
+        priorityFilter === "Todas" || task.prioridad === priorityFilter;
+
+      if (matchesClient && matchesPriority) {
+        result[id] = task;
+      }
     }
+
     return result;
   }, [state.tasks, searchClient, priorityFilter]);
 
   function getVisibleTaskIds(columnId: StatusId) {
-    return state.columns[columnId].taskIds.filter((taskId) => filteredTasks[taskId]);
+    return state.columns[columnId].taskIds.filter(
+      (taskId) => filteredTasks[taskId]
+    );
   }
 
   function openNewTask() {
@@ -586,7 +626,9 @@ export function KanbanBoard() {
 
     setState({
       ...state,
-      tasks: Object.fromEntries(Object.entries(state.tasks).filter(([k]) => k !== taskId)),
+      tasks: Object.fromEntries(
+        Object.entries(state.tasks).filter(([k]) => k !== taskId)
+      ),
       columns: {
         ...state.columns,
         [col.id]: { ...col, taskIds: col.taskIds.filter((id) => id !== taskId) },
@@ -618,7 +660,10 @@ export function KanbanBoard() {
     }
 
     if (isNew) {
-      if (!taskInput.idOrganizacion || !Number.isFinite(taskInput.idOrganizacion)) {
+      if (
+        !taskInput.idOrganizacion ||
+        !Number.isFinite(taskInput.idOrganizacion)
+      ) {
         alert("Debes seleccionar una organización.");
         return;
       }
@@ -634,7 +679,9 @@ export function KanbanBoard() {
       createTaskInDb(taskInput, isAdmin)
         .then((row) => {
           const created = apiRowToTask(row);
-          if (!created) throw new Error("Formato inválido de API (id_tarea)");
+          if (!created) {
+            throw new Error("Formato inválido de API (id_tarea)");
+          }
 
           setState((prev) => {
             const col = prev.columns[created.statusId];
@@ -703,7 +750,7 @@ export function KanbanBoard() {
           ...prev,
           tasks: { ...prev.tasks, [taskInput.id]: updated },
         }));
-        setSaveOkMsg("✅ Cambios guardados");
+        setSaveOkMsg("Cambios guardados");
         window.setTimeout(() => setSaveOkMsg(""), 1500);
       })
       .catch((err) => {
@@ -720,7 +767,7 @@ export function KanbanBoard() {
     <div className={kanbanStyles.root}>
       {/* Header + filtros */}
       <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 shadow-[0_12px_40px_rgba(0,0,0,0.25)]">
-        <div className="flex flex-col md:flex-row md:items-end gap-3">
+        <div className="flex flex-col gap-3 md:flex-row md:items-end">
           <div className="flex-1">
             <label className={kanbanStyles.label}>Buscar por cliente</label>
             <div className={kanbanStyles.searchWrapper}>
@@ -750,213 +797,253 @@ export function KanbanBoard() {
               <option value="Baja">Baja</option>
             </select>
           </div>
+<div className="flex w-full gap-2 md:w-auto">
 
-          <div className="w-full md:w-auto">
-            <button
-              type="button"
-              onClick={openNewTask}
-              disabled={!canCreate}
-              className={`${kanbanStyles.primaryButton} w-full md:w-auto justify-center ${
-                !canCreate ? "opacity-50 cursor-not-allowed" : ""
-              }`}
-              title={
-                !canCreate
-                  ? isCliente
-                    ? "Como cliente no puedes crear tareas"
-                    : "Solo admin/colaborador puede crear tareas"
-                  : "Nueva tarea"
-              }
-            >
-              <Plus size={16} />
-              Nueva tarea
-            </button>
-          </div>
-        </div>
+{isCliente ? (
+  <ReporteDropdown isCliente />
+) : (
+  <ReporteDropdown />
+)}
 
-        <div className="mt-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+  {/* BOTÓN NUEVA TAREA */}
+  {(isAdmin || isColab) && (
+    <button
+      type="button"
+      onClick={openNewTask}
+      className={`${kanbanStyles.primaryButton} flex items-center gap-2`}
+    >
+      <Plus size={16} />
+      Nueva tarea
+    </button>
+  )}
+
+</div>
+
+    </div> 
+        <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="text-[11px] text-[#fffef9]/45">
             Rol: <b className="text-[#fffef9]/70">{role}</b>
           </div>
 
-          <div className="flex flex-col md:flex-row gap-2">
+          <div className="flex flex-col gap-2 md:flex-row">
             {loading ? (
               <div className="text-sm text-[#fffef9]/60">Cargando tareas…</div>
             ) : loadErr ? (
               <div className="text-sm text-[#ffb3c2]">{loadErr}</div>
             ) : null}
 
-            {saveOkMsg ? <div className="text-sm text-[#b9f7a6]">{saveOkMsg}</div> : null}
-            {saveErrMsg ? <div className="text-sm text-[#ffb3c2]">{saveErrMsg}</div> : null}
+            {saveOkMsg ? (
+              <div className="text-sm text-[#b9f7a6]">{saveOkMsg}</div>
+            ) : null}
+            {saveErrMsg ? (
+              <div className="text-sm text-[#ffb3c2]">{saveErrMsg}</div>
+            ) : null}
           </div>
         </div>
       </div>
 
       <div className={kanbanStyles.boardWrapper}>
-        <DragDropContext onDragEnd={onDragEnd}>
-          <Droppable droppableId="all-columns" direction="horizontal" type="column">
-            {(provided) => (
-              <div
-                className={kanbanStyles.columnsRow}
-                ref={provided.innerRef}
-                {...provided.droppableProps}
-              >
-                {state.columnOrder.map((columnId, index) => {
-                  const column = state.columns[columnId];
-                  const visibleTaskIds = getVisibleTaskIds(columnId);
-                  const tasks = visibleTaskIds.map((taskId) => filteredTasks[taskId]);
+        {!mounted ? null : (
+          <DragDropContext onDragEnd={onDragEnd}>
+            <Droppable
+              droppableId="all-columns"
+              direction="horizontal"
+              type="column"
+            >
+              {(provided) => (
+                <div
+                  className={kanbanStyles.columnsRow}
+                  ref={provided.innerRef}
+                  {...provided.droppableProps}
+                >
+                  {state.columnOrder.map((columnId, index) => {
+                    const column = state.columns[columnId];
+                    const visibleTaskIds = getVisibleTaskIds(columnId);
+                    const tasks = visibleTaskIds.map(
+                      (taskId) => filteredTasks[taskId]
+                    );
 
-                  return (
-                    <Draggable
-                      draggableId={column.id}
-                      index={index}
-                      key={column.id}
-                      isDragDisabled={!isAdmin}
-                    >
-                      {(colProvided) => (
-                        <div
-                          ref={colProvided.innerRef}
-                          {...colProvided.draggableProps}
-                          className={`${kanbanStyles.columnWrapperBase} ${
-                            index % 2 === 0 ? kanbanStyles.columnBgEven : kanbanStyles.columnBgOdd
-                          }`}
-                        >
-                          <div className={kanbanStyles.columnHeader}>
-                            <h2
-                              className={kanbanStyles.columnTitle}
-                              {...colProvided.dragHandleProps}
-                              title={!isAdmin ? "Solo admin reordena columnas" : undefined}
-                            >
-                              {column.titulo}
-                            </h2>
-                            <span className={kanbanStyles.columnCount}>
-                              {visibleTaskIds.length}
-                            </span>
-                          </div>
-
-                          <Droppable droppableId={column.id} type="task">
-                            {(taskProvided, snapshot) => (
-                              <div
-                                ref={taskProvided.innerRef}
-                                {...taskProvided.droppableProps}
-                                className={`${kanbanStyles.columnDropAreaBase} ${
-                                  snapshot.isDraggingOver
-                                    ? kanbanStyles.columnDropAreaDragging
-                                    : kanbanStyles.columnDropAreaIdle
-                                }`}
+                    return (
+                      <Draggable
+                        draggableId={column.id}
+                        index={index}
+                        key={column.id}
+                        isDragDisabled={!isAdmin}
+                      >
+                        {(colProvided) => (
+                          <div
+                            ref={colProvided.innerRef}
+                            {...colProvided.draggableProps}
+                            className={`${kanbanStyles.columnWrapperBase} ${
+                              index % 2 === 0
+                                ? kanbanStyles.columnBgEven
+                                : kanbanStyles.columnBgOdd
+                            }`}
+                          >
+                            <div className={kanbanStyles.columnHeader}>
+                              <h2
+                                className={kanbanStyles.columnTitle}
+                                {...colProvided.dragHandleProps}
+                                title={
+                                  !isAdmin
+                                    ? "Solo admin reordena columnas"
+                                    : undefined
+                                }
                               >
-                                {tasks.map((task, taskIndex) => {
-                                  const unread = unreadByTaskId[task.id] ?? 0;
-                                  const idOk = isNumericId(task.id);
+                                {column.titulo}
+                              </h2>
+                              <span className={kanbanStyles.columnCount}>
+                                {visibleTaskIds.length}
+                              </span>
+                            </div>
 
-                                  return (
-                                    <Draggable
-                                      draggableId={task.id}
-                                      index={taskIndex}
-                                      key={task.id}
-                                      isDragDisabled={!canEdit || !idOk}
-                                    >
-                                      {(dragProvided, dragSnapshot) => (
-                                        <div
-                                          ref={dragProvided.innerRef}
-                                          {...dragProvided.draggableProps}
-                                          {...dragProvided.dragHandleProps}
-                                          className={`${kanbanStyles.cardBase} ${
-                                            dragSnapshot.isDragging
-                                              ? kanbanStyles.cardDragging
-                                              : kanbanStyles.cardBorderIdle
-                                          } ${!canEdit || !idOk ? "opacity-75" : ""}`}
-                                          onClick={() => openTaskDetails(task as Task)}
-                                          title={!idOk ? `ID inválido: ${String(task.id)}` : undefined}
-                                        >
-                                          <div className="flex items-start justify-between gap-2">
-                                            <div>
-                                              <p className={kanbanStyles.cardTitle}>{task.titulo}</p>
+                            <Droppable droppableId={column.id} type="task">
+                              {(taskProvided, snapshot) => (
+                                <div
+                                  ref={taskProvided.innerRef}
+                                  {...taskProvided.droppableProps}
+                                  className={`${kanbanStyles.columnDropAreaBase} ${
+                                    snapshot.isDraggingOver
+                                      ? kanbanStyles.columnDropAreaDragging
+                                      : kanbanStyles.columnDropAreaIdle
+                                  }`}
+                                >
+                                  {tasks.map((task, taskIndex) => {
+                                    const unread =
+                                      unreadByTaskId[task.id] ?? 0;
+                                    const idOk = isNumericId(task.id);
 
-                                              <div className={kanbanStyles.cardMetaRow}>
-                                                <span className="inline-flex items-center gap-1">
-                                                  <User size={12} />
-                                                  {task.cliente || "—"}
-                                                </span>
-                                                <span className="inline-flex items-center gap-1">
-                                                  <Edit2 size={11} />
-                                                  {task.asignadoA || "—"}
-                                                </span>
+                                    return (
+                                      <Draggable
+                                        draggableId={task.id}
+                                        index={taskIndex}
+                                        key={task.id}
+                                        isDragDisabled={!canEdit || !idOk}
+                                      >
+                                        {(dragProvided, dragSnapshot) => (
+                                          <div
+                                            ref={dragProvided.innerRef}
+                                            {...dragProvided.draggableProps}
+                                            {...dragProvided.dragHandleProps}
+                                            className={`${kanbanStyles.cardBase} ${
+                                              dragSnapshot.isDragging
+                                                ? kanbanStyles.cardDragging
+                                                : kanbanStyles.cardBorderIdle
+                                            } ${
+                                              !canEdit || !idOk
+                                                ? "opacity-75"
+                                                : ""
+                                            }`}
+                                            onClick={() =>
+                                              openTaskDetails(task as Task)
+                                            }
+                                            title={
+                                              !idOk
+                                                ? `ID inválido: ${String(
+                                                    task.id
+                                                  )}`
+                                                : undefined
+                                            }
+                                          >
+                                            <div className="flex items-start justify-between gap-2">
+                                              <div>
+                                                <p className={kanbanStyles.cardTitle}>
+                                                  {task.titulo}
+                                                </p>
+
+                                                <div className={kanbanStyles.cardMetaRow}>
+                                                  <span className="inline-flex items-center gap-1">
+                                                    <User size={12} />
+                                                    {task.cliente || "—"}
+                                                  </span>
+                                                  <span className="inline-flex items-center gap-1">
+                                                    <Edit2 size={11} />
+                                                    {task.asignadoA || "—"}
+                                                  </span>
+                                                </div>
                                               </div>
+
+                                              <button
+                                                type="button"
+                                                onClick={(e) =>
+                                                  openConversation(task as Task, e)
+                                                }
+                                                className="relative inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] transition-colors hover:bg-white/[0.10]"
+                                                title="Abrir conversación"
+                                              >
+                                                <MessageCircle size={14} />
+                                                Chat
+                                                {unread > 0 ? (
+                                                  <span className="absolute -right-2 -top-2 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#ee2346] px-1 text-[10px] text-white shadow">
+                                                    {unread > 99 ? "99+" : unread}
+                                                  </span>
+                                                ) : null}
+                                              </button>
                                             </div>
 
-                                            <button
-                                              type="button"
-                                              onClick={(e) => openConversation(task as Task, e)}
-                                              className="relative inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border border-white/10 bg-white/[0.06] hover:bg-white/[0.10] transition-colors"
-                                              title="Abrir conversación"
-                                            >
-                                              <MessageCircle size={14} />
-                                              Chat
-                                              {unread > 0 ? (
-                                                <span className="absolute -top-2 -right-2 min-w-[18px] h-[18px] px-1 rounded-full bg-[#ee2346] text-white text-[10px] flex items-center justify-center shadow">
-                                                  {unread > 99 ? "99+" : unread}
-                                                </span>
-                                              ) : null}
-                                            </button>
-                                          </div>
+                                            <div className={kanbanStyles.cardFooterRow}>
+                                              <div className={kanbanStyles.cardFooterLeft}>
+                                                {task.fechaEntrega && (
+                                                  <span className={kanbanStyles.cardMetaText}>
+                                                    <Calendar
+                                                      size={12}
+                                                      className="mr-1 inline"
+                                                    />
+                                                    {task.fechaEntrega}
+                                                  </span>
+                                                )}
+                                                {task.mes && (
+                                                  <span className={kanbanStyles.cardMetaMuted}>
+                                                    {task.mes}
+                                                  </span>
+                                                )}
 
-                                          <div className={kanbanStyles.cardFooterRow}>
-                                            <div className={kanbanStyles.cardFooterLeft}>
-                                              {task.fechaEntrega && (
-                                                <span className={kanbanStyles.cardMetaText}>
-                                                  <Calendar size={12} className="inline mr-1" />
-                                                  {task.fechaEntrega}
-                                                </span>
-                                              )}
-                                              {task.mes && (
-                                                <span className={kanbanStyles.cardMetaMuted}>
-                                                  {task.mes}
-                                                </span>
-                                              )}
+                                                {task.googleDriveUrl && (
+                                                  <a
+                                                    href={task.googleDriveUrl}
+                                                    target="_blank"
+                                                    rel="noreferrer"
+                                                    onClick={(e) =>
+                                                      e.stopPropagation()
+                                                    }
+                                                    className={kanbanStyles.cardLink}
+                                                  >
+                                                    <LinkIcon size={12} />
+                                                    Drive
+                                                  </a>
+                                                )}
+                                              </div>
 
-                                              {task.googleDriveUrl && (
-                                                <a
-                                                  href={task.googleDriveUrl}
-                                                  target="_blank"
-                                                  rel="noreferrer"
-                                                  onClick={(e) => e.stopPropagation()}
-                                                  className={kanbanStyles.cardLink}
-                                                >
-                                                  <LinkIcon size={12} />
-                                                  Drive
-                                                </a>
-                                              )}
+                                              <span
+                                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getPriorityClasses(
+                                                  task.prioridad
+                                                )}`}
+                                              >
+                                                {task.prioridad ?? "Sin prio"}
+                                              </span>
                                             </div>
-
-                                            <span
-                                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium ${getPriorityClasses(
-                                                task.prioridad
-                                              )}`}
-                                            >
-                                              {task.prioridad ?? "Sin prio"}
-                                            </span>
                                           </div>
-                                        </div>
-                                      )}
-                                    </Draggable>
-                                  );
-                                })}
+                                        )}
+                                      </Draggable>
+                                    );
+                                  })}
 
-                                {taskProvided.placeholder}
-                              </div>
-                            )}
-                          </Droppable>
-                        </div>
-                      )}
-                    </Draggable>
-                  );
-                })}
+                                  {taskProvided.placeholder}
+                                </div>
+                              )}
+                            </Droppable>
+                          </div>
+                        )}
+                      </Draggable>
+                    );
+                  })}
 
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
+        )}
       </div>
 
       {/* Modals */}
@@ -983,9 +1070,15 @@ export function KanbanBoard() {
               setSaveOkMsg("");
               setSaveErrMsg("");
 
-              const updatedRow = await decideTaskInDb(t.id, accion, comentario);
+              const updatedRow = await decideTaskInDb(
+                t.id,
+                accion,
+                comentario
+              );
               const updatedTask = apiRowToTask(updatedRow);
-              if (!updatedTask) throw new Error("Respuesta inválida del servidor");
+              if (!updatedTask) {
+                throw new Error("Respuesta inválida del servidor");
+              }
 
               setState((prev) => {
                 const prevTask = prev.tasks[t.id];
@@ -1023,7 +1116,9 @@ export function KanbanBoard() {
               setEditingTask(null);
               setIsNew(false);
             } catch (e: any) {
-              setSaveErrMsg(e?.message ?? "No se pudo registrar la decisión");
+              setSaveErrMsg(
+                e?.message ?? "No se pudo registrar la decisión"
+              );
             }
           }}
         />
@@ -1059,7 +1154,11 @@ type TaskModalProps = {
   onSave: (task: Task) => void;
   onDelete: (taskId: string) => void;
   onOpenChat: (task: Task) => void;
-  onClientDecision: (task: Task, accion: "APROBAR" | "RECHAZAR", comentario: string) => void;
+  onClientDecision: (
+    task: Task,
+    accion: "APROBAR" | "RECHAZAR",
+    comentario: string
+  ) => void;
 };
 
 function TaskModal({
@@ -1076,9 +1175,8 @@ function TaskModal({
   onClientDecision,
 }: TaskModalProps) {
   const [form, setForm] = useState<Task>(task);
-
   const [decisionComment, setDecisionComment] = useState("");
-  const [deciding, setDeciding] = useState<"APROBAR" | "RECHAZAR" | "">("");
+  const [deciding, setDeciding] = useState<"" | "APROBAR" | "RECHAZAR">("");
 
   useEffect(() => {
     setForm(task);
@@ -1096,6 +1194,7 @@ function TaskModal({
   function updateField<K extends keyof Task>(key: K, value: Task[K]) {
     if (readOnly) return;
     if (!isAdmin && key === "idColaborador") return;
+
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -1106,54 +1205,21 @@ function TaskModal({
     if (!form.titulo.trim()) return alert("Título es obligatorio.");
 
     if (isNew) {
-      if (!form.idOrganizacion || !Number.isFinite(form.idOrganizacion)) {
-        return alert("Debes seleccionar una organización.");
-      }
-      if (isAdmin && colabs.length > 0 && !form.idColaborador) {
-        return alert("Debes seleccionar un colaborador.");
+      if (!form.idOrganizacion) return alert("Selecciona una organización.");
+      if (isAdmin && !form.idColaborador) {
+        return alert("Selecciona un colaborador.");
       }
     }
 
     onSave(form);
   }
 
-  const canPickColaborador = isNew && isAdmin && colabs.length > 0;
-
-  useEffect(() => {
-    if (!isNew) return;
-    if (!isColab) return;
-    if (!perfilId) return;
-
-    setForm((prev) => {
-      const me = colabs.find((c) => String(c.id_usuario) === String(perfilId));
-      return {
-        ...prev,
-        idColaborador: String(perfilId),
-        asignadoA: me?.nombre ?? prev.asignadoA,
-      };
-    });
-  }, [isNew, isColab, perfilId, colabs]);
-
-  useEffect(() => {
-    if (!isNew) return;
-    if (!isColab) return;
-    if (!orgs || orgs.length !== 1) return;
-
-    setForm((prev) => {
-      const only = orgs[0];
-      if (Number(prev.idOrganizacion) === Number(only.id_organizacion)) return prev;
-      return {
-        ...prev,
-        idOrganizacion: Number(only.id_organizacion),
-        cliente: String(only.nombre ?? ""),
-      };
-    });
-  }, [isNew, isColab, orgs]);
-
   const canClientDecide =
     isCliente &&
     !isNew &&
-    (form.statusId === "en_revision" || form.statusId === "aprobada" || form.statusId === "en_progreso");
+    (form.statusId === "en_revision" ||
+      form.statusId === "aprobada" ||
+      form.statusId === "en_progreso");
 
   const decisionDisabled = deciding !== "" || !decisionComment.trim();
 
@@ -1162,6 +1228,7 @@ function TaskModal({
     if (!text) return;
 
     setDeciding(accion);
+
     try {
       await onClientDecision(form, accion, text);
     } finally {
@@ -1170,289 +1237,468 @@ function TaskModal({
   }
 
   return (
-    <div className={kanbanStyles.modalOverlay}>
-      <div className={kanbanStyles.modalContainer}>
-        <div className={kanbanStyles.modalHeader}>
-          <div className="flex items-center justify-between w-full gap-3">
-            <div className="flex flex-col">
-              <h2 className={kanbanStyles.modalTitle}>
-                {isNew ? "Nueva tarea" : readOnly ? "Detalle de tarea" : "Editar tarea"}
-              </h2>
-              {!isNew ? (
-                <p className="text-[12px] text-[#fffef9]/60 mt-1 line-clamp-1">
-                  {form.cliente || "—"} • {form.asignadoA || "—"}
-                </p>
-              ) : null}
-            </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="flex h-[80vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0f1117] shadow-2xl">
+        {/* HEADER */}
+        <div className="flex items-start justify-between border-b border-white/10 p-6">
+          <div>
+            <h2 className="text-xl font-semibold text-white">
+              {isNew ? "Nueva tarea" : form.titulo || "Detalle de tarea"}
+            </h2>
 
-            <div className="flex items-center gap-2">
-              {!isNew ? (
-                <button
-                  type="button"
-                  onClick={() => onOpenChat(form)}
-                  className="relative inline-flex items-center gap-2 text-[12px] px-3 py-2 rounded-xl border border-white/10 bg-white/[0.06] hover:bg-white/[0.10] transition-colors"
-                  title="Abrir conversación"
+            {!isNew && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-white/60">
+                <span>{form.cliente || "—"}</span>
+                <span>•</span>
+                <span>{form.asignadoA || "—"}</span>
+              </div>
+            )}
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {form.tipoEntregable && (
+                <span className="rounded-lg bg-white/10 px-2 py-1 text-xs">
+                  {form.tipoEntregable}
+                </span>
+              )}
+
+              {form.prioridad && (
+                <span
+                  className={`rounded-lg px-2 py-1 text-xs ${getPriorityClasses(
+                    form.prioridad
+                  )}`}
                 >
-                  <MessageCircle size={16} />
-                  Chat
-                </button>
-              ) : null}
+                  {form.prioridad}
+                </span>
+              )}
 
-              <button className={kanbanStyles.modalClose} onClick={onClose} type="button">
-                Cerrar
-              </button>
+              <span className="rounded-lg bg-[#6cbe45]/20 px-2 py-1 text-xs text-[#c7f9b4]">
+                {STATUS_OPTIONS.find((s) => s.id === form.statusId)?.label}
+              </span>
             </div>
           </div>
+
+          <button
+            onClick={onClose}
+            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+          >
+            Cerrar
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className={kanbanStyles.modalForm}>
-          <div className={kanbanStyles.modalGrid}>
+        {/* BODY */}
+        <form onSubmit={handleSubmit} className="flex flex-1 overflow-hidden">
+          {/* LEFT SIDE */}
+          <div className="w-[55%] space-y-6 overflow-y-auto border-r border-white/10 p-6">
             <div>
-              <label className={kanbanStyles.label}>Título *</label>
-              <input
-                type="text"
-                className={kanbanStyles.modalInput}
-                value={form.titulo}
-                disabled={readOnly}
-                onChange={(e) => updateField("titulo", e.target.value)}
-              />
-            </div>
+              <h3 className="mb-3 text-sm font-semibold text-white/80">
+                Información
+              </h3>
 
-            {isNew ? (
-              <div>
-                <label className={kanbanStyles.label}>Organización *</label>
-                <select
-                  className={kanbanStyles.modalInput}
-                  value={form.idOrganizacion ?? ""}
-                  disabled={readOnly}
-                  onChange={(e) => {
-                    const id = Number(e.target.value);
-                    const org = orgs.find((o) => o.id_organizacion === id);
-                    updateField("idOrganizacion", id);
-                    updateField("cliente", org?.nombre ?? "");
-                  }}
-                >
-                  <option value="" disabled>
-                    Selecciona una organización…
-                  </option>
-                  {orgs.map((o) => (
-                    <option key={o.id_organizacion} value={o.id_organizacion}>
-                      {o.nombre}
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                {/* TITLE */}
+                <div className="col-span-2">
+                  <label className={kanbanStyles.label}>Título *</label>
+
+                  {readOnly ? (
+                    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm">
+                      {form.titulo || "—"}
+                    </div>
+                  ) : (
+                    <input
+                      className={kanbanStyles.modalInput}
+                      value={form.titulo}
+                      onChange={(e) => updateField("titulo", e.target.value)}
+                    />
+                  )}
+                </div>
+
+                {/* PRIORITY */}
+                <div>
+                  <label className={kanbanStyles.label}>Prioridad</label>
+
+                  {readOnly ? (
+                    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm">
+                      {form.prioridad ?? "—"}
+                    </div>
+                  ) : (
+                    <select
+                      className={kanbanStyles.modalInput}
+                      value={form.prioridad ?? "Media"}
+                      onChange={(e) =>
+                        updateField("prioridad", e.target.value as Task["prioridad"])
+                      }
+                    >
+                      <option>Alta</option>
+                      <option>Media</option>
+                      <option>Baja</option>
+                    </select>
+                  )}
+                </div>
+
+                {/* STATUS */}
+                <div>
+                  <label className={kanbanStyles.label}>Estado</label>
+
+                  {readOnly ? (
+                    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm">
+                      {STATUS_OPTIONS.find((s) => s.id === form.statusId)?.label}
+                    </div>
+                  ) : (
+                    <select
+                      className={kanbanStyles.modalInput}
+                      value={form.statusId}
+                      onChange={(e) => updateField("statusId", e.target.value as StatusId)}
+                    >
+                      {STATUS_OPTIONS.map((opt) => (
+                        <option key={opt.id} value={opt.id}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                {/* DELIVERY DATE */}
+                <div>
+                  <label className={kanbanStyles.label}>Fecha entrega</label>
+
+                  {readOnly ? (
+                    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm">
+                      {form.fechaEntrega || "—"}
+                    </div>
+                  ) : (
+                    <input
+                      type="date"
+                      className={kanbanStyles.modalInput}
+                      value={form.fechaEntrega ?? ""}
+                      onChange={(e) => updateField("fechaEntrega", e.target.value)}
+                    />
+                  )}
+                </div>
+
+                {/* DELIVERABLE TYPE */}
+                <div>
+                  <label className={kanbanStyles.label}>Tipo entregable</label>
+
+                  {readOnly ? (
+                    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm">
+                      {form.tipoEntregable ?? "—"}
+                    </div>
+                  ) : (
+                    <select
+                      className={kanbanStyles.modalInput}
+                      value={form.tipoEntregable ?? "Arte"}
+                      onChange={(e) =>
+                        updateField(
+                          "tipoEntregable",
+                          e.target.value as Task["tipoEntregable"]
+                        )
+                      }
+                    >
+                      {TIPO_ENTREGABLE_OPTIONS.map((opt) => (
+                        <option key={opt}>{opt}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
               </div>
-            ) : (
-              <div>
-                <label className={kanbanStyles.label}>Cliente</label>
-                <input type="text" className={kanbanStyles.modalInput} value={form.cliente} disabled />
-              </div>
-            )}
+            </div>
 
+            {/* DESCRIPTION */}
             <div>
-              <label className={kanbanStyles.label}>Asignado a</label>
-
-              {canPickColaborador ? (
-                <select
-                  className={kanbanStyles.modalInput}
-                  value={form.idColaborador ?? ""}
-                  disabled={readOnly}
-                  onChange={(e) => {
-                    const id = String(e.target.value);
-                    const c = colabs.find((x) => x.id_usuario === id);
-                    updateField("idColaborador", id);
-                    updateField("asignadoA", c?.nombre ?? "");
-                  }}
-                >
-                  <option value="" disabled>
-                    Selecciona un colaborador…
-                  </option>
-                  {colabs.map((c) => (
-                    <option key={c.id_usuario} value={c.id_usuario}>
-                      {c.nombre}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  className={kanbanStyles.modalInput}
-                  value={form.asignadoA || "—"}
-                  disabled
-                />
-              )}
-            </div>
-
-            <div>
-              <label className={kanbanStyles.label}>Mes</label>
-              <input
-                type="text"
-                className={kanbanStyles.modalInput}
-                placeholder="Ej: Febrero 2025"
-                value={form.mes ?? ""}
-                disabled={readOnly}
-                onChange={(e) => updateField("mes", e.target.value)}
-              />
-            </div>
-
-            <div>
-              <label className={kanbanStyles.label}>Tipo de entregable</label>
-              <select
-                className={kanbanStyles.modalInput}
-                value={form.tipoEntregable ?? "Arte"}
-                disabled={readOnly}
-                onChange={(e) =>
-                  updateField("tipoEntregable", e.target.value as Task["tipoEntregable"])
-                }
-              >
-                {TIPO_ENTREGABLE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className={kanbanStyles.label}>Prioridad</label>
-              <select
-                className={kanbanStyles.modalInput}
-                value={form.prioridad ?? "Media"}
-                disabled={readOnly}
-                onChange={(e) => updateField("prioridad", e.target.value as Task["prioridad"])}
-              >
-                <option value="Alta">Alta</option>
-                <option value="Media">Media</option>
-                <option value="Baja">Baja</option>
-              </select>
-            </div>
-
-            <div>
-              <label className={kanbanStyles.label}>Estado</label>
-              <select
-                className={kanbanStyles.modalInput}
-                value={form.statusId}
-                disabled={readOnly}
-                onChange={(e) => updateField("statusId", e.target.value as StatusId)}
-              >
-                {STATUS_OPTIONS.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
-              {isCliente ? (
-                <p className="text-[11px] text-[#fffef9]/50 mt-1">
-                  Como cliente, el estado cambia solo al aprobar/rechazar.
-                </p>
-              ) : null}
-            </div>
-
-            <div>
-              <label className={kanbanStyles.label}>Fecha de entrega</label>
-              <input
-                type="date"
-                className={kanbanStyles.modalInput}
-                value={form.fechaEntrega ?? ""}
-                disabled={readOnly}
-                onChange={(e) => updateField("fechaEntrega", e.target.value)}
-              />
-            </div>
-
-            <div className="md:col-span-2">
-              <label className={kanbanStyles.label}>Carpeta de Google Drive</label>
-              <input
-                type="url"
-                className={kanbanStyles.modalInput}
-                placeholder="https://drive.google.com/..."
-                value={form.googleDriveUrl ?? ""}
-                disabled={readOnly}
-                onChange={(e) => updateField("googleDriveUrl", e.target.value)}
-              />
-              <p className="text-[11px] text-[#fffef9]/50 mt-1">
-                (Futuro) Este campo se mostrará, pero por ahora no se guarda en la BD.
-              </p>
-            </div>
-          </div>
-
-          <div>
-            <label className={kanbanStyles.label}>Descripción / notas internas</label>
-            <textarea
-              className={kanbanStyles.modalTextarea}
-              value={form.descripcion ?? ""}
-              disabled={readOnly}
-              onChange={(e) => updateField("descripcion", e.target.value)}
-            />
-          </div>
-
-          {canClientDecide ? (
-            <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
-              <p className="text-[12px] text-[#fffef9]/80 mb-2">
-                Para <b>aprobar</b> o <b>rechazar</b>, debes dejar un comentario.
-              </p>
+              <h3 className="mb-2 text-sm font-semibold text-white/80">
+                Descripción
+              </h3>
 
               <textarea
-                className={kanbanStyles.modalTextarea}
-                placeholder="Escribe aquí tu comentario obligatorio…"
-                value={decisionComment}
-                onChange={(e) => setDecisionComment(e.target.value)}
-                rows={3}
+                rows={5}
+                className="w-full resize-none rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#6cbe45]/40"
+                value={form.descripcion ?? ""}
+                disabled={readOnly}
+                onChange={(e) => updateField("descripcion", e.target.value)}
               />
+            </div>
 
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={decisionDisabled}
-                  onClick={() => handleClientDecision("APROBAR")}
-                  className={`${kanbanStyles.modalPrimaryBtn} ${decisionDisabled ? "opacity-60" : ""}`}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <CheckCircle size={16} />
-                    {deciding === "APROBAR" ? "Aprobando…" : "Aprobar"}
-                  </span>
-                </button>
+            {/* ENTREGABLES */}
+            {!isNew && (
+              <div>
+                <h3 className="mb-3 text-sm font-semibold text-white/80">
+                  Entregables
+                </h3>
 
-                <button
-                  type="button"
-                  disabled={decisionDisabled}
-                  onClick={() => handleClientDecision("RECHAZAR")}
-                  className={`${kanbanStyles.modalSecondaryBtn} ${decisionDisabled ? "opacity-60" : ""}`}
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <XCircle size={16} />
-                    {deciding === "RECHAZAR" ? "Rechazando…" : "Rechazar"}
-                  </span>
-                </button>
+                <TaskDeliverablesSection
+                  taskId={form.id}
+                  googleDriveUrl={form.googleDriveUrl}
+                  role={role}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* RIGHT SIDE CHAT */}
+          {!isNew && (
+            <div className="flex flex-1 flex-col bg-[#0b0d12]">
+              <div className="flex items-center gap-2 border-b border-white/10 p-4">
+                <MessageCircle size={16} />
+                <h3 className="text-sm font-semibold text-white/80">
+                  Conversación
+                </h3>
               </div>
 
-              <p className="text-[11px] text-[#fffef9]/50 mt-2">
-                Rechazar devolverá la tarea a <b>En progreso</b>.
-              </p>
+              <div className="flex-1 overflow-y-auto">
+                <TaskConversationModal
+                  taskId={form.id}
+                  taskTitle={form.titulo}
+                  embedded
+                />
+              </div>
             </div>
-          ) : null}
+          )}
+        </form>
 
-          <div className={kanbanStyles.modalFooter}>
-            {!isNew && isAdmin && (
-              <button type="button" onClick={() => onDelete(form.id)} className={kanbanStyles.modalDelete}>
-                <Trash2 size={14} />
-                Eliminar
+        {/* FOOTER */}
+        <div className="flex justify-between border-t border-white/10 p-4">
+          {!isNew && isAdmin && (
+            <button
+              type="button"
+              onClick={() => onDelete(form.id)}
+              className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300"
+            >
+              <Trash2 size={14} />
+              Eliminar
+            </button>
+          )}
+
+          <div className="ml-auto flex gap-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2"
+            >
+              Cancelar
+            </button>
+
+            {(isAdmin || isColab) && (
+              <button
+                type="submit"
+                className="rounded-xl bg-[#6cbe45] px-4 py-2 font-medium text-black hover:bg-[#7bd456]"
+              >
+                Guardar
               </button>
             )}
-
-            <div className={kanbanStyles.modalFooterRight}>
-              <button type="button" onClick={onClose} className={kanbanStyles.modalSecondaryBtn}>
-                Cerrar
-              </button>
-
-              {isAdmin || isColab ? (
-                <button type="submit" className={kanbanStyles.modalPrimaryBtn}>
-                  Guardar
-                </button>
-              ) : null}
-            </div>
           </div>
-        </form>
+        </div>
       </div>
+    </div>
+  );
+}
+function ReporteDropdown({ isCliente = false }: { isCliente?: boolean }) {
+
+  const [open, setOpen] = React.useState(false);
+  const [meses, setMeses] = React.useState<any[]>([]);
+  const [selected, setSelected] = React.useState("");
+  const [alertMsg, setAlertMsg] = React.useState("");
+
+const showAlert = (msg: string) => {
+  setAlertMsg(msg);
+
+  setTimeout(() => {
+    setAlertMsg("");
+  }, 3000);
+};
+
+  React.useEffect(() => {
+    fetch("/api/reportes/meses")
+      .then(res => res.json())
+      .then(setMeses)
+      .catch(() => setMeses([]));
+  }, []);
+
+
+const buildUrl = (preview = false) => {
+
+  const baseUrl = isCliente
+    ? "/api/reportes/cliente/pdf"
+    : "/api/reportes/admin/pdf";
+
+  if (!selected) {
+    return `${baseUrl}${preview ? "?preview=true" : ""}`;
+  }
+
+  if (selected === "all") {
+    return `${baseUrl}?mes=all${preview ? "&preview=true" : ""}`;
+  }
+
+  const { mes, anio } = JSON.parse(selected);
+
+  return `${baseUrl}?mes=${mes}&anio=${anio}${preview ? "&preview=true" : ""}`;
+};
+
+
+const handlePreview = async () => {
+  const url = buildUrl(true);
+
+  try {
+    const res = await fetch(url);
+    const contentType = res.headers.get("content-type");
+
+    if (!contentType?.includes("application/pdf")) {
+      const data = await res.json();
+
+      showAlert(
+        data?.message || "No hay tareas en este período para generar el reporte"
+      );
+      return;
+    }
+
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+
+    const win = window.open("", "_blank");
+
+    if (win) {
+     win.document.write(`
+      <html>
+        <head>
+          <title>Reporte SandíaShake</title>
+        </head>
+        <body style="margin:0">
+          <iframe src="${blobUrl}" style="width:100%;height:100vh;border:none;"></iframe>
+        </body>
+      </html>
+    `);
+    }
+
+  } catch (err) {
+    showAlert("Error generando el reporte");
+  }
+
+  setOpen(false);
+};
+
+//Generar y decargar pdf según rol 
+const handleDownload = async () => {
+  const url = buildUrl(false);
+
+  try {
+    const res = await fetch(url);
+    const contentType = res.headers.get("content-type");
+
+    if (!contentType?.includes("application/pdf")) {
+      const data = await res.json();
+
+      showAlert(
+        data?.message || "No hay tareas en este período para descargar"
+      );
+      return;
+    }
+
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const disposition = res.headers.get("content-disposition");
+
+      let filename = "reporte.pdf";
+
+      if (disposition && disposition.includes("filename=")) {
+        filename = disposition
+          .split("filename=")[1]
+          .replace(/"/g, "")
+          .trim();
+      }
+
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+        } catch (err) {
+          showAlert("Error descargando el reporte");
+        }
+
+        setOpen(false);
+      };
+      
+  
+//Boton para reportes
+
+  return (
+    <div className="relative">
+    {alertMsg && (
+  <div className="fixed top-6 right-6 z-[9999] animate-fade-in">
+    <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-[#1a0f12] px-4 py-3 shadow-lg backdrop-blur-md">
+
+      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500/20">
+        ❌
+      </div>
+
+      <div>
+        <p className="text-sm font-semibold text-red-400">
+          No se pudo generar el reporte
+        </p>
+        <p className="text-xs text-red-300/80">
+          {alertMsg}
+        </p>
+      </div>
+    </div>
+  </div>
+)}
+
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 rounded-xl bg-[#6cbe45] px-4 py-2 text-sm font-medium text-black hover:bg-[#7bd456]"
+      >
+        Generar reporte
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-64 rounded-xl border border-white/10 bg-[#0f1117] p-4 shadow-xl z-50">
+
+          <p className="mb-2 text-sm text-white/70">
+            Seleccionar período
+          </p>
+
+          <select
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-sm text-white mb-3"
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+          >
+            <option value="">Mes actual</option>
+
+            {meses.map((m, i) => (
+              <option
+                key={i}
+                value={
+                  m.mes === "all"
+                    ? "all"
+                    : JSON.stringify({ mes: m.mes, anio: m.anio })
+                }
+              >
+                {m.label}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex gap-2">
+
+            <button
+              onClick={handlePreview}
+              className="flex-1 rounded-lg bg-[#ee2346] px-3 py-2 text-sm font-medium text-white hover:bg-[#ff3b5c]"
+            >
+              Ver
+            </button>
+
+            <button
+              onClick={handleDownload}
+              className="flex-1 rounded-lg bg-[#6cbe45] px-3 py-2 text-sm font-medium text-black hover:bg-[#7bd456]"
+            >
+              Descargar PDF
+            </button>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }

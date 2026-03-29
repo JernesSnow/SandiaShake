@@ -1,6 +1,8 @@
 // app/page.tsx
 import { redirect } from "next/navigation";
+import LandingHero from "@/components/landing/LandingHero";
 
 export default function Home() {
-  redirect("/auth");
+  return <LandingHero />;
+  //redirect("/auth");
 }

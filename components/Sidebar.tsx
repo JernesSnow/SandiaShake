@@ -22,7 +22,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", roles: ["ADMIN","COLABORADOR","CLIENTE"] },
-  { href: "/clientes", label: "Clientes", roles: ["ADMIN"] },
+  { href: "/clientes", label: "Clientes", roles: ["ADMIN","COLABORADOR"] },
   { href: "/tareas", label: "Tareas", roles: ["ADMIN","COLABORADOR","CLIENTE"] },
   { href: "/cursos", label: "Cursos", roles: ["ADMIN","COLABORADOR","CLIENTE"] },
   {
@@ -34,7 +34,7 @@ const NAV_ITEMS: NavItem[] = [
       { href: "/facturacion", label: "Facturación", roles: ["ADMIN"] },
       { href: "/facturacion/morosidad", label: "Morosidad", roles: ["ADMIN"] },
       { href: "/facturacion/historial", label: "Reporte de pagos", roles: ["ADMIN"] },
-      { href: "/facturacion/mis-facturas", label: "Mis facturas", roles: ["ADMIN","CLIENTE"] },
+      { href: "/facturacion/mis-facturas", label: "Mis facturas", roles: ["CLIENTE"] },
     ],
   },
   { href: "/colaboradores", label: "Colaboradores", roles: ["ADMIN"] },

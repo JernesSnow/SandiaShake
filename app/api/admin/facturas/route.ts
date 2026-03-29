@@ -174,25 +174,26 @@ export async function POST(req: Request) {
     }
 
     for (const item of items) {
-      if (!item.tipo || typeof item.tipo !== "string" || !item.tipo.trim()) {
-        return NextResponse.json(
-          { error: "Cada item debe tener un tipo" },
-          { status: 400 }
-        );
-      }
-      if (!Number.isFinite(Number(item.cantidad)) || Number(item.cantidad) <= 0) {
-        return NextResponse.json(
-          { error: "Cada item debe tener cantidad > 0" },
-          { status: 400 }
-        );
-      }
-      if (!Number.isFinite(Number(item.precio_unitario)) || Number(item.precio_unitario) <= 0) {
-        return NextResponse.json(
-          { error: "Cada item debe tener precio_unitario > 0" },
-          { status: 400 }
-        );
-      }
+
+    if (!item.concepto || typeof item.concepto !== "string" || !item.concepto.trim()) {
+      return NextResponse.json(
+        { error: "Cada item debe tener un concepto (servicio)" },
+        { status: 400 }
+      );
     }
+
+    if (!Number.isFinite(Number(item.cantidad)) || Number(item.cantidad) <= 0) {
+      return NextResponse.json(
+        { error: "Cada item debe tener cantidad > 0" },
+        { status: 400 }
+      );
+    }
+
+    if (item.precio_unitario < 0) {
+      throw new Error("precio_unitario no puede ser negativo")
+    }
+
+  }
 
     // Compute total from items
     const totalNum = items.reduce(
@@ -257,8 +258,9 @@ export async function POST(req: Request) {
     // Insert factura_detalles for each line item
     const detallesRows = items.map((item: any, idx: number) => ({
       id_factura: facturaId,
-      concepto: String(item.tipo).trim(),
-      tipo: "OTRO",
+      concepto: String(item.concepto).trim(),
+      tipo: item.tipo ?? "SERVICIO",
+      referencia_id: item.referencia_id ?? null,
       cantidad: Number(item.cantidad),
       precio_unitario: Number(item.precio_unitario),
       total_linea: Number(item.cantidad) * Number(item.precio_unitario),
@@ -278,7 +280,7 @@ export async function POST(req: Request) {
     const tareasRows: Record<string, unknown>[] = [];
     for (const item of items) {
       const cantidad = Number(item.cantidad);
-      const titulo = String(item.tipo).trim();
+      const titulo = String(item.concepto).trim();
       for (let i = 0; i < cantidad; i++) {
         tareasRows.push({
           id_organizacion,
@@ -288,6 +290,7 @@ export async function POST(req: Request) {
           status_kanban: "pendiente",
           tipo_entregable: "Otro",
           prioridad: "Media",
+          fecha_entrega: item.fecha_entrega ?? null,
           estado: "ACTIVO",
           created_by: perfil!.id_usuario,
           updated_by: perfil!.id_usuario,

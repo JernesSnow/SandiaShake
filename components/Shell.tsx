@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { Menu } from "react-feather";
 import { Sidebar } from "./Sidebar";
 import OrganizacionSetupModal from "./OrganizacionSetupModal";
+import MembershipBanner from "./MembershipBanner";
 
 export function Shell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -57,6 +58,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         </div>
 
         <main className="flex-1 p-4 md:p-6 overflow-y-auto">
+            <MembershipBanner />
           {children}
         </main>
       </div>
