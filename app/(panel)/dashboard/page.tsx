@@ -11,40 +11,44 @@ import EntregablesChart from "./EntregablesChart";
 import SaludMental from "./SaludMental";
 import Rendimiento from "./Rendimiento";
 import ChilliPoints from "./ChilliPoints";
-import { requestNotificationPermissionAndToken } from "@/lib/firebase/messaging";
 
 import { CheckSquare, FileText, Users, User } from "react-feather";
+
+type DashboardData = {
+  kpis: {
+    tareasActivas: number;
+    entregablesEstaSemana: number;
+    clientesActivos: number;
+    colaboradoresActivos: number;
+  };
+  tareasChart: { pendientes: number; enProgreso: number; enRevision: number; atrasadas: number };
+  entregablesChart: { aprobados: number; pendientes: number; rechazados: number };
+  saludMental: { estable: number; atento: number; enRiesgo: number; sinRegistro: number };
+  rendimiento: { nombre: string; score: number }[];
+  chilliPoints: { totalGanados: number; totalCanjeados: number; disponibles: number };
+};
 
 export default function DashboardPage() {
   const supabase = createSupabaseClient();
   const router = useRouter();
 
   const [ready, setReady] = useState(false);
+  const [data, setData] = useState<DashboardData | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function guard() {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        router.replace("/auth");
-        return;
-      }
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) { router.replace("/auth"); return; }
 
       const { data: perfil } = await supabase
         .from("usuarios")
-        .select("force_password_change, temp_password")
+        .select("force_password_change, temp_password, rol")
         .eq("auth_user_id", user.id)
         .single();
 
-
-      if (!perfil) {
-        router.replace("/auth");
-        return;
-      }
+      if (!perfil) { router.replace("/auth"); return; }
 
       if (perfil.force_password_change === true || perfil.temp_password === true) {
         router.replace("/force-password-change");
@@ -52,12 +56,15 @@ export default function DashboardPage() {
       }
 
       if (!cancelled) setReady(true);
+
+      if (perfil.rol === "ADMIN") {
+        const res = await fetch("/api/admin/dashboard", { cache: "no-store" });
+        if (res.ok && !cancelled) setData(await res.json());
+      }
     }
 
-    guard();
-    return () => {
-      cancelled = true;
-    };
+    init();
+    return () => { cancelled = true; };
   }, [router, supabase]);
 
   if (!ready) {
@@ -68,26 +75,50 @@ export default function DashboardPage() {
     );
   }
 
+  const kpis = data?.kpis;
+  const tc   = data?.tareasChart;
+  const ec   = data?.entregablesChart;
+  const sm   = data?.saludMental;
+  const cp   = data?.chilliPoints;
+
   return (
     <Shell>
-      <h1 className="text-xl font-semibold mb-6 text-white">Dashboard</h1>
+      <h1 className="text-xl font-semibold mb-6 text-[#fffef9]">Dashboard</h1>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        <KPI icon={<CheckSquare size={26} />} label="Tareas activas" value={14} />
-        <KPI icon={<FileText size={26} />} label="Entregables esta semana" value={5} />
-        <KPI icon={<Users size={26} />} label="Clientes activos" value={12} />
-        <KPI icon={<User size={26} />} label="Colaboradores activos" value={8} />
+        <KPI icon={<CheckSquare size={26} />} label="Tareas activas"          value={kpis?.tareasActivas         ?? "—"} />
+        <KPI icon={<FileText    size={26} />} label="Entregables esta semana" value={kpis?.entregablesEstaSemana ?? "—"} />
+        <KPI icon={<Users       size={26} />} label="Clientes activos"        value={kpis?.clientesActivos       ?? "—"} />
+        <KPI icon={<User        size={26} />} label="Colaboradores activos"   value={kpis?.colaboradoresActivos  ?? "—"} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <TareasChart />
-        <EntregablesChart />
-        <SaludMental />
-        <Rendimiento />
-        <ChilliPoints />
+        <TareasChart
+          pendientes={tc?.pendientes ?? 0}
+          enProgreso={tc?.enProgreso ?? 0}
+          enRevision={tc?.enRevision ?? 0}
+          atrasadas={tc?.atrasadas ?? 0}
+        />
+        <EntregablesChart
+          aprobados={ec?.aprobados ?? 0}
+          pendientes={ec?.pendientes ?? 0}
+          rechazados={ec?.rechazados ?? 0}
+        />
+        <SaludMental
+          estable={sm?.estable ?? 0}
+          atento={sm?.atento ?? 0}
+          enRiesgo={sm?.enRiesgo ?? 0}
+          sinRegistro={sm?.sinRegistro ?? 0}
+        />
+        <Rendimiento colaboradores={data?.rendimiento ?? []} />
+        <ChilliPoints
+          totalGanados={cp?.totalGanados ?? 0}
+          totalCanjeados={cp?.totalCanjeados ?? 0}
+          disponibles={cp?.disponibles ?? 0}
+        />
       </div>
 
-    <button
+      <button
   type="button"
   onClick={async () => {
     try {

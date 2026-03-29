@@ -34,7 +34,7 @@ const NAV_ITEMS: NavItem[] = [
       { href: "/facturacion", label: "Facturación", roles: ["ADMIN"] },
       { href: "/facturacion/morosidad", label: "Morosidad", roles: ["ADMIN"] },
       { href: "/facturacion/historial", label: "Reporte de pagos", roles: ["ADMIN"] },
-      { href: "/facturacion/mis-facturas", label: "Mis facturas", roles: ["ADMIN","CLIENTE"] },
+      { href: "/facturacion/mis-facturas", label: "Mis facturas", roles: ["CLIENTE"] },
     ],
   },
   { href: "/colaboradores", label: "Colaboradores", roles: ["ADMIN"] },
