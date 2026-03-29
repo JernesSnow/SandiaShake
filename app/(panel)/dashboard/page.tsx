@@ -11,6 +11,7 @@ import EntregablesChart from "./EntregablesChart";
 import SaludMental from "./SaludMental";
 import Rendimiento from "./Rendimiento";
 import ChilliPoints from "./ChilliPoints";
+import SaludMentalModal from "@/components/SaludMentalModal";
 
 import { CheckSquare, FileText, Users, User } from "react-feather";
 import { requestNotificationPermissionAndToken } from "@/lib/firebase/messaging";
@@ -35,6 +36,7 @@ export default function DashboardPage() {
 
   const [ready, setReady] = useState(false);
   const [data, setData] = useState<DashboardData | null>(null);
+  const [showBienestar, setShowBienestar] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,6 +64,12 @@ export default function DashboardPage() {
         const res = await fetch("/api/admin/dashboard", { cache: "no-store" });
         if (res.ok && !cancelled) setData(await res.json());
       }
+
+      if (perfil.rol === "COLABORADOR") {
+        const res = await fetch("/api/bienestar/hoy");
+        const hoy = await res.json();
+        if (hoy.aplica && !hoy.registrado && !cancelled) setShowBienestar(true);
+      }
     }
 
     init();
@@ -83,6 +91,8 @@ export default function DashboardPage() {
   const cp   = data?.chilliPoints;
 
   return (
+    <>
+      {showBienestar && <SaludMentalModal onClose={() => setShowBienestar(false)} />}
     <Shell>
       <h1 className="text-xl font-semibold mb-6 text-[#fffef9]">Dashboard</h1>
 
@@ -220,5 +230,6 @@ export default function DashboardPage() {
   Registrar push en este dispositivo
 </button>
     </Shell>
+    </>
   );
 }
