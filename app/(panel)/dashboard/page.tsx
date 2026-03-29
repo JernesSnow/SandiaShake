@@ -13,6 +13,7 @@ import Rendimiento from "./Rendimiento";
 import ChilliPoints from "./ChilliPoints";
 
 import { CheckSquare, FileText, Users, User } from "react-feather";
+import { requestNotificationPermissionAndToken } from "@/lib/firebase/messaging";
 
 type DashboardData = {
   kpis: {
