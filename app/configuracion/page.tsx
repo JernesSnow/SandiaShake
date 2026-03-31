@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Shell } from "@/components/Shell";
 import PlanesEntregablesSection from "@/components/configuracion/PlanesEntregablesSection";
 import RewardsSection from "@/components/configuracion/RewardsSection";
+import BitacoraSection from "@/components/configuracion/BitacoraSection";
+
 
 import {
   User,
@@ -859,6 +861,9 @@ useEffect(() => {
           </div>
         </div>
       </div>
+
+      {/* ------------------ BITÁCORA ------------------ */}
+      <BitacoraSection />
 
       {/* ------------------ DATABASE ------------------ */}
       <div className="bg-[#333132] rounded-xl border border-[#4a4748]/40 shadow mb-6">
