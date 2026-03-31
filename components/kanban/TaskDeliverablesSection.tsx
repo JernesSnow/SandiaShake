@@ -94,6 +94,8 @@ export default function TaskDeliverablesSection({
 
       if (!canUpload) return;
 
+      if (uploading) return;
+
       if (!folderId || !googleDriveUrl) {
         console.error("Drive folder not configured for this task");
         alert("Drive folder not configured.");
@@ -154,14 +156,14 @@ export default function TaskDeliverablesSection({
         setUploading(false);
       }
     },
-    [taskId, folderId, canUpload, googleDriveUrl]
+    [taskId, folderId, canUpload, googleDriveUrl, uploading]
   );
 
   const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
     onDrop,
     noClick: true,
     noKeyboard: true,
-    disabled: !canUpload,
+    disabled: !canUpload || uploading,
   });
 
   /* -------------------------

@@ -189,11 +189,8 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!Number.isFinite(Number(item.precio_unitario)) || Number(item.precio_unitario) <= 0) {
-      return NextResponse.json(
-        { error: "Cada item debe tener precio_unitario > 0" },
-        { status: 400 }
-      );
+    if (item.precio_unitario < 0) {
+      throw new Error("precio_unitario no puede ser negativo")
     }
 
   }

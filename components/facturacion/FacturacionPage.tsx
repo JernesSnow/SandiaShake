@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Search, CheckCircle, AlertTriangle, Clock, X } from "react-feather";
+import type { ReactNode } from "react";
+
 
 type FacturaEstado =
 | "PENDIENTE"
@@ -21,6 +23,18 @@ type ServicioCatalogo = {
 id_servicio: number;
 nombre: string;
 precio_publico: number | null;
+};
+type PlanContenido = {
+  id_plan: number;
+  nombre: string;
+  descripcion?: string;
+  precio: number;
+  servicios: {
+    id_servicio: number;
+    nombre: string;
+    cantidad: number;
+    precio: number;
+  }[];
 };
 
 type DbFactura = {
@@ -99,8 +113,8 @@ function Modal({
   title: string;
   subtitle?: string;
   onClose: () => void;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
+  children: ReactNode;
+  footer?: ReactNode;
 }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 px-4 flex items-center justify-center">
@@ -112,6 +126,7 @@ function Modal({
               <p className="text-xs text-[#fffef9]/60 mt-1">{subtitle}</p>
             )}
           </div>
+
           <button
             type="button"
             onClick={onClose}
@@ -156,6 +171,9 @@ export function FacturacionPage() {
   const [createPeriodo, setCreatePeriodo] = useState("");
   const [createVencimiento, setCreateVencimiento] = useState("");
   const [servicios, setServicios] = useState<ServicioCatalogo[]>([]);
+
+  const [planes, setPlanes] = useState<PlanContenido[]>([]);
+  const [createPlanId, setCreatePlanId] = useState<number | "">("");
   const [createFechaEntrega, setCreateFechaEntrega] = useState("");
 
   const [createItems, setCreateItems] = useState<
@@ -177,11 +195,19 @@ export function FacturacionPage() {
 
   const [savingCreate, setSavingCreate] = useState(false);
 
-  const createTotal = useMemo(
-    () => createItems.reduce((sum, item) => sum + item.cantidad * item.precio, 0),
-    [createItems]
-  );
+  const createTotal = useMemo(() => {
+  const planPrice =
+    createPlanId
+      ? planes.find(p => p.id_plan === createPlanId)?.precio ?? 0
+      : 0
 
+  const itemsTotal = createItems.reduce(
+    (sum, item) => sum + item.cantidad * item.precio,
+    0
+  )
+
+  return planPrice + itemsTotal
+}, [createItems, createPlanId, planes])
   const [editOpen, setEditOpen] = useState(false);
   const [editPeriodo, setEditPeriodo] = useState("");
   const [editTotal, setEditTotal] = useState("");
@@ -195,6 +221,19 @@ export function FacturacionPage() {
   const [loadingTareas, setLoadingTareas] = useState(false);
 
 const [sendingEmail, setSendingEmail] = useState(false);
+
+async function fetchPlanes() {
+  try {
+    const res = await fetch("/api/admin/planes-contenido");
+    const json = await res.json();
+
+    if (res.ok && json?.data) {
+      setPlanes(json.data);
+    }
+  } catch (e) {
+    console.error("Error loading planes", e);
+  }
+}
 
 async function enviarNotificacion(tipo: "recordatorio" | "pago") {
   if (!selectedInvoice) return;
@@ -251,6 +290,7 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
 
   useEffect(() => {
     fetchServicios();
+    fetchPlanes();
   }, []);
 
   async function fetchServicios() {
@@ -365,10 +405,10 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
         alert("La cantidad de cada item debe ser mayor a 0.");
         return;
       }
-      if (item.precio <= 0) {
-        alert("El precio unitario de cada item debe ser mayor a 0.");
-        return;
-      }
+      if (item.precio < 0) {
+    alert("El precio no puede ser negativo.");
+    return;
+  }
     }
 
     setSavingCreate(true);
@@ -409,9 +449,13 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
   }
 
   function openEditModal() {
-    if (!selectedInvoice) return;
-    setEditPeriodo(selectedInvoice.periodo);
-    setEditTotal(String(selectedInvoice.total));
+    if (!selectedInvoice) {
+      alert("Selecciona una factura primero.");
+      return;
+    }
+
+    setEditPeriodo(selectedInvoice.periodo ?? "");
+    setEditTotal(String(selectedInvoice.total ?? ""));
     setEditVencimiento(selectedInvoice.fecha_vencimiento ?? "");
     setEditOpen(true);
   }
@@ -420,8 +464,16 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
     if (!selectedInvoice) return;
 
     const total = Number(editTotal);
+
     if (!Number.isFinite(total) || total <= 0) {
       alert("El total debe ser un número positivo.");
+      return;
+    }
+
+    const paid = selectedInvoice.total - selectedInvoice.saldo;
+
+    if (total < paid) {
+      alert("El total no puede ser menor a lo ya pagado.");
       return;
     }
     if (!editPeriodo.trim()) {
@@ -768,11 +820,13 @@ await enviarNotificacion("pago");
                     <button
                       type="button"
                       onClick={openEditModal}
+                      disabled={!selectedInvoice}
                       className="
                         inline-flex items-center gap-2 rounded-md
                         bg-[#4a4748] text-[#fffef9] px-3 py-2
                         text-xs font-medium hover:bg-[#5a5758]
                         active:scale-[.98]
+                        disabled:opacity-50 disabled:cursor-not-allowed
                       "
                     >
                       Editar
@@ -1046,6 +1100,42 @@ await enviarNotificacion("pago");
               </select>
             </div>
 
+            {/* PLAN */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[11px] text-[#fffef9]/70">
+                Plan (opcional)
+              </label>
+
+              <select
+                value={createPlanId}
+                onChange={(e) => {
+  const id = Number(e.target.value)
+  setCreatePlanId(id)
+
+  const plan = planes.find(p => p.id_plan === id)
+  if (!plan) return
+
+  const serviciosItems = plan.servicios.map(s => ({
+    referencia_id: s.id_servicio,
+    concepto: s.nombre,
+    cantidad: s.cantidad,
+    precio: 0,   // always zero
+    fecha_entrega: createFechaEntrega
+  }))
+
+  setCreateItems(serviciosItems)
+}}
+                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15"
+              >
+                <option value="">Selecciona un plan</option>
+
+                {planes.map(p => (
+                  <option key={p.id_plan} value={p.id_plan}>
+                    {p.nombre} · {formatCRC(p.precio)}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {/* PERIODO */}
             <div className="flex flex-col gap-1">

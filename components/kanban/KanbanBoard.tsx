@@ -355,6 +355,14 @@ export function KanbanBoard() {
   const canReassign = isAdmin;
   const canDelete = isAdmin;
 
+  function openReport() {
+  if (isCliente) {
+    window.open("/api/reportes/cliente/pdf");
+  } else {
+    window.open("/api/reportes/admin/pdf");
+  }
+}
+
   async function loadUnreadCounts() {
     try {
       const res = await fetch("/api/admin/tareas/[id]/comentarios/unread", {
@@ -742,7 +750,7 @@ export function KanbanBoard() {
           ...prev,
           tasks: { ...prev.tasks, [taskInput.id]: updated },
         }));
-        setSaveOkMsg("✅ Cambios guardados");
+        setSaveOkMsg("Cambios guardados");
         window.setTimeout(() => setSaveOkMsg(""), 1500);
       })
       .catch((err) => {
@@ -789,29 +797,29 @@ export function KanbanBoard() {
               <option value="Baja">Baja</option>
             </select>
           </div>
+<div className="flex w-full gap-2 md:w-auto">
 
-          <div className="w-full md:w-auto">
-            <button
-              type="button"
-              onClick={openNewTask}
-              disabled={!canCreate}
-              className={`${kanbanStyles.primaryButton} w-full justify-center md:w-auto ${
-                !canCreate ? "cursor-not-allowed opacity-50" : ""
-              }`}
-              title={
-                !canCreate
-                  ? isCliente
-                    ? "Como cliente no puedes crear tareas"
-                    : "Solo admin/colaborador puede crear tareas"
-                  : "Nueva tarea"
-              }
-            >
-              <Plus size={16} />
-              Nueva tarea
-            </button>
-          </div>
-        </div>
+{isCliente ? (
+  <ReporteDropdown isCliente />
+) : (
+  <ReporteDropdown />
+)}
 
+  {/* BOTÓN NUEVA TAREA */}
+  {(isAdmin || isColab) && (
+    <button
+      type="button"
+      onClick={openNewTask}
+      className={`${kanbanStyles.primaryButton} flex items-center gap-2`}
+    >
+      <Plus size={16} />
+      Nueva tarea
+    </button>
+  )}
+
+</div>
+
+    </div> 
         <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <div className="text-[11px] text-[#fffef9]/45">
             Rol: <b className="text-[#fffef9]/70">{role}</b>
@@ -1481,6 +1489,216 @@ function TaskModal({
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+function ReporteDropdown({ isCliente = false }: { isCliente?: boolean }) {
+
+  const [open, setOpen] = React.useState(false);
+  const [meses, setMeses] = React.useState<any[]>([]);
+  const [selected, setSelected] = React.useState("");
+  const [alertMsg, setAlertMsg] = React.useState("");
+
+const showAlert = (msg: string) => {
+  setAlertMsg(msg);
+
+  setTimeout(() => {
+    setAlertMsg("");
+  }, 3000);
+};
+
+  React.useEffect(() => {
+    fetch("/api/reportes/meses")
+      .then(res => res.json())
+      .then(setMeses)
+      .catch(() => setMeses([]));
+  }, []);
+
+
+const buildUrl = (preview = false) => {
+
+  const baseUrl = isCliente
+    ? "/api/reportes/cliente/pdf"
+    : "/api/reportes/admin/pdf";
+
+  if (!selected) {
+    return `${baseUrl}${preview ? "?preview=true" : ""}`;
+  }
+
+  if (selected === "all") {
+    return `${baseUrl}?mes=all${preview ? "&preview=true" : ""}`;
+  }
+
+  const { mes, anio } = JSON.parse(selected);
+
+  return `${baseUrl}?mes=${mes}&anio=${anio}${preview ? "&preview=true" : ""}`;
+};
+
+
+const handlePreview = async () => {
+  const url = buildUrl(true);
+
+  try {
+    const res = await fetch(url);
+    const contentType = res.headers.get("content-type");
+
+    if (!contentType?.includes("application/pdf")) {
+      const data = await res.json();
+
+      showAlert(
+        data?.message || "No hay tareas en este período para generar el reporte"
+      );
+      return;
+    }
+
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+
+    const win = window.open("", "_blank");
+
+    if (win) {
+     win.document.write(`
+      <html>
+        <head>
+          <title>Reporte SandíaShake</title>
+        </head>
+        <body style="margin:0">
+          <iframe src="${blobUrl}" style="width:100%;height:100vh;border:none;"></iframe>
+        </body>
+      </html>
+    `);
+    }
+
+  } catch (err) {
+    showAlert("Error generando el reporte");
+  }
+
+  setOpen(false);
+};
+
+//Generar y decargar pdf según rol 
+const handleDownload = async () => {
+  const url = buildUrl(false);
+
+  try {
+    const res = await fetch(url);
+    const contentType = res.headers.get("content-type");
+
+    if (!contentType?.includes("application/pdf")) {
+      const data = await res.json();
+
+      showAlert(
+        data?.message || "No hay tareas en este período para descargar"
+      );
+      return;
+    }
+
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const disposition = res.headers.get("content-disposition");
+
+      let filename = "reporte.pdf";
+
+      if (disposition && disposition.includes("filename=")) {
+        filename = disposition
+          .split("filename=")[1]
+          .replace(/"/g, "")
+          .trim();
+      }
+
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+        } catch (err) {
+          showAlert("Error descargando el reporte");
+        }
+
+        setOpen(false);
+      };
+      
+  
+//Boton para reportes
+
+  return (
+    <div className="relative">
+    {alertMsg && (
+  <div className="fixed top-6 right-6 z-[9999] animate-fade-in">
+    <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-[#1a0f12] px-4 py-3 shadow-lg backdrop-blur-md">
+
+      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500/20">
+        ❌
+      </div>
+
+      <div>
+        <p className="text-sm font-semibold text-red-400">
+          No se pudo generar el reporte
+        </p>
+        <p className="text-xs text-red-300/80">
+          {alertMsg}
+        </p>
+      </div>
+    </div>
+  </div>
+)}
+
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 rounded-xl bg-[#6cbe45] px-4 py-2 text-sm font-medium text-black hover:bg-[#7bd456]"
+      >
+        Generar reporte
+      </button>
+
+      {open && (
+        <div className="absolute right-0 mt-2 w-64 rounded-xl border border-white/10 bg-[#0f1117] p-4 shadow-xl z-50">
+
+          <p className="mb-2 text-sm text-white/70">
+            Seleccionar período
+          </p>
+
+          <select
+            className="w-full rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-sm text-white mb-3"
+            value={selected}
+            onChange={(e) => setSelected(e.target.value)}
+          >
+            <option value="">Mes actual</option>
+
+            {meses.map((m, i) => (
+              <option
+                key={i}
+                value={
+                  m.mes === "all"
+                    ? "all"
+                    : JSON.stringify({ mes: m.mes, anio: m.anio })
+                }
+              >
+                {m.label}
+              </option>
+            ))}
+          </select>
+
+          <div className="flex gap-2">
+
+            <button
+              onClick={handlePreview}
+              className="flex-1 rounded-lg bg-[#ee2346] px-3 py-2 text-sm font-medium text-white hover:bg-[#ff3b5c]"
+            >
+              Ver
+            </button>
+
+            <button
+              onClick={handleDownload}
+              className="flex-1 rounded-lg bg-[#6cbe45] px-3 py-2 text-sm font-medium text-black hover:bg-[#7bd456]"
+            >
+              Descargar PDF
+            </button>
+
+          </div>
+        </div>
+      )}
     </div>
   );
 }

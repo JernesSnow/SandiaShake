@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { grantChilliPointsIfNotExists } from "@/lib/chilli-points";
 
 type Perfil = {
   id_usuario: number;
@@ -308,6 +309,57 @@ export async function POST(
 
     if (insErr) {
       return NextResponse.json({ error: insErr.message }, { status: 500 });
+    }
+
+    /* ---------------------------
+   SLA: +1 chilli if collaborator
+   replies to CLIENTE within 1 hour
+--------------------------- */
+
+    try {
+
+      const rol = String(perfil!.rol ?? "").toUpperCase();
+
+      if (rol !== "CLIENTE") {
+
+        const { data: lastClientMsg } = await admin
+          .from("tarea_comentarios")
+          .select("id_comentario, created_at")
+          .eq("id_tarea", idTarea)
+          .eq("tipo_autor", "CLIENTE")
+          .eq("estado", "ACTIVO")
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (lastClientMsg) {
+
+          const clientTime = new Date(lastClientMsg.created_at);
+          const now = new Date();
+
+          const diffMinutes =
+            (now.getTime() - clientTime.getTime()) / 1000 / 60;
+
+          if (diffMinutes <= 60) {
+
+            const motivo =
+              `SLA_RESPUESTA_CHAT:TAREA:${idTarea}:COMENTARIO:${created.id_comentario}`;
+
+            await grantChilliPointsIfNotExists(admin, {
+              id_colaborador: perfil!.id_usuario,
+              puntos: 1,
+              motivo,
+              id_tarea: idTarea
+            });
+
+          }
+
+        }
+
+      }
+
+    } catch (err) {
+      console.error("SLA chilli rule error:", err);
     }
 
     return NextResponse.json(
