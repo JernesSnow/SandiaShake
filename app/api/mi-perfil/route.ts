@@ -12,12 +12,10 @@ export async function GET() {
     const supabase = await createSupabaseServer();
     const admin = createSupabaseAdmin();
 
-    // ⚠️ DO NOT fail hard on userErr
     const {
       data: { user },
     } = await supabase.auth.getUser();
 
-    // Clean auth check (no Supabase internal error leakage)
     if (!user) {
       return jsonError("No session", 401);
     }
@@ -26,12 +24,11 @@ export async function GET() {
       .from("usuarios")
       .select("id_usuario, nombre, correo, rol, admin_nivel")
       .eq("auth_user_id", user.id)
-      .maybeSingle(); // 👈 important
+      .maybeSingle();
 
     if (error) return jsonError(error.message, 500);
     if (!perfil) return jsonError("Perfil no encontrado", 404);
 
-    // ✅ return EVERYTHING the UI needs for permissions
     return NextResponse.json({
       id_usuario: perfil.id_usuario,
       nombre: perfil.nombre,
@@ -87,10 +84,21 @@ export async function PATCH(req: Request) {
       }
     }
 
-    const { error: updErr } = await admin
+    // Get own id_usuario
+    const { data: self } = await admin
       .from("usuarios")
-      .update({ nombre, updated_at: new Date().toISOString() })
-      .eq("auth_user_id", user.id);
+      .select("id_usuario")
+      .eq("auth_user_id", user.id)
+      .maybeSingle();
+
+    const actorId = self?.id_usuario ?? null;
+
+    // Use RPC so set_config + UPDATE run in the same transaction
+    const { error: updErr } = await admin.rpc("rpc_update_perfil", {
+      p_actor_id:     actorId,
+      p_auth_user_id: user.id,
+      p_nombre:       nombre,
+    });
 
     if (updErr) return jsonError(updErr.message, 500);
 

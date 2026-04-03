@@ -5,9 +5,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Shell } from "@/components/Shell";
 import PlanesEntregablesSection from "@/components/configuracion/PlanesEntregablesSection";
 import RewardsSection from "@/components/configuracion/RewardsSection";
+import BitacoraSection from "@/components/configuracion/BitacoraSection";
+
 
 import {
-  User, Mail, Lock, Users, Plus, Edit2, Trash2,
+  User, Mail, Lock, Users, Plus, Edit2, Trash2, Check,
   Link as LinkIcon, Database, Cloud, CheckCircle,
   Eye, EyeOff, RefreshCw, X,
 } from "react-feather";
@@ -27,7 +29,7 @@ export type UsuarioSistema = {
   adminNivel?: AdminNivel;
 };
 
-type Tab = "perfil" | "usuarios" | "planes" | "integraciones" | "sistema";
+type Tab = "perfil" | "usuarios" | "planes" | "integraciones" | "sistema" | "bitacora";
 
 /* ─── helpers ─── */
 
@@ -86,6 +88,9 @@ export default function ConfiguracionPage() {
   /* profile */
   const [name, setName]   = useState("");
   const [email, setEmail] = useState("");
+  const [editingName, setEditingName]   = useState(false);
+  const [draftName, setDraftName]       = useState("");
+  const [confirmName, setConfirmName]   = useState(false);
   const [currentPwd, setCurrentPwd]   = useState("");
   const [newPwd, setNewPwd]           = useState("");
   const [confirmPwd, setConfirmPwd]   = useState("");
@@ -225,6 +230,7 @@ export default function ConfiguracionPage() {
     { id: "planes",         label: "Planes & Rewards" },
     { id: "integraciones",  label: "Integraciones" },
     { id: "sistema",        label: "Sistema" },
+    { id: "bitacora",       label: "Bitácora" },
   ];
 
   return (
@@ -258,14 +264,58 @@ export default function ConfiguracionPage() {
 
           <form onSubmit={handleSaveProfile} className="space-y-5">
             <div className="grid gap-4 md:grid-cols-2">
+
+              {/* Nombre */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[var(--ss-text2)] flex items-center gap-1.5"><Mail size={13} /> Nombre completo</label>
-                <input type="text" value={name} onChange={e => setName(e.target.value)} className={inputCls} />
+                <label className="text-xs font-medium text-[var(--ss-text2)] flex items-center gap-1.5"><User size={12} /> Nombre completo</label>
+                {!editingName ? (
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 rounded-xl px-3 py-2.5 text-sm bg-[var(--ss-raised)] border border-[var(--ss-border)] text-[var(--ss-text)]">
+                      {name || <span className="text-[var(--ss-text3)]">—</span>}
+                    </div>
+                    <button type="button" onClick={() => { setDraftName(name); setEditingName(true); setConfirmName(false); }}
+                      className="shrink-0 p-2 rounded-xl border border-[var(--ss-border)] text-[var(--ss-text3)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-overlay)] transition" title="Editar nombre">
+                      <Edit2 size={14} />
+                    </button>
+                  </div>
+                ) : confirmName ? (
+                  <div className="rounded-xl bg-[#facc15]/10 border border-[#facc15]/30 p-3 space-y-2">
+                    <p className="text-xs text-[#facc15] font-medium">¿Cambiar nombre a <span className="font-bold">"{draftName.trim()}"</span>?</p>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={() => { setName(draftName.trim()); setEditingName(false); setConfirmName(false); }}
+                        className="inline-flex items-center gap-1 rounded-lg bg-[#6cbe45] hover:bg-[#5aa63d] px-3 py-1.5 text-xs font-semibold text-white transition">
+                        <Check size={12} /> Confirmar
+                      </button>
+                      <button type="button" onClick={() => { setEditingName(false); setConfirmName(false); }}
+                        className="inline-flex items-center gap-1 rounded-lg border border-[var(--ss-border)] px-3 py-1.5 text-xs text-[var(--ss-text2)] hover:bg-[var(--ss-overlay)] transition">
+                        <X size={12} /> Cancelar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input type="text" value={draftName} onChange={e => setDraftName(e.target.value)} autoFocus className={inputCls + " flex-1"} />
+                    <button type="button" onClick={() => { if (draftName.trim() && draftName.trim() !== name) setConfirmName(true); else { setEditingName(false); } }}
+                      className="shrink-0 p-2 rounded-xl bg-[#6cbe45] hover:bg-[#5aa63d] text-white transition" title="Guardar">
+                      <Check size={14} />
+                    </button>
+                    <button type="button" onClick={() => { setEditingName(false); setConfirmName(false); }}
+                      className="shrink-0 p-2 rounded-xl border border-[var(--ss-border)] text-[var(--ss-text3)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-overlay)] transition" title="Cancelar">
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
+
+              {/* Email — read-only */}
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-[var(--ss-text2)] flex items-center gap-1.5"><Mail size={13} /> Correo electrónico</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className={inputCls} />
+                <label className="text-xs font-medium text-[var(--ss-text2)] flex items-center gap-1.5"><Mail size={12} /> Correo electrónico</label>
+                <div className="flex items-center gap-2 rounded-xl px-3 py-2.5 text-sm bg-[var(--ss-raised)] border border-[var(--ss-border)] text-[var(--ss-text2)]">
+                  <span className="flex-1 truncate">{email}</span>
+                  <span className="shrink-0 text-[10px] text-[var(--ss-text3)] bg-[var(--ss-overlay)] px-2 py-0.5 rounded-full">Solo lectura</span>
+                </div>
               </div>
+
             </div>
 
             <div className="pt-4 border-t border-[var(--ss-border)]">
@@ -516,6 +566,9 @@ export default function ConfiguracionPage() {
           </div>
         </div>
       )}
+
+      {/* ═══════ BITÁCORA ═══════ */}
+      {activeTab === "bitacora" && <BitacoraSection />}
 
       {/* ═══════ USER MODAL ═══════ */}
       {editingUser && (
