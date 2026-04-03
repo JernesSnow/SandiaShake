@@ -197,22 +197,22 @@ export default function TaskDeliverablesSection({
       {canUpload && (
         <div
           {...getRootProps()}
-          className={`border border-dashed border-white/20 rounded-xl p-6 text-center transition ${
+          className={`border border-dashed border-[var(--ss-border)] rounded-xl p-6 text-center transition ${
             isDragActive
-              ? "bg-white/10"
-              : "bg-black/30 hover:bg-white/[0.04]"
+              ? "bg-[var(--ss-raised)]"
+              : "bg-[var(--ss-raised)] hover:bg-[var(--ss-raised)]"
           }`}
         >
           <input {...getInputProps()} />
 
-          <UploadCloud size={28} className="mx-auto mb-2 text-white/60" />
+          <UploadCloud size={28} className="mx-auto mb-2 text-[var(--ss-text2)]" />
 
-          <p className="text-sm text-white/70">Arrastre los archivos aquí</p>
+          <p className="text-sm text-[var(--ss-text2)]">Arrastre los archivos aquí</p>
 
           <button
             type="button"
             onClick={open}
-            className="mt-3 px-3 py-2 bg-[#6cbe45] text-black rounded-lg text-sm"
+            className="mt-3 px-3 py-2 bg-[#6cbe45] text-black rounded-xl text-sm"
           >
             Seleccionar archivos
           </button>
@@ -226,9 +226,9 @@ export default function TaskDeliverablesSection({
       {/* File List */}
 
       {loading ? (
-        <p className="text-sm text-white/50">Cargando archivos...</p>
+        <p className="text-sm text-[var(--ss-text3)]">Cargando archivos...</p>
       ) : files.length === 0 ? (
-        <p className="text-sm text-white/40">
+        <p className="text-sm text-[var(--ss-text3)]">
           No se ha realizado ningún entregable.
         </p>
       ) : (
@@ -239,11 +239,11 @@ export default function TaskDeliverablesSection({
             return (
               <div
                 key={file.id_entregable}
-                className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg px-3 py-2"
+                className="flex items-center justify-between bg-[var(--ss-raised)] border border-[var(--ss-border)] rounded-xl px-3 py-2"
               >
                 <button
                     onClick={() => setPreviewFileId(file.drive_file_id!)}
-                    className="flex items-center gap-2 text-sm text-white/80 hover:text-white"
+                    className="flex items-center gap-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)]"
                     >
                     <FileText size={14} />
                     <span>
@@ -279,7 +279,7 @@ export default function TaskDeliverablesSection({
             onClick={() => setPreviewFileId(null)}
         >
             <div
-            className="bg-black rounded-xl overflow-hidden border border-white/10 shadow-xl"
+            className="bg-black rounded-xl overflow-hidden border border-[var(--ss-border)] shadow-xl"
             onClick={(e) => e.stopPropagation()}
             >
             <iframe

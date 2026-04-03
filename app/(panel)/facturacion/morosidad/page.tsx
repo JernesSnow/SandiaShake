@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Shell } from "@/components/Shell";
 
 type MorosoFactura = {
   id_factura: number;
@@ -83,13 +82,13 @@ export default function MorosidadPage() {
   }, [filtered, selectedOrgId]);
 
   return (
-    <Shell>
+    <>
     <div className="space-y-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-xl font-bold">Facturas vencidas o pendientes por pagar</h1>
-          <p className="text-sm text-[#fffef9]/60">
+          <p className="text-sm text-[var(--ss-text2)]">
             Clientes con facturas vencidas y saldo pendiente.
           </p>
         </div>
@@ -100,7 +99,7 @@ export default function MorosidadPage() {
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Buscar organización / cliente / correo..."
-              className="w-[320px] max-w-[60vw] rounded-md bg-[#2e2c2d] border border-[#444242] px-3 py-2 text-sm outline-none focus:border-[#ee2346]"
+              className="w-[320px] max-w-[60vw] rounded-xl bg-[var(--ss-surface)] border border-[var(--ss-border)] px-3 py-2 text-sm outline-none focus:border-[#6cbe45]/60"
             />
           </div>
         </div>
@@ -110,17 +109,17 @@ export default function MorosidadPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Listado morosos */}
         <div className="lg:col-span-5">
-          <div className="rounded-lg border border-[#444242] bg-[#2e2c2d] overflow-hidden">
-            <div className="px-4 py-3 border-b border-[#444242] flex items-center justify-between">
+          <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] overflow-hidden">
+            <div className="px-4 py-3 border-b border-[var(--ss-border)] flex items-center justify-between">
               <div className="text-sm font-semibold">Clientes morosos</div>
-              <div className="text-xs text-[#fffef9]/60">
+              <div className="text-xs text-[var(--ss-text2)]">
                 {loading ? "Cargando..." : `${filtered.length} registros`}
               </div>
             </div>
 
             <div className="max-h-[70vh] overflow-y-auto">
               {!loading && filtered.length === 0 && (
-                <div className="p-4 text-sm text-[#fffef9]/60">
+                <div className="p-4 text-sm text-[var(--ss-text2)]">
                   No hay morosos con los filtros actuales.
                 </div>
               )}
@@ -132,21 +131,21 @@ export default function MorosidadPage() {
                     key={it.id_organizacion}
                     onClick={() => setSelectedOrgId(it.id_organizacion)}
                     className={[
-                      "w-full text-left px-4 py-3 border-b border-[#444242]/60 hover:bg-[#343132] transition",
-                      active ? "bg-[#3a3738]" : "",
+                      "w-full text-left px-4 py-3 border-b border-[var(--ss-border)]/60 hover:bg-[var(--ss-raised)] transition",
+                      active ? "bg-[var(--ss-raised)]" : "",
                     ].join(" ")}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="font-semibold truncate">{it.organizacion_nombre}</div>
-                        <div className="text-xs text-[#fffef9]/60 truncate">
+                        <div className="text-xs text-[var(--ss-text2)] truncate">
                           {it.cliente_contacto?.nombre ?? "Cliente —"}{" "}
                           {it.cliente_contacto?.correo ? `· ${it.cliente_contacto.correo}` : ""}
                         </div>
                       </div>
 
                       <div className="text-right shrink-0">
-                        <div className="text-xs text-[#fffef9]/70">
+                        <div className="text-xs text-[var(--ss-text2)]">
                           {it.dias_atraso} días atraso
                         </div>
                         <div className="text-sm font-bold">
@@ -155,11 +154,11 @@ export default function MorosidadPage() {
                       </div>
                     </div>
 
-                    <div className="mt-2 flex items-center gap-2 text-[11px] text-[#fffef9]/60">
-                      <span className="inline-flex rounded-full border border-[#444242] px-2 py-0.5">
+                    <div className="mt-2 flex items-center gap-2 text-[11px] text-[var(--ss-text2)]">
+                      <span className="inline-flex rounded-full border border-[var(--ss-border)] px-2 py-0.5">
                         {it.facturas_count} facturas
                       </span>
-                      <span className="inline-flex rounded-full border border-[#444242] px-2 py-0.5">
+                      <span className="inline-flex rounded-full border border-[var(--ss-border)] px-2 py-0.5">
                         Límite: {it.fecha_limite_vencida ?? "—"}
                       </span>
                     </div>
@@ -172,14 +171,14 @@ export default function MorosidadPage() {
 
         {/* Detalle derecha */}
         <div className="lg:col-span-7">
-          <div className="rounded-lg border border-[#444242] bg-[#2e2c2d] overflow-hidden">
-            <div className="px-4 py-3 border-b border-[#444242] flex items-center justify-between">
+          <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] overflow-hidden">
+            <div className="px-4 py-3 border-b border-[var(--ss-border)] flex items-center justify-between">
               <div className="text-sm font-semibold">Detalle</div>
 
               {selected && (
                 <Link
                   href={`/facturacion/historial?id_organizacion=${selected.id_organizacion}`}
-                  className="rounded-md bg-[#ee2346] hover:bg-[#d81d3e] px-3 py-2 text-xs font-semibold transition"
+                  className="rounded-xl bg-[#ee2346] hover:bg-[#d81d3e] px-3 py-2 text-xs font-semibold transition"
                 >
                   Ver historial de pagos
                 </Link>
@@ -187,25 +186,25 @@ export default function MorosidadPage() {
             </div>
 
             {!selected ? (
-              <div className="p-4 text-sm text-[#fffef9]/60">
+              <div className="p-4 text-sm text-[var(--ss-text2)]">
                 Seleccioná una organización de la lista.
               </div>
             ) : (
               <div className="p-4 space-y-4">
                 {/* Cards resumen */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <div className="rounded-md bg-[#262425] border border-[#444242] p-3">
-                    <div className="text-xs text-[#fffef9]/60">Organización</div>
+                  <div className="rounded-xl bg-[var(--ss-bg)] border border-[var(--ss-border)] p-3">
+                    <div className="text-xs text-[var(--ss-text2)]">Organización</div>
                     <div className="font-semibold truncate">{selected.organizacion_nombre}</div>
                   </div>
 
-                  <div className="rounded-md bg-[#262425] border border-[#444242] p-3">
-                    <div className="text-xs text-[#fffef9]/60">Atraso</div>
+                  <div className="rounded-xl bg-[var(--ss-bg)] border border-[var(--ss-border)] p-3">
+                    <div className="text-xs text-[var(--ss-text2)]">Atraso</div>
                     <div className="font-semibold">{selected.dias_atraso} días</div>
                   </div>
 
-                  <div className="rounded-md bg-[#262425] border border-[#444242] p-3">
-                    <div className="text-xs text-[#fffef9]/60">Monto pendiente</div>
+                  <div className="rounded-xl bg-[var(--ss-bg)] border border-[var(--ss-border)] p-3">
+                    <div className="text-xs text-[var(--ss-text2)]">Monto pendiente</div>
                     <div className="font-semibold">
                       ₡ {Number(selected.monto_pendiente || 0).toLocaleString("es-CR")}
                     </div>
@@ -213,14 +212,14 @@ export default function MorosidadPage() {
                 </div>
 
                 {/* Tabla facturas vencidas */}
-                <div className="rounded-md border border-[#444242] overflow-hidden">
-                  <div className="px-3 py-2 bg-[#262425] border-b border-[#444242] text-sm font-semibold">
+                <div className="rounded-xl border border-[var(--ss-border)] overflow-hidden">
+                  <div className="px-3 py-2 bg-[var(--ss-bg)] border-b border-[var(--ss-border)] text-sm font-semibold">
                     Facturas vencidas / con saldo
                   </div>
 
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
-                      <thead className="text-xs text-[#fffef9]/60 bg-[#2b292a]">
+                      <thead className="text-xs text-[var(--ss-text2)] bg-[var(--ss-raised)]">
                         <tr>
                           <th className="text-left px-3 py-2">Factura</th>
                           <th className="text-left px-3 py-2">Período</th>
@@ -232,7 +231,7 @@ export default function MorosidadPage() {
                       </thead>
                       <tbody>
                         {selected.facturas.map((f) => (
-                          <tr key={f.id_factura} className="border-t border-[#444242]/60">
+                          <tr key={f.id_factura} className="border-t border-[var(--ss-border)]/60">
                             <td className="px-3 py-2">#{f.id_factura}</td>
                             <td className="px-3 py-2">{f.periodo ?? "—"}</td>
                             <td className="px-3 py-2">{f.fecha_vencimiento ?? "—"}</td>
@@ -247,7 +246,7 @@ export default function MorosidadPage() {
                         ))}
                         {selected.facturas.length === 0 && (
                           <tr>
-                            <td className="px-3 py-3 text-[#fffef9]/60" colSpan={6}>
+                            <td className="px-3 py-3 text-[var(--ss-text2)]" colSpan={6}>
                               No hay facturas en detalle.
                             </td>
                           </tr>
@@ -258,15 +257,15 @@ export default function MorosidadPage() {
                 </div>
 
                 {/* Contacto */}
-                <div className="text-xs text-[#fffef9]/60">
+                <div className="text-xs text-[var(--ss-text2)]">
                   Contacto:{" "}
-                  <span className="text-[#fffef9]">
+                  <span className="text-[var(--ss-text)]">
                     {selected.cliente_contacto?.nombre ?? "—"}
                   </span>
                   {selected.cliente_contacto?.correo ? (
                     <>
                       {" "}
-                      · <span className="text-[#fffef9]">{selected.cliente_contacto.correo}</span>
+                      · <span className="text-[var(--ss-text)]">{selected.cliente_contacto.correo}</span>
                     </>
                   ) : null}
                 </div>
@@ -276,6 +275,6 @@ export default function MorosidadPage() {
         </div>
       </div>
     </div>
-    </Shell>
+    </>
   );
 }

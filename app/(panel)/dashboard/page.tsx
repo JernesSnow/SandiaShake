@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseClient } from "@/lib/supabase/client";
 
-import { Shell } from "@/components/Shell";
 import KPI from "./KPI";
 import TareasChart from "./TareasChart";
 import EntregablesChart from "./EntregablesChart";
@@ -78,7 +77,7 @@ export default function DashboardPage() {
 
   if (!ready) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#262425] text-white text-sm">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--ss-bg)] text-[var(--ss-text3)] text-sm">
         Verificando sesión…
       </div>
     );
@@ -93,17 +92,19 @@ export default function DashboardPage() {
   return (
     <>
       {showBienestar && <SaludMentalModal onClose={() => setShowBienestar(false)} />}
-    <Shell>
-      <h1 className="text-xl font-semibold mb-6 text-[#fffef9]">Dashboard</h1>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-        <KPI icon={<CheckSquare size={26} />} label="Tareas activas"          value={kpis?.tareasActivas         ?? "—"} />
-        <KPI icon={<FileText    size={26} />} label="Entregables esta semana" value={kpis?.entregablesEstaSemana ?? "—"} />
-        <KPI icon={<Users       size={26} />} label="Clientes activos"        value={kpis?.clientesActivos       ?? "—"} />
-        <KPI icon={<User        size={26} />} label="Colaboradores activos"   value={kpis?.colaboradoresActivos  ?? "—"} />
+      <h1 className="text-xl font-semibold mb-6 text-[var(--ss-text)]">Dashboard</h1>
+
+      {/* KPIs */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <KPI icon={<CheckSquare size={22} />} label="Tareas activas"          value={kpis?.tareasActivas         ?? "—"} accent="#6cbe45" />
+        <KPI icon={<FileText    size={22} />} label="Entregables esta semana" value={kpis?.entregablesEstaSemana ?? "—"} accent="#7dd3fc" />
+        <KPI icon={<Users       size={22} />} label="Clientes activos"        value={kpis?.clientesActivos       ?? "—"} accent="#8b5cf6" />
+        <KPI icon={<User        size={22} />} label="Colaboradores activos"   value={kpis?.colaboradoresActivos  ?? "—"} accent="#f97316" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-8">
         <TareasChart
           pendientes={tc?.pendientes ?? 0}
           enProgreso={tc?.enProgreso ?? 0}
@@ -129,107 +130,92 @@ export default function DashboardPage() {
         />
       </div>
 
-      <button
-  type="button"
-  onClick={async () => {
-    try {
-      const res = await fetch("/api/fcm/test-send", {
-        method: "POST",
-      });
+      {/* Debug FCM buttons */}
+      <div className="flex flex-wrap gap-2 mt-4">
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              const res = await fetch("/api/fcm/test-send", { method: "POST" });
+              const data = await res.json();
+              console.log("FCM test-send response:", data);
+              alert(JSON.stringify(data, null, 2));
+            } catch (err) {
+              console.error(err);
+              alert("Error enviando push");
+            }
+          }}
+          className="rounded-lg bg-green-600 px-3 py-1.5 text-white text-xs font-medium"
+        >
+          Probar envío push
+        </button>
 
-      const data = await res.json();
-      console.log("FCM test-send response:", data);
-      alert(JSON.stringify(data, null, 2));
-    } catch (err) {
-      console.error(err);
-      alert("Error enviando push");
-    }
-  }}
-  className="mb-4 rounded bg-green-600 px-4 py-2 text-white"
->
-  Probar envío push
-</button>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              const hasNotification = typeof window !== "undefined" && "Notification" in window;
+              const permission = hasNotification ? Notification.permission : "no-api";
+              alert(`Notification API: ${hasNotification}\nPermiso actual: ${permission}`);
+            } catch (e) {
+              console.error(e);
+              alert("Error revisando Notification API");
+            }
+          }}
+          className="rounded-lg bg-orange-600 px-3 py-1.5 text-white text-xs font-medium"
+        >
+          Diagnóstico notificaciones
+        </button>
 
-<button
-  type="button"
-  onClick={async () => {
-    try {
-      const hasNotification = typeof window !== "undefined" && "Notification" in window;
-      const permission = hasNotification ? Notification.permission : "no-api";
-      alert(`Notification API: ${hasNotification}\nPermiso actual: ${permission}`);
-      console.log("Notification API:", hasNotification);
-      console.log("Permiso actual:", permission);
-    } catch (e) {
-      console.error(e);
-      alert("Error revisando Notification API");
-    }
-  }}
-  className="mb-4 rounded bg-orange-600 px-4 py-2 text-white"
->
-  Diagnóstico notificaciones
-</button>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              const token = await requestNotificationPermissionAndToken();
+              console.log("TOKEN TELEFONO:", token);
+              alert(token ? "Token generado" : "No se generó token");
+            } catch (e) {
+              console.error(e);
+              alert("Error generando token");
+            }
+          }}
+          className="rounded-lg bg-blue-600 px-3 py-1.5 text-white text-xs font-medium"
+        >
+          Generar token push
+        </button>
 
-<button
-  type="button"
-  onClick={async () => {
-    try {
-      const token = await requestNotificationPermissionAndToken();
-      console.log("TOKEN TELEFONO:", token);
-      alert(token ? "Token generado" : "No se generó token");
-    } catch (e) {
-      console.error(e);
-      alert("Error generando token");
-    }
-  }}
-  className="mb-4 rounded bg-blue-600 px-4 py-2 text-white"
->
-  Generar token push
-</button>
-
-<button
-  type="button"
-  onClick={async () => {
-    try {
-      if (!("Notification" in window)) {
-        alert("Este navegador no soporta Notification API");
-        return;
-      }
-
-      const permission = await Notification.requestPermission();
-      alert(`Permiso después de pedirlo: ${permission}`);
-
-      if (permission !== "granted") return;
-
-      const token = await requestNotificationPermissionAndToken();
-      console.log("TOKEN TELEFONO:", token);
-
-      if (!token) {
-        alert("No se generó token");
-        return;
-      }
-
-      const res = await fetch("/api/fcm/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ token }),
-      });
-
-      const data = await res.json();
-      console.log("Respuesta register:", data);
-
-      alert(`Token generado y enviado al backend.\nRegistro ok: ${res.ok}`);
-    } catch (e) {
-      console.error(e);
-      alert("Error generando o guardando token");
-    }
-  }}
-  className="mb-4 rounded bg-blue-600 px-4 py-2 text-white"
->
-  Registrar push en este dispositivo
-</button>
-    </Shell>
+        <button
+          type="button"
+          onClick={async () => {
+            try {
+              if (!("Notification" in window)) {
+                alert("Este navegador no soporta Notification API");
+                return;
+              }
+              const permission = await Notification.requestPermission();
+              alert(`Permiso después de pedirlo: ${permission}`);
+              if (permission !== "granted") return;
+              const token = await requestNotificationPermissionAndToken();
+              console.log("TOKEN TELEFONO:", token);
+              if (!token) { alert("No se generó token"); return; }
+              const res = await fetch("/api/fcm/register", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ token }),
+              });
+              const data = await res.json();
+              console.log("Respuesta register:", data);
+              alert(`Token generado y enviado al backend.\nRegistro ok: ${res.ok}`);
+            } catch (e) {
+              console.error(e);
+              alert("Error generando o guardando token");
+            }
+          }}
+          className="rounded-lg bg-blue-600 px-3 py-1.5 text-white text-xs font-medium"
+        >
+          Registrar push en este dispositivo
+        </button>
+      </div>
     </>
   );
 }

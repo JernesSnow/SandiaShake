@@ -2,10 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
  reactStrictMode: false,
-
- experimental: {
-  serverComponentsExternalPackages: ["chartjs-node-canvas"],
- },
+ serverExternalPackages: ["chartjs-node-canvas"],
 };
 
 export default nextConfig;

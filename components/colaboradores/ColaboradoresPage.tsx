@@ -4,6 +4,25 @@ import { useEffect, useState } from "react";
 import { Edit2, Trash2, Heart, X, Save } from "react-feather";
 import { useRouter } from "next/navigation";
 
+const AVATAR_COLORS = [
+  { bg: "#ee2346", text: "#fff" },
+  { bg: "#6cbe45", text: "#fff" },
+  { bg: "#3b82f6", text: "#fff" },
+  { bg: "#8b5cf6", text: "#fff" },
+  { bg: "#f97316", text: "#fff" },
+  { bg: "#14b8a6", text: "#fff" },
+  { bg: "#ec4899", text: "#fff" },
+  { bg: "#6366f1", text: "#fff" },
+  { bg: "#eab308", text: "#fff" },
+  { bg: "#0ea5e9", text: "#fff" },
+];
+
+function avatarColor(nombre: string) {
+  let hash = 0;
+  for (let i = 0; i < nombre.length; i++) hash = nombre.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
 type MentalState = "Estable" | "Atento" | "En riesgo";
 type EstadoCuenta = "Activo" | "Suspendido";
 type RolColaborador = "Admin" | "Ejecutivo de cuenta" | "Diseñador" | "Editor" | "Community Manager";
@@ -22,9 +41,9 @@ type Colaborador = {
 };
 
 const mentalConfig: Record<MentalState, { strip: string; badge: string; glow: string }> = {
-  "Estable":   { strip: "bg-[#6cbe45]", badge: "bg-[#6cbe45]/15 text-[#6cbe45]", glow: "hover:border-[#6cbe45]/40"  },
-  "Atento":    { strip: "bg-[#facc15]", badge: "bg-[#facc15]/15 text-[#facc15]", glow: "hover:border-[#facc15]/40"  },
-  "En riesgo": { strip: "bg-[#ee2346]", badge: "bg-[#ee2346]/15 text-[#ee2346]", glow: "hover:border-[#ee2346]/40"  },
+  "Estable":   { strip: "bg-[#6cbe45]", badge: "bg-[#6cbe45]/15 text-[#6cbe45]",  glow: "hover:border-[#6cbe45]/40"  },
+  "Atento":    { strip: "bg-[#facc15]", badge: "bg-[#facc15]/20 text-yellow-600 dark:text-[#facc15]", glow: "hover:border-[#facc15]/40" },
+  "En riesgo": { strip: "bg-[#ee2346]", badge: "bg-[#ee2346]/15 text-[#ee2346]",  glow: "hover:border-[#ee2346]/40"  },
 };
 
 export function ColaboradoresPage() {
@@ -113,40 +132,56 @@ export function ColaboradoresPage() {
   }
 
   return (
-    <div className="space-y-6 text-[#fffef9]">
-      <h1 className="text-xl font-semibold">Equipo</h1>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold text-[var(--ss-text)]">Equipo</h1>
+        <p className="text-xs text-[var(--ss-text3)]">{colaboradores.length} colaboradores</p>
+      </div>
 
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {colaboradores.map((c) => {
           const mental = mentalConfig[c.mentalState];
           const completionPct = c.totalTareas > 0
             ? Math.round((c.tareasAprobadas / c.totalTareas) * 100)
             : 0;
 
+          const av = avatarColor(c.nombre);
           return (
             <div
               key={c.id}
               onClick={() => router.push("/colaboradores/" + c.id)}
-              className={"cursor-pointer rounded-xl bg-[#2b2b30] border border-[#4a4748]/40 overflow-hidden transition-all hover:shadow-lg hover:-translate-y-0.5 " + mental.glow}
+              className={"cursor-pointer rounded-2xl bg-[var(--ss-surface)] border border-[var(--ss-border)] overflow-hidden transition-all hover:shadow-md hover:-translate-y-0.5 " + mental.glow}
             >
+              {/* top accent strip */}
               <div className={"h-1 w-full " + mental.strip} />
 
               {/* HEADER */}
               <div className="p-5 flex gap-4 items-start">
                 <div className="relative shrink-0">
-                  <div className="h-12 w-12 rounded-full bg-gradient-to-br from-[#ee2346] to-[#7dd3fc] flex items-center justify-center text-lg font-bold">
-                    {c.nombre.charAt(0)}
+                  <div
+                    className="h-12 w-12 rounded-full flex items-center justify-center text-lg font-bold select-none"
+                    style={{ backgroundColor: av.bg, color: av.text }}
+                  >
+                    {c.nombre.charAt(0).toUpperCase()}
                   </div>
-                  <div className={"absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[#2b2b30] " + (c.estadoCuenta === "Activo" ? "bg-[#6cbe45]" : "bg-[#4a4748]")} />
+                  <div className={
+                    "absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-[var(--ss-surface)] " +
+                    (c.estadoCuenta === "Activo" ? "bg-[#6cbe45]" : "bg-[var(--ss-text3)]")
+                  } />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-semibold truncate">{c.nombre}</div>
-                  <div className="text-xs text-[#fffef9]/50 truncate">{c.email}</div>
+                  <div className="font-semibold text-[var(--ss-text)] truncate">{c.nombre}</div>
+                  <div className="text-xs text-[var(--ss-text3)] truncate mt-0.5">{c.email}</div>
                   <div className="flex flex-wrap gap-1.5 mt-2">
-                    <span className={"px-2 py-0.5 text-xs rounded-full " + (c.estadoCuenta === "Activo" ? "bg-[#6cbe45]/15 text-[#6cbe45]" : "bg-[#ee2346]/15 text-[#ee2346]")}>
+                    <span className={
+                      "px-2 py-0.5 text-xs rounded-full font-medium " +
+                      (c.estadoCuenta === "Activo"
+                        ? "bg-[#6cbe45]/15 text-[#6cbe45]"
+                        : "bg-[#ee2346]/15 text-[#ee2346]")
+                    }>
                       {c.estadoCuenta}
                     </span>
-                    <span className={"px-2 py-0.5 text-xs rounded-full flex items-center gap-1 " + mental.badge}>
+                    <span className={"px-2 py-0.5 text-xs rounded-full font-medium flex items-center gap-1 " + mental.badge}>
                       <Heart size={10} />
                       {c.mentalState}
                     </span>
@@ -156,27 +191,27 @@ export function ColaboradoresPage() {
 
               {/* COMPLETION BAR */}
               <div className="px-5 pb-3">
-                <div className="flex justify-between text-xs text-[#fffef9]/40 mb-1">
+                <div className="flex justify-between text-xs text-[var(--ss-text3)] mb-1.5">
                   <span>Completado</span>
-                  <span>{completionPct}%</span>
+                  <span className="font-medium text-[var(--ss-text2)]">{completionPct}%</span>
                 </div>
-                <div className="h-1 rounded-full bg-[#4a4748]/40">
-                  <div className="h-1 rounded-full bg-[#6cbe45] transition-all" style={{ width: completionPct + "%" }} />
+                <div className="h-1.5 rounded-full bg-[var(--ss-overlay)]">
+                  <div className="h-1.5 rounded-full bg-[#6cbe45] transition-all" style={{ width: completionPct + "%" }} />
                 </div>
               </div>
 
               {/* STATS */}
-              <div className="grid grid-cols-4 gap-2 px-5 pb-5">
+              <div className="grid grid-cols-4 gap-2 px-5 pb-4">
                 <MiniStat label="Tareas" value={c.totalTareas} />
                 <MiniStat label="Aprobadas" value={c.tareasAprobadas} accent="green" />
                 <MiniStat label="Pendientes" value={c.tareasPendientes} accent="yellow" />
                 <div
-                  className="rounded-lg p-2.5 text-center relative overflow-hidden"
+                  className="rounded-xl p-2.5 text-center relative overflow-hidden"
                   style={{ background: "linear-gradient(135deg, #ee2346 0%, #b91c1c 60%, #7f1d1d 100%)" }}
                 >
-                  <span className="absolute -right-1 -top-1 text-2xl opacity-20 select-none rotate-12 pointer-events-none"></span>
+                  <span className="absolute -right-1 -top-1 text-2xl opacity-20 select-none rotate-12 pointer-events-none">🌶</span>
                   <div className="text-lg font-bold text-white relative z-10">{c.chilliPoints}</div>
-                  <div className="text-xs text-white/50 relative z-10">Chilli</div>
+                  <div className="text-[10px] text-white/60 relative z-10">Chilli</div>
                 </div>
               </div>
 
@@ -184,17 +219,17 @@ export function ColaboradoresPage() {
               <div className="flex gap-2 px-5 pb-5">
                 <button
                   onClick={(e) => abrirEditar(e, c)}
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-[#4a4748]/40 bg-[#1f1f24] px-3 py-2 text-xs text-[#fffef9]/70 hover:bg-[#2b2b30] hover:text-[#fffef9] transition-colors"
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-3 py-2 text-xs font-medium text-[var(--ss-text2)] hover:bg-[var(--ss-overlay)] hover:text-[var(--ss-text)] transition-colors"
                 >
                   <Edit2 size={13} /> Editar
                 </button>
                 <button
                   onClick={(e) => desactivar(e, c)}
                   disabled={desactivando === c.id}
-                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg border border-[#ee2346]/30 bg-[#ee2346]/10 px-3 py-2 text-xs text-[#ee2346] hover:bg-[#ee2346]/20 transition-colors disabled:opacity-50"
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-[#ee2346]/30 bg-[#ee2346]/10 px-3 py-2 text-xs font-medium text-[#ee2346] hover:bg-[#ee2346]/20 transition-colors disabled:opacity-50"
                 >
                   <Trash2 size={13} />
-                  {desactivando === c.id ? "Desactivando..." : "Desactivar"}
+                  {desactivando === c.id ? "Desactivando…" : "Desactivar"}
                 </button>
               </div>
             </div>
@@ -205,27 +240,30 @@ export function ColaboradoresPage() {
       {/* EDIT MODAL */}
       {editando && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4"
           onClick={() => setEditando(null)}
         >
           <div
-            className="w-full max-w-md rounded-xl border border-[#4a4748]/40 bg-[#2b2b30] p-6 shadow-2xl"
+            className="w-full max-w-md rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             {/* modal header */}
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
-                <div className="h-9 w-9 rounded-full bg-gradient-to-br from-[#ee2346] to-[#7dd3fc] flex items-center justify-center font-bold text-sm">
-                  {editando.nombre.charAt(0)}
+                <div
+                  className="h-9 w-9 rounded-full flex items-center justify-center font-bold text-sm select-none"
+                  style={{ backgroundColor: avatarColor(editando.nombre).bg, color: avatarColor(editando.nombre).text }}
+                >
+                  {editando.nombre.charAt(0).toUpperCase()}
                 </div>
                 <div>
-                  <p className="font-semibold text-sm">{editando.nombre}</p>
-                  <p className="text-xs text-[#fffef9]/40">Editar colaborador</p>
+                  <p className="font-semibold text-sm text-[var(--ss-text)]">{editando.nombre}</p>
+                  <p className="text-xs text-[var(--ss-text3)]">Editar colaborador</p>
                 </div>
               </div>
               <button
                 onClick={() => setEditando(null)}
-                className="text-[#fffef9]/40 hover:text-[#fffef9] transition-colors"
+                className="text-[var(--ss-text3)] hover:text-[var(--ss-text)] transition-colors p-1 rounded-lg hover:bg-[var(--ss-overlay)]"
               >
                 <X size={18} />
               </button>
@@ -234,20 +272,20 @@ export function ColaboradoresPage() {
             {/* fields */}
             <div className="space-y-4">
               <div>
-                <label className="block text-xs text-[#fffef9]/50 mb-1.5">Nombre</label>
+                <label className="block text-xs font-medium text-[var(--ss-text2)] mb-1.5">Nombre</label>
                 <input
                   value={editNombre}
                   onChange={(e) => setEditNombre(e.target.value)}
-                  className="w-full rounded-lg border border-[#4a4748]/40 bg-[#1f1f24] px-3 py-2.5 text-sm text-[#fffef9] placeholder-[#fffef9]/30 focus:outline-none focus:border-[#ee2346]/60 transition-colors"
+                  className="w-full rounded-xl border border-[var(--ss-border)] bg-[var(--ss-input)] px-3 py-2.5 text-sm text-[var(--ss-text)] placeholder:text-[var(--ss-text3)] focus:outline-none focus:border-[#ee2346]/60 focus:ring-2 focus:ring-[#ee2346]/10 transition-colors"
                 />
               </div>
               <div>
-                <label className="block text-xs text-[#fffef9]/50 mb-1.5">Correo</label>
+                <label className="block text-xs font-medium text-[var(--ss-text2)] mb-1.5">Correo</label>
                 <input
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
                   type="email"
-                  className="w-full rounded-lg border border-[#4a4748]/40 bg-[#1f1f24] px-3 py-2.5 text-sm text-[#fffef9] placeholder-[#fffef9]/30 focus:outline-none focus:border-[#ee2346]/60 transition-colors"
+                  className="w-full rounded-xl border border-[var(--ss-border)] bg-[var(--ss-input)] px-3 py-2.5 text-sm text-[var(--ss-text)] placeholder:text-[var(--ss-text3)] focus:outline-none focus:border-[#ee2346]/60 focus:ring-2 focus:ring-[#ee2346]/10 transition-colors"
                 />
               </div>
             </div>
@@ -256,17 +294,17 @@ export function ColaboradoresPage() {
             <div className="flex gap-2 mt-6">
               <button
                 onClick={() => setEditando(null)}
-                className="flex-1 rounded-lg border border-[#4a4748]/40 bg-[#1f1f24] px-4 py-2.5 text-sm text-[#fffef9]/60 hover:text-[#fffef9] transition-colors"
+                className="flex-1 rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-4 py-2.5 text-sm font-medium text-[var(--ss-text2)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-overlay)] transition-colors"
               >
                 Cancelar
               </button>
               <button
                 onClick={guardarEdicion}
                 disabled={saving || !editNombre.trim() || !editEmail.trim()}
-                className="flex-1 inline-flex items-center justify-center gap-2 rounded-lg bg-[#ee2346] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#cc1f3d] disabled:opacity-50 transition-colors"
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[#ee2346] px-4 py-2.5 text-sm font-medium text-white hover:bg-[#cc1f3d] disabled:opacity-50 transition-colors"
               >
                 <Save size={14} />
-                {saving ? "Guardando..." : "Guardar"}
+                {saving ? "Guardando…" : "Guardar"}
               </button>
             </div>
           </div>
@@ -277,13 +315,13 @@ export function ColaboradoresPage() {
 }
 
 function MiniStat({ label, value, accent }: { label: string; value: number; accent?: "green" | "yellow" }) {
-  const strip = accent === "green" ? "bg-[#6cbe45]" : accent === "yellow" ? "bg-[#facc15]" : "bg-[#4a4748]";
-  const valColor = accent === "green" ? "text-[#6cbe45]" : accent === "yellow" ? "text-[#facc15]" : "text-[#fffef9]";
+  const strip    = accent === "green" ? "bg-[#6cbe45]" : accent === "yellow" ? "bg-[#facc15]" : "bg-[var(--ss-text3)]";
+  const valColor = accent === "green" ? "text-[#6cbe45]" : accent === "yellow" ? "text-yellow-500 dark:text-[#facc15]" : "text-[var(--ss-text)]";
   return (
-    <div className="rounded-lg bg-[#1f1f24] p-2.5 text-center relative overflow-hidden">
-      <div className={"absolute left-0 top-0 bottom-0 w-0.5 rounded-l-lg " + strip} />
+    <div className="rounded-xl bg-[var(--ss-raised)] p-2.5 text-center relative overflow-hidden border border-[var(--ss-border)]">
+      <div className={"absolute left-0 top-0 bottom-0 w-0.5 rounded-l-xl " + strip} />
       <div className={"text-lg font-bold " + valColor}>{value}</div>
-      <div className="text-xs text-[#fffef9]/40">{label}</div>
+      <div className="text-[10px] text-[var(--ss-text3)]">{label}</div>
     </div>
   );
 }

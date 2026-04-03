@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { Shell } from "@/components/Shell";
 import {
   ArrowLeft,
   Folder,
@@ -276,33 +275,33 @@ export default function TaskDetailPage() {
 
   if (loadingTask) {
     return (
-      <Shell>
-        <p className="text-sm text-white/60">Cargando tarea...</p>
-      </Shell>
+      <>
+        <p className="text-sm text-[var(--ss-text2)]">Cargando tarea...</p>
+      </>
     );
   }
 
   if (!task) {
     return (
-      <Shell>
+      <>
         <p className="text-sm text-red-400">Tarea no encontrada.</p>
-      </Shell>
+      </>
     );
   }
 
   return (
-    <Shell>
+    <>
       <div className="space-y-8">
         <button
           onClick={() => router.back()}
-          className="flex items-center gap-2 text-sm text-white/60 hover:text-white"
+          className="flex items-center gap-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)]"
         >
           <ArrowLeft size={16} />
           Volver
         </button>
 
         {/* TASK CARD */}
-        <div className="bg-[#1e1e1e] rounded-xl p-8 border border-white/10 space-y-6">
+        <div className="bg-[var(--ss-surface)] rounded-xl p-8 border border-[var(--ss-border)] space-y-6">
           <div className="flex items-center justify-between gap-4">
             <h1 className="text-2xl font-semibold">{task.titulo}</h1>
 
@@ -326,12 +325,12 @@ export default function TaskDetailPage() {
           </div>
 
           {task.descripcion && (
-            <p className="text-sm text-white/70 whitespace-pre-line">
+            <p className="text-sm text-[var(--ss-text)]/70 whitespace-pre-line">
               {task.descripcion}
             </p>
           )}
 
-          <div className="grid md:grid-cols-4 gap-6 text-sm text-white/60">
+          <div className="grid md:grid-cols-4 gap-6 text-sm text-[var(--ss-text2)]">
             <div className="flex items-center gap-2">
               <Tag size={14} />
               Tipo: {task.tipo_entregable}
@@ -375,15 +374,15 @@ export default function TaskDetailPage() {
             className={`relative rounded-xl border-2 border-dashed transition p-8 ${
               isDragging
                 ? "border-blue-400 bg-blue-500/10"
-                : "border-white/20 bg-[#1e1e1e]"
+                : "border-[var(--ss-border)] bg-[var(--ss-surface)]"
             }`}
           >
             <div className="flex flex-col items-center justify-center text-center">
               <UploadCloud size={34} className="text-blue-400 mb-2" />
-              <p className="text-sm font-semibold text-white">
+              <p className="text-sm font-semibold text-[var(--ss-text)]">
                 Arrastra y suelta archivos aquí
               </p>
-              <p className="text-xs text-white/50 mt-1">
+              <p className="text-xs text-[var(--ss-text3)] mt-1">
                 Cada archivo se registra como una nueva versión para aprobación
               </p>
             </div>
@@ -393,14 +392,14 @@ export default function TaskDetailPage() {
         {/* APPROVAL PIPELINE */}
         <div className="space-y-8">
           {/* EN REVISION */}
-          <div className="bg-[#1e1e1e] rounded-xl border border-purple-500/30 overflow-hidden">
+          <div className="bg-[var(--ss-surface)] rounded-xl border border-purple-500/30 overflow-hidden">
             <div className="px-6 py-4 border-b border-purple-500/30 bg-purple-500/5 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-purple-300">
                 En revisión ({enRevision.length})
               </h2>
 
               {loadingEntregables && (
-                <div className="flex items-center text-xs text-white/50">
+                <div className="flex items-center text-xs text-[var(--ss-text3)]">
                   <Loader size={14} className="animate-spin mr-2" />
                   Actualizando...
                 </div>
@@ -409,7 +408,7 @@ export default function TaskDetailPage() {
 
             <div className="p-6">
               {enRevision.length === 0 ? (
-                <p className="text-sm text-white/50">
+                <p className="text-sm text-[var(--ss-text3)]">
                   No hay archivos en revisión.
                 </p>
               ) : (
@@ -429,13 +428,13 @@ export default function TaskDetailPage() {
                         return (
                           <tr
                             key={e.id_entregable}
-                            className="border-t border-white/10"
+                            className="border-t border-[var(--ss-border)]"
                           >
                             <td className="py-3">
                               <button
                                 type="button"
                                 onClick={() => setPreview(e)}
-                                className="flex items-center gap-2 hover:text-white transition text-left"
+                                className="flex items-center gap-2 hover:text-[var(--ss-text)] transition text-left"
                               >
                                 {mimeIcon(mime)}
                                 <span className="truncate max-w-[360px]">
@@ -451,11 +450,11 @@ export default function TaskDetailPage() {
                               </button>
                             </td>
 
-                            <td className="py-3 text-white/60">
+                            <td className="py-3 text-[var(--ss-text2)]">
                               v{e.version_num}
                             </td>
 
-                            <td className="py-3 text-right text-white/50">
+                            <td className="py-3 text-right text-[var(--ss-text3)]">
                               {formatSize(e.drive_file_size)}
                             </td>
 
@@ -464,13 +463,13 @@ export default function TaskDetailPage() {
                                 <button
                                   type="button"
                                   onClick={() => setSelectedForDecision(e)}
-                                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-purple-600/20 border border-purple-500/30 text-purple-200 hover:bg-purple-600/30 transition"
+                                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-purple-600/20 border border-purple-500/30 text-purple-200 hover:bg-purple-600/30 transition"
                                 >
                                   <MessageSquare size={14} />
                                   Revisar
                                 </button>
                               ) : (
-                                <span className="text-xs text-white/40">
+                                <span className="text-xs text-[var(--ss-text3)]">
                                   Solo clientes pueden aprobar
                                 </span>
                               )}
@@ -488,10 +487,10 @@ export default function TaskDetailPage() {
                 <div className="mt-6 rounded-xl border border-purple-500/30 bg-purple-500/5 p-5 space-y-4">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <p className="text-sm font-semibold text-white">
+                      <p className="text-sm font-semibold text-[var(--ss-text)]">
                         Aprobación (v{selectedForDecision.version_num})
                       </p>
-                      <p className="text-xs text-white/50 mt-1">
+                      <p className="text-xs text-[var(--ss-text3)] mt-1">
                         {selectedForDecision.drive_file_name ?? "Archivo"}
                       </p>
                     </div>
@@ -503,7 +502,7 @@ export default function TaskDetailPage() {
                         setComentario("");
                         setErrorAprobacion(null);
                       }}
-                      className="text-white/50 hover:text-white transition"
+                      className="text-[var(--ss-text3)] hover:text-[var(--ss-text)] transition"
                     >
                       <X size={18} />
                     </button>
@@ -513,7 +512,7 @@ export default function TaskDetailPage() {
                     value={comentario}
                     onChange={(ev) => setComentario(ev.target.value)}
                     placeholder="Escribe tu comentario de retroalimentación..."
-                    className="w-full bg-[#2a2a2a] border border-white/10 rounded-lg p-4 text-sm focus:outline-none focus:border-purple-500"
+                    className="w-full bg-[var(--ss-input)] border border-[var(--ss-border)] rounded-xl p-4 text-sm focus:outline-none focus:border-[#6cbe45]/60"
                     rows={4}
                   />
 
@@ -525,7 +524,7 @@ export default function TaskDetailPage() {
                     <button
                       disabled={aprobando || !canApprove}
                       onClick={() => handleDecision("APROBADO")}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-green-600 hover:bg-green-700 text-sm font-medium transition disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-sm font-medium transition disabled:opacity-50"
                     >
                       <CheckCircle size={16} />
                       Aprobar
@@ -534,7 +533,7 @@ export default function TaskDetailPage() {
                     <button
                       disabled={aprobando || !canApprove}
                       onClick={() => handleDecision("RECHAZADO")}
-                      className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-sm font-medium transition disabled:opacity-50"
+                      className="flex items-center gap-2 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-700 text-sm font-medium transition disabled:opacity-50"
                     >
                       <XCircle size={16} />
                       Rechazar
@@ -542,7 +541,7 @@ export default function TaskDetailPage() {
                   </div>
 
                   {loadingMe && (
-                    <p className="text-xs text-white/40">
+                    <p className="text-xs text-[var(--ss-text3)]">
                       Cargando usuario...
                     </p>
                   )}
@@ -560,7 +559,7 @@ export default function TaskDetailPage() {
           </div>
 
           {/* APROBADAS */}
-          <div className="bg-[#1e1e1e] rounded-xl border border-green-500/30 overflow-hidden">
+          <div className="bg-[var(--ss-surface)] rounded-xl border border-green-500/30 overflow-hidden">
             <div className="px-6 py-4 border-b border-green-500/30 bg-green-500/5">
               <h2 className="text-sm font-semibold text-green-300">
                 Aprobadas ({aprobadas.length})
@@ -569,7 +568,7 @@ export default function TaskDetailPage() {
 
             <div className="p-6">
               {aprobadas.length === 0 ? (
-                <p className="text-sm text-white/50">
+                <p className="text-sm text-[var(--ss-text3)]">
                   No hay aprobaciones registradas.
                 </p>
               ) : (
@@ -588,13 +587,13 @@ export default function TaskDetailPage() {
                         return (
                           <tr
                             key={e.id_entregable}
-                            className="border-t border-white/10"
+                            className="border-t border-[var(--ss-border)]"
                           >
                             <td className="py-3">
                               <button
                                 type="button"
                                 onClick={() => setPreview(e)}
-                                className="flex items-center gap-2 hover:text-white transition text-left"
+                                className="flex items-center gap-2 hover:text-[var(--ss-text)] transition text-left"
                               >
                                 {mimeIcon(mime)}
                                 <span className="truncate max-w-[420px]">
@@ -609,10 +608,10 @@ export default function TaskDetailPage() {
                                 </span>
                               </button>
                             </td>
-                            <td className="py-3 text-white/60">
+                            <td className="py-3 text-[var(--ss-text2)]">
                               v{e.version_num}
                             </td>
-                            <td className="py-3 text-right text-white/50">
+                            <td className="py-3 text-right text-[var(--ss-text3)]">
                               {formatSize(e.drive_file_size)}
                             </td>
                           </tr>
@@ -626,7 +625,7 @@ export default function TaskDetailPage() {
           </div>
 
           {/* RECHAZADAS */}
-          <div className="bg-[#1e1e1e] rounded-xl border border-red-500/30 overflow-hidden">
+          <div className="bg-[var(--ss-surface)] rounded-xl border border-red-500/30 overflow-hidden">
             <div className="px-6 py-4 border-b border-red-500/30 bg-red-500/5">
               <h2 className="text-sm font-semibold text-red-300">
                 Rechazadas ({rechazadas.length})
@@ -635,7 +634,7 @@ export default function TaskDetailPage() {
 
             <div className="p-6">
               {rechazadas.length === 0 ? (
-                <p className="text-sm text-white/50">
+                <p className="text-sm text-[var(--ss-text3)]">
                   No hay rechazos registrados.
                 </p>
               ) : (
@@ -654,13 +653,13 @@ export default function TaskDetailPage() {
                         return (
                           <tr
                             key={e.id_entregable}
-                            className="border-t border-white/10"
+                            className="border-t border-[var(--ss-border)]"
                           >
                             <td className="py-3">
                               <button
                                 type="button"
                                 onClick={() => setPreview(e)}
-                                className="flex items-center gap-2 hover:text-white transition text-left"
+                                className="flex items-center gap-2 hover:text-[var(--ss-text)] transition text-left"
                               >
                                 {mimeIcon(mime)}
                                 <span className="truncate max-w-[420px]">
@@ -675,10 +674,10 @@ export default function TaskDetailPage() {
                                 </span>
                               </button>
                             </td>
-                            <td className="py-3 text-white/60">
+                            <td className="py-3 text-[var(--ss-text2)]">
                               v{e.version_num}
                             </td>
-                            <td className="py-3 text-right text-white/50">
+                            <td className="py-3 text-right text-[var(--ss-text3)]">
                               {formatSize(e.drive_file_size)}
                             </td>
                           </tr>
@@ -703,11 +702,11 @@ export default function TaskDetailPage() {
               className="max-w-5xl w-full mx-4"
             >
               <div className="flex items-center justify-between mb-3">
-                <div className="text-sm text-white truncate pr-4">
+                <div className="text-sm text-[var(--ss-text)] truncate pr-4">
                   {preview.drive_file_name ?? "Archivo"}
                 </div>
                 <button
-                  className="text-white/50 hover:text-white transition"
+                  className="text-[var(--ss-text3)] hover:text-[var(--ss-text)] transition"
                   onClick={() => setPreview(null)}
                 >
                   <X size={22} />
@@ -718,12 +717,12 @@ export default function TaskDetailPage() {
                 <img
                   src={`/api/google-drive/file/${preview.drive_file_id}`}
                   alt={preview.drive_file_name ?? "preview"}
-                  className="max-h-[80vh] max-w-full object-contain rounded-lg"
+                  className="max-h-[80vh] max-w-full object-contain rounded-xl"
                 />
               )}
 
               {preview.drive_mime_type?.startsWith("video/") && (
-                <video controls autoPlay className="max-h-[80vh] w-full rounded-lg">
+                <video controls autoPlay className="max-h-[80vh] w-full rounded-xl">
                   <source
                     src={`/api/google-drive/file/${preview.drive_file_id}`}
                     type={preview.drive_mime_type ?? "video/mp4"}
@@ -733,11 +732,11 @@ export default function TaskDetailPage() {
 
               {!preview.drive_mime_type?.startsWith("image/") &&
                 !preview.drive_mime_type?.startsWith("video/") && (
-                  <div className="rounded-xl border border-white/10 bg-[#1e1e1e] p-6 text-sm text-white/70">
+                  <div className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-6 text-sm text-[var(--ss-text)]/70">
                     Este archivo no se puede previsualizar aquí.
                     <div className="mt-3">
                       <a
-                        className="underline text-white hover:text-white/80"
+                        className="underline text-[var(--ss-text)] hover:text-[var(--ss-text)]/80"
                         href={`/api/google-drive/file/${preview.drive_file_id}`}
                         target="_blank"
                         rel="noreferrer"
@@ -751,6 +750,6 @@ export default function TaskDetailPage() {
           </div>
         )}
       </div>
-    </Shell>
+    </>
   );
 }

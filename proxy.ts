@@ -12,6 +12,8 @@ const baseUrl = `${proto}://${host}`;
   const isPublic =
     pathname === "/" ||
     pathname.startsWith("/auth") ||
+    pathname.startsWith("/signup") ||
+    pathname.startsWith("/forgot-password") ||
     pathname.startsWith("/verify-email-mfa") ||
     pathname.startsWith("/morosidad") ||
     pathname.startsWith("/_next") ||

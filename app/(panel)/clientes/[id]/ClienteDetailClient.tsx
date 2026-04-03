@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Shell } from "@/components/Shell";
 import { Folder, Plus, Trash2, Users } from "react-feather";
 
 /* ================= TYPES ================= */
@@ -296,46 +295,46 @@ export default function ClienteDetailClient({ id }: { id: string }) {
 
   if (role === "CLIENTE" && !resolvedOrgId) {
     return (
-      <Shell>
-        <div className="text-[#fffef9]/60">Cargando cliente...</div>
-      </Shell>
+      <>
+        <div className="text-[var(--ss-text2)]">Cargando cliente...</div>
+      </>
     );
   }
 
   if (!cliente) {
     return (
-      <Shell>
-        <div className="text-[#fffef9]/60">Cargando cliente...</div>
-      </Shell>
+      <>
+        <div className="text-[var(--ss-text2)]">Cargando cliente...</div>
+      </>
     );
   }
 
   return (
-    <Shell>
-      <div className="flex flex-col gap-8 text-[#fffef9]">
+    <>
+      <div className="flex flex-col gap-8 text-[var(--ss-text)]">
         {/* ================= HEADER ================= */}
-        <div className="bg-[#2b2b30] p-6 rounded-xl border border-[#4a4748]/40">
+        <div className="bg-[var(--ss-surface)] p-6 rounded-2xl border border-[var(--ss-border)]">
           <div className="flex justify-between flex-wrap gap-6">
             <div>
               <h1 className="text-2xl font-bold">{cliente.nombre}</h1>
-              <p className="text-sm text-[#fffef9]/60">
+              <p className="text-sm text-[var(--ss-text2)]">
                 {cliente.descripcion || "Cliente activo"}
               </p>
             </div>
 
             <div className="flex gap-8 text-sm">
               <div>
-                <p className="text-[#fffef9]/50">Plan</p>
+                <p className="text-[var(--ss-text3)]">Plan</p>
                 <p className="font-semibold">{planConfig?.nombre ?? "Sin plan"}</p>
               </div>
 
               <div>
-                <p className="text-[#fffef9]/50">Tareas totales</p>
+                <p className="text-[var(--ss-text3)]">Tareas totales</p>
                 <p className="font-semibold">{tareas.length}</p>
               </div>
 
               <div>
-                <p className="text-[#fffef9]/50">Colaboradores</p>
+                <p className="text-[var(--ss-text3)]">Colaboradores</p>
                 <p className="font-semibold">{colaboradores.length}</p>
               </div>
             </div>
@@ -347,15 +346,15 @@ export default function ClienteDetailClient({ id }: { id: string }) {
           {Object.entries(remainingByType).map(([tipo, restante]) => (
             <div
               key={tipo}
-              className="bg-[#2b2b30] p-5 rounded-xl border border-[#4a4748]/40"
+              className="bg-[var(--ss-surface)] p-5 rounded-2xl border border-[var(--ss-border)]"
             >
-              <p className="text-xs text-[#fffef9]/60">{tipo}</p>
+              <p className="text-xs text-[var(--ss-text2)]">{tipo}</p>
               <p className="text-xl font-bold">{restante < 0 ? 0 : restante}</p>
             </div>
           ))}
 
-          <div className="bg-[#2b2b30] p-5 rounded-xl border border-[#4a4748]/40">
-            <p className="text-xs text-[#fffef9]/60">Tareas activas</p>
+          <div className="bg-[var(--ss-surface)] p-5 rounded-2xl border border-[var(--ss-border)]">
+            <p className="text-xs text-[var(--ss-text2)]">Tareas activas</p>
             <p className="text-xl font-bold">
               {
                 tareas.filter((t) =>
@@ -369,13 +368,13 @@ export default function ClienteDetailClient({ id }: { id: string }) {
         </div>
 
         {/* ================= FACTURACIÓN ================= */}
-        <div className="bg-[#2b2b30] p-6 rounded-xl border border-[#4a4748]/40">
+        <div className="bg-[var(--ss-surface)] p-6 rounded-2xl border border-[var(--ss-border)]">
           <h2 className="font-semibold mb-6">Facturación del cliente</h2>
 
           {/* KPIs */}
           <div className="grid md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-[#1f1f24] p-4 rounded-lg border border-[#4a4748]/30">
-              <p className="text-xs text-[#fffef9]/60">Total facturado</p>
+            <div className="bg-[var(--ss-raised)] p-4 rounded-lg border border-[var(--ss-border)]">
+              <p className="text-xs text-[var(--ss-text2)]">Total facturado</p>
               <p className="text-lg font-bold">
                 ₡{" "}
                 {(facturas ?? [])
@@ -384,8 +383,8 @@ export default function ClienteDetailClient({ id }: { id: string }) {
               </p>
             </div>
 
-            <div className="bg-[#1f1f24] p-4 rounded-lg border border-[#4a4748]/30">
-              <p className="text-xs text-[#fffef9]/60">Total pendiente</p>
+            <div className="bg-[var(--ss-raised)] p-4 rounded-lg border border-[var(--ss-border)]">
+              <p className="text-xs text-[var(--ss-text2)]">Total pendiente</p>
               <p className="text-lg font-bold text-[#ee2346]">
                 ₡{" "}
                 {(facturas ?? [])
@@ -394,16 +393,16 @@ export default function ClienteDetailClient({ id }: { id: string }) {
               </p>
             </div>
 
-            <div className="bg-[#1f1f24] p-4 rounded-lg border border-[#4a4748]/30">
-              <p className="text-xs text-[#fffef9]/60">Facturas vencidas</p>
+            <div className="bg-[var(--ss-raised)] p-4 rounded-lg border border-[var(--ss-border)]">
+              <p className="text-xs text-[var(--ss-text2)]">Facturas vencidas</p>
               <p className="text-lg font-bold">
                 {(facturas ?? []).filter((f) => f.estado_factura === "VENCIDA")
                   .length}
               </p>
             </div>
 
-            <div className="bg-[#1f1f24] p-4 rounded-lg border border-[#4a4748]/30">
-              <p className="text-xs text-[#fffef9]/60">Facturas pagadas</p>
+            <div className="bg-[var(--ss-raised)] p-4 rounded-lg border border-[var(--ss-border)]">
+              <p className="text-xs text-[var(--ss-text2)]">Facturas pagadas</p>
               <p className="text-lg font-bold">
                 {(facturas ?? []).filter((f) => f.estado_factura === "PAGADA")
                   .length}
@@ -414,7 +413,7 @@ export default function ClienteDetailClient({ id }: { id: string }) {
           {/* Invoice List */}
           <div className="space-y-2 max-h-[220px] overflow-y-auto dark-scroll">
             {(facturas ?? []).length === 0 && (
-              <div className="text-xs text-[#fffef9]/50">
+              <div className="text-xs text-[var(--ss-text3)]">
                 Este cliente no tiene facturas registradas.
               </div>
             )}
@@ -424,13 +423,13 @@ export default function ClienteDetailClient({ id }: { id: string }) {
               .map((f) => (
                 <div
                   key={f.id_factura}
-                  className="flex justify-between items-center bg-[#1f1f24] p-3 rounded-lg border border-[#4a4748]/30"
+                  className="flex justify-between items-center bg-[var(--ss-raised)] p-3 rounded-lg border border-[var(--ss-border)]"
                 >
                   <div>
                     <p className="text-sm font-semibold">
                       Factura #{f.id_factura}
                     </p>
-                    <p className="text-xs text-[#fffef9]/50">{f.periodo}</p>
+                    <p className="text-xs text-[var(--ss-text3)]">{f.periodo}</p>
                   </div>
 
                   <div className="text-right">
@@ -445,7 +444,7 @@ export default function ClienteDetailClient({ id }: { id: string }) {
                             ? "text-emerald-400"
                             : f.estado_factura === "VENCIDA"
                             ? "text-[#ee2346]"
-                            : "text-[#fffef9]/60"
+                            : "text-[var(--ss-text2)]"
                         }
                       `}
                     >
@@ -462,43 +461,43 @@ export default function ClienteDetailClient({ id }: { id: string }) {
           {/* ================= LEFT ================= */}
           <div className="lg:col-span-2 space-y-8">
             {/* GOOGLE DRIVE */}
-            <div className="bg-[#2b2b30] p-6 rounded-xl border border-[#4a4748]/40">
+            <div className="bg-[var(--ss-surface)] p-6 rounded-2xl border border-[var(--ss-border)]">
               <h2 className="font-semibold mb-4">Explorador de archivos</h2>
 
-              <div className="bg-[#1f1f24] rounded-lg border border-[#4a4748]/30 divide-y divide-[#4a4748]/30">
+              <div className="bg-[var(--ss-raised)] rounded-lg border border-[var(--ss-border)] divide-y divide-[#4a4748]/30">
                 {taskFolders.map((folder) => (
                   <a
                     key={folder.id_tarea}
                     href={folder.folder_url}
                     target="_blank"
-                    className="flex justify-between px-4 py-3 hover:bg-[#2b2b30]"
+                    className="flex justify-between px-4 py-3 hover:bg-[var(--ss-surface)]"
                     rel="noreferrer"
                   >
                     <div className="flex items-center gap-3">
                       <Folder size={16} className="text-[#6cbe45]" />
                       <span>{folder.folder_name}</span>
                     </div>
-                    <span className="text-xs text-[#fffef9]/40">Abrir →</span>
+                    <span className="text-xs text-[var(--ss-text3)]">Abrir →</span>
                   </a>
                 ))}
               </div>
             </div>
 
             {/* PRODUCCIÓN */}
-            <div className="bg-[#2b2b30] p-6 rounded-xl border border-[#4a4748]/40">
+            <div className="bg-[var(--ss-surface)] p-6 rounded-2xl border border-[var(--ss-border)]">
               <h2 className="font-semibold mb-4">Producción</h2>
 
               {/* Summary */}
               <div className="grid grid-cols-3 gap-3 mb-5 text-xs">
-                <div className="bg-[#1f1f24] border border-[#4a4748]/30 rounded-lg p-3 text-center">
-                  <p className="text-[#fffef9]/60">Pendientes</p>
+                <div className="bg-[var(--ss-raised)] border border-[var(--ss-border)] rounded-lg p-3 text-center">
+                  <p className="text-[var(--ss-text2)]">Pendientes</p>
                   <p className="font-semibold">
                     {tareas.filter((t) => t.status_kanban === "pendiente").length}
                   </p>
                 </div>
 
-                <div className="bg-[#1f1f24] border border-[#4a4748]/30 rounded-lg p-3 text-center">
-                  <p className="text-[#fffef9]/60">En progreso</p>
+                <div className="bg-[var(--ss-raised)] border border-[var(--ss-border)] rounded-lg p-3 text-center">
+                  <p className="text-[var(--ss-text2)]">En progreso</p>
                   <p className="font-semibold">
                     {
                       tareas.filter((t) => t.status_kanban === "en_progreso")
@@ -507,8 +506,8 @@ export default function ClienteDetailClient({ id }: { id: string }) {
                   </p>
                 </div>
 
-                <div className="bg-[#1f1f24] border border-[#4a4748]/30 rounded-lg p-3 text-center">
-                  <p className="text-[#fffef9]/60">Aprobadas</p>
+                <div className="bg-[var(--ss-raised)] border border-[var(--ss-border)] rounded-lg p-3 text-center">
+                  <p className="text-[var(--ss-text2)]">Aprobadas</p>
                   <p className="font-semibold">
                     {tareas.filter((t) => t.status_kanban === "aprobada").length}
                   </p>
@@ -520,26 +519,26 @@ export default function ClienteDetailClient({ id }: { id: string }) {
                 {tareas.map((t) => (
                   <div
                     key={t.id_tarea}
-                    className="bg-[#1f1f24] p-4 rounded-lg border border-[#4a4748]/30 flex justify-between items-center"
+                    className="bg-[var(--ss-raised)] p-4 rounded-lg border border-[var(--ss-border)] flex justify-between items-center"
                   >
                     <div>
                       <p className="font-semibold">{t.titulo}</p>
-                      <p className="text-xs text-[#fffef9]/50">{t.tipo_tarea}</p>
+                      <p className="text-xs text-[var(--ss-text3)]">{t.tipo_tarea}</p>
                     </div>
 
                     <span
                       className={`
-                        text-xs uppercase px-3 py-1 rounded-full
+                        text-xs uppercase px-3 py-1 rounded-full font-medium
                         ${
                           t.status_kanban === "pendiente"
-                            ? "bg-zinc-700/60 text-zinc-200 border border-zinc-500/70"
+                            ? "bg-[var(--ss-overlay)] text-[var(--ss-text2)] border border-[var(--ss-border)]"
                             : t.status_kanban === "en_progreso"
-                            ? "bg-sky-500/15 text-sky-300 border border-sky-400/40"
+                            ? "bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-400/40"
                             : t.status_kanban === "en_revision"
-                            ? "bg-amber-500/15 text-amber-300 border border-amber-400/40"
+                            ? "bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-400/40"
                             : t.status_kanban === "aprobada"
-                            ? "bg-emerald-500/15 text-emerald-300 border border-emerald-400/40"
-                            : "bg-zinc-700 text-zinc-300 border border-zinc-500"
+                            ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border border-emerald-400/40"
+                            : "bg-[var(--ss-overlay)] text-[var(--ss-text2)] border border-[var(--ss-border)]"
                         }
                       `}
                     >
@@ -555,7 +554,7 @@ export default function ClienteDetailClient({ id }: { id: string }) {
           <div className="space-y-8">
             {/* ================= COLABORADORES ================= */}
             {role !== "CLIENTE" && (
-              <div className="bg-[#2b2b30] p-6 rounded-xl border border-[#4a4748]/40">
+              <div className="bg-[var(--ss-surface)] p-6 rounded-2xl border border-[var(--ss-border)]">
                 <h2 className="font-semibold mb-4 flex items-center gap-2">
                   <Users size={16} />
                   Equipo asignado
@@ -564,7 +563,7 @@ export default function ClienteDetailClient({ id }: { id: string }) {
                 {/* LISTA DE COLABORADORES */}
                 <div className="space-y-3 mb-4">
                   {colaboradores.length === 0 && (
-                    <div className="text-xs text-[#fffef9]/50">
+                    <div className="text-xs text-[var(--ss-text3)]">
                       No hay colaboradores asignados.
                     </div>
                   )}
@@ -572,11 +571,11 @@ export default function ClienteDetailClient({ id }: { id: string }) {
                   {colaboradores.map((c) => (
                     <div
                       key={c.id_colaborador}
-                      className="bg-[#1f1f24] p-3 rounded-lg flex justify-between items-center"
+                      className="bg-[var(--ss-raised)] p-3 rounded-lg flex justify-between items-center"
                     >
                       <div>
                         <div className="font-medium">{c.nombre}</div>
-                        <div className="text-xs text-[#fffef9]/60">{c.correo}</div>
+                        <div className="text-xs text-[var(--ss-text2)]">{c.correo}</div>
                       </div>
 
                       {/* SOLO ADMIN PUEDE REMOVER */}
@@ -603,7 +602,7 @@ export default function ClienteDetailClient({ id }: { id: string }) {
                           e.target.value ? Number(e.target.value) : null
                         )
                       }
-                      className="bg-[#1f1f24] border border-[#4a4748]/40 rounded px-3 py-2 text-sm flex-1"
+                      className="bg-[var(--ss-input)] border border-[var(--ss-border)] rounded-xl px-3 py-2 text-sm text-[var(--ss-text)] flex-1 focus:outline-none focus:border-[#ee2346]/50"
                     >
                       <option value="">Agregar colaborador</option>
                       {todosColaboradores.map((c) => (
@@ -627,14 +626,14 @@ export default function ClienteDetailClient({ id }: { id: string }) {
 
             {/* ================= NOTAS INTERNAS ================= */}
             {role !== "CLIENTE" && (
-              <div className="bg-[#2b2b30] p-6 rounded-xl border border-[#4a4748]/40">
+              <div className="bg-[var(--ss-surface)] p-6 rounded-2xl border border-[var(--ss-border)]">
                 <h2 className="font-semibold mb-4">Notas internas</h2>
 
                 <div className="flex gap-2 mb-4">
                   <textarea
                     value={nuevaNota}
                     onChange={(e) => setNuevaNota(e.target.value)}
-                    className="flex-1 bg-[#1f1f24] border border-[#4a4748]/40 rounded-lg p-2 text-sm"
+                    className="flex-1 bg-[var(--ss-input)] border border-[var(--ss-border)] rounded-xl p-2 text-sm text-[var(--ss-text)] focus:outline-none focus:border-[#ee2346]/50"
                     placeholder="Escribe una nota interna…"
                   />
                   <button
@@ -648,7 +647,7 @@ export default function ClienteDetailClient({ id }: { id: string }) {
 
                 <div className="space-y-3 max-h-[250px] overflow-y-auto dark-scroll">
                   {notas.length === 0 && (
-                    <div className="text-xs text-[#fffef9]/50">
+                    <div className="text-xs text-[var(--ss-text3)]">
                       No hay notas internas.
                     </div>
                   )}
@@ -656,20 +655,20 @@ export default function ClienteDetailClient({ id }: { id: string }) {
                   {notas.map((n) => (
                     <div
                       key={n.id_nota}
-                      className="bg-[#1f1f24] p-3 rounded-lg border border-[#4a4748]/30"
+                      className="bg-[var(--ss-raised)] p-3 rounded-lg border border-[var(--ss-border)]"
                     >
                       <div className="flex justify-between items-start gap-3">
                         <div className="min-w-0">
-                          <div className="text-xs text-[#fffef9]/55">
+                          <div className="text-xs text-[var(--ss-text3)]">
                             {n.autor?.nombre ?? "—"}
                             {n.autor?.correo ? (
-                              <span className="text-[#fffef9]/35">
+                              <span className="text-[var(--ss-text3)]">
                                 {" "}
                                 · {n.autor.correo}
                               </span>
                             ) : null}
                             {n.created_at ? (
-                              <span className="text-[#fffef9]/35">
+                              <span className="text-[var(--ss-text3)]">
                                 {" "}
                                 · {formatCRDate(n.created_at)}
                               </span>
@@ -701,6 +700,6 @@ export default function ClienteDetailClient({ id }: { id: string }) {
           </div>
         </div>
       </div>
-    </Shell>
+    </>
   );
 }

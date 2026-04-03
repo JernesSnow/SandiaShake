@@ -1,55 +1,53 @@
 "use client";
 
 type Colaborador = { nombre: string; score: number };
-
 type Props = { colaboradores: Colaborador[] };
 
 function barColor(score: number) {
-  if (score >= 85) return "bg-[#6cbe45]";
-  if (score >= 60) return "bg-[#facc15]";
-  return "bg-[#ee2346]";
-}
-
-function textColor(score: number) {
-  if (score >= 85) return "text-[#6cbe45]";
-  if (score >= 60) return "text-[#facc15]";
-  return "text-[#ee2346]";
+  if (score >= 85) return "#6cbe45";
+  if (score >= 60) return "#facc15";
+  return "#ee2346";
 }
 
 export default function Rendimiento({ colaboradores }: Props) {
   return (
-    <div className="bg-[#2b2b30] p-6 rounded-xl border border-[#3a3a40] shadow">
-      <h2 className="text-[#fffef9] font-semibold mb-1">Rendimiento del equipo</h2>
-      <p className="text-xs text-[#fffef9]/40 mb-4">% de tareas aprobadas por colaborador.</p>
+    <div className="rounded-2xl bg-[var(--ss-surface)] border border-[var(--ss-border)] shadow-sm p-6">
+      <h2 className="font-semibold text-[var(--ss-text)] mb-0.5">Rendimiento del equipo</h2>
+      <p className="text-xs text-[var(--ss-text3)] mb-5">% de tareas aprobadas por colaborador.</p>
 
       {colaboradores.length === 0 ? (
-        <div className="h-32 flex items-center justify-center text-[#fffef9]/30 text-sm">
+        <div className="h-32 flex items-center justify-center text-[var(--ss-text3)] text-sm">
           Sin colaboradores activos
         </div>
       ) : (
-        <div className="max-h-64 overflow-y-auto pr-1 space-y-3 text-sm text-[#fffef9]/80 custom-scroll">
+        <div
+          className="max-h-64 overflow-y-auto pr-1 space-y-3.5 text-sm"
+          style={{
+            scrollbarWidth: "thin",
+            scrollbarColor: "var(--ss-border) transparent",
+          }}
+        >
           {colaboradores.map((c, i) => (
             <div key={i}>
-              <div className="flex justify-between mb-1">
-                <span className="truncate max-w-[70%]">{c.nombre}</span>
-                <span className={"font-medium shrink-0 " + textColor(c.score)}>{c.score}%</span>
+              <div className="flex justify-between mb-1.5">
+                <span className="truncate max-w-[70%] text-[var(--ss-text2)]">{c.nombre}</span>
+                <span
+                  className="font-semibold shrink-0 tabular-nums text-xs"
+                  style={{ color: barColor(c.score) }}
+                >
+                  {c.score}%
+                </span>
               </div>
-              <div className="w-full bg-[#1f1f24] h-1.5 rounded-full border border-[#3a3a40]">
+              <div className="w-full bg-[var(--ss-raised)] h-1.5 rounded-full overflow-hidden">
                 <div
-                  className={"h-1.5 rounded-full transition-all " + barColor(c.score)}
-                  style={{ width: c.score + "%" }}
+                  className="h-1.5 rounded-full transition-all duration-500"
+                  style={{ width: c.score + "%", backgroundColor: barColor(c.score) }}
                 />
               </div>
             </div>
           ))}
         </div>
       )}
-
-      <style jsx>{`
-        .custom-scroll::-webkit-scrollbar { width: 4px; }
-        .custom-scroll::-webkit-scrollbar-track { background: #1f1f24; border-radius: 10px; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #4a4748; border-radius: 10px; }
-      `}</style>
     </div>
   );
 }
