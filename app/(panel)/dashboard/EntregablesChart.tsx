@@ -16,19 +16,35 @@ export default function EntregablesChart({ aprobados, pendientes, rechazados }: 
   ];
 
   return (
-    <div className="bg-[#2b2b30] p-6 rounded-xl border border-[#3a3a40] shadow">
-      <h2 className="text-[#fffef9] font-semibold mb-1">Entregables</h2>
-      <p className="text-xs text-[#fffef9]/40 mb-4">Estado de aprobación de entregables.</p>
+    <div className="rounded-2xl bg-[var(--ss-surface)] border border-[var(--ss-border)] shadow-sm p-6">
+      <h2 className="font-semibold text-[var(--ss-text)] mb-0.5">Entregables</h2>
+      <p className="text-xs text-[var(--ss-text3)] mb-5">Estado de aprobación de entregables.</p>
       <div className="h-48">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} barGap={4}>
-            <XAxis dataKey="name" tick={{ fill: "#fffef9", fontSize: 11, opacity: 0.6 }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fill: "#fffef9", fontSize: 11, opacity: 0.6 }} axisLine={false} tickLine={false} allowDecimals={false} />
-            <Tooltip
-              contentStyle={{ backgroundColor: "#1f1f24", border: "1px solid #4a474840", borderRadius: 8, color: "#fffef9", fontSize: 12 }}
-              cursor={{ fill: "#ffffff08" }}
+            <XAxis
+              dataKey="name"
+              tick={{ fill: "#94a3b8", fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
             />
-            <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+            <YAxis
+              tick={{ fill: "#94a3b8", fontSize: 11 }}
+              axisLine={false}
+              tickLine={false}
+              allowDecimals={false}
+            />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: "var(--ss-raised)",
+                border: "1px solid var(--ss-border)",
+                borderRadius: 12,
+                color: "var(--ss-text)",
+                fontSize: 12,
+              }}
+              cursor={{ fill: "var(--ss-overlay)" }}
+            />
+            <Bar dataKey="value" radius={[6, 6, 0, 0]}>
               {data.map((entry, i) => (
                 <Cell key={i} fill={entry.color} />
               ))}

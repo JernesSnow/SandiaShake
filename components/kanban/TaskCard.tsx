@@ -1,4 +1,3 @@
-// components/kanban/TaskCard.tsx
 "use client";
 
 import React from "react";
@@ -13,34 +12,19 @@ type Props = {
 export function TaskCard({ task, onOpenDetails, onOpenChat }: Props) {
   return (
     <div
-      className="
-        bg-white 
-        rounded-xl 
-        border 
-        border-[#e8e5dd]
-        p-4 
-        shadow-sm 
-        hover:shadow-md 
-        transition-all 
-        duration-200
-        cursor-pointer
-      "
-      onClick={() => onOpenDetails?.(task)} 
+      className="bg-[var(--ss-surface)] rounded-xl border border-[var(--ss-border)] p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer"
+      onClick={() => onOpenDetails?.(task)}
     >
-
       <div className="flex items-start justify-between gap-2">
-        <h3 className="font-semibold text-sm text-[#2e2e2e] mb-1">
+        <h3 className="font-semibold text-sm text-[var(--ss-text)] mb-1">
           {task.title}
         </h3>
 
         {onOpenChat && (
           <button
             type="button"
-            onClick={(e) => {
-              e.stopPropagation(); 
-              onOpenChat(task);
-            }}
-            className="text-xs flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 hover:bg-gray-100"
+            onClick={(e) => { e.stopPropagation(); onOpenChat(task); }}
+            className="text-xs flex items-center gap-1 px-2 py-1 rounded-xl border border-[var(--ss-border)] hover:bg-[var(--ss-raised)] text-[var(--ss-text2)]"
             title="Abrir conversación"
           >
             <MessageCircle size={14} />
@@ -49,12 +33,12 @@ export function TaskCard({ task, onOpenDetails, onOpenChat }: Props) {
         )}
       </div>
 
-      <div className="text-xs text-[#666] flex items-center gap-1 mb-2">
+      <div className="text-xs text-[var(--ss-text2)] flex items-center gap-1 mb-2">
         <User size={12} />
         {task.cliente} — {task.asignado}
       </div>
 
-      <div className="text-xs text-[#666] flex items-center gap-1 mb-2">
+      <div className="text-xs text-[var(--ss-text2)] flex items-center gap-1 mb-2">
         <Calendar size={12} />
         {task.fecha}
       </div>
@@ -64,7 +48,7 @@ export function TaskCard({ task, onOpenDetails, onOpenChat }: Props) {
           href={task.drive}
           target="_blank"
           onClick={(e) => e.stopPropagation()}
-          className="text-xs flex items-center gap-1 text-[#5c5aff] hover:underline"
+          className="text-xs flex items-center gap-1 text-[#6cbe45] hover:underline"
         >
           <LinkIcon size={12} />
           Drive
@@ -73,16 +57,13 @@ export function TaskCard({ task, onOpenDetails, onOpenChat }: Props) {
 
       {task.prioridad && (
         <span
-          className={`
-            inline-block mt-3 px-2 py-1 text-xs rounded-full
-            ${
-              task.prioridad === "Alta"
-                ? "bg-red-100 text-red-700 border border-red-200"
-                : task.prioridad === "Media"
-                ? "bg-yellow-100 text-yellow-700 border border-yellow-200"
-                : "bg-green-100 text-green-700 border border-green-200"
-            }
-          `}
+          className={`inline-block mt-3 px-2 py-1 text-xs rounded-full ${
+            task.prioridad === "Alta"
+              ? "bg-[#ee2346]/15 text-[#ee2346] border border-[#ee2346]/40"
+              : task.prioridad === "Media"
+              ? "bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/40"
+              : "bg-[#6cbe45]/15 text-[#4a8c2a] dark:text-[#b9f7a6] border border-[#6cbe45]/40"
+          }`}
         >
           {task.prioridad}
         </span>

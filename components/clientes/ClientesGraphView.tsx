@@ -61,12 +61,12 @@ async function safeJson(res: Response) {
 
 const getEstadoClasses = (estado: Client["estado"]) => {
   if (estado === "Activo") {
-    return "bg-[#6cbe45]/20 text-[#b9f7a6] border border-[#6cbe45]/50";
+    return "bg-[#6cbe45]/15 text-[#6cbe45] border border-[#6cbe45]/40";
   }
   if (estado === "Moroso") {
-    return "bg-[#ee2346]/20 text-[#ffb3c2] border border-[#ee2346]/60";
+    return "bg-[#ee2346]/15 text-[#ee2346] border border-[#ee2346]/40";
   }
-  return "bg-[#4b5563]/40 text-[#e5e7eb] border border-[#9ca3af]/40";
+  return "bg-[var(--ss-overlay)] text-[var(--ss-text2)] border border-[var(--ss-border)]";
 };
 
 function mapEstadoFromAPI(o: any): Client["estado"] {
@@ -101,19 +101,19 @@ function Modal({
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 px-4 flex items-center justify-center">
-      <div className="w-full max-w-2xl rounded-xl bg-[#333132] border border-[#4a4748]/40 shadow-lg overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#4a4748]/30 flex items-start justify-between gap-3">
+    <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm px-4 flex items-center justify-center">
+      <div className="w-full max-w-2xl rounded-2xl bg-[var(--ss-surface)] border border-[var(--ss-border)] shadow-2xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-[var(--ss-border)] flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-white font-semibold">{title}</h3>
+            <h3 className="text-[var(--ss-text)] font-semibold">{title}</h3>
             {subtitle && (
-              <p className="text-xs text-[#fffef9]/60 mt-1">{subtitle}</p>
+              <p className="text-xs text-[var(--ss-text3)] mt-1">{subtitle}</p>
             )}
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="text-[#fffef9]/70 hover:text-white transition"
+            className="text-[var(--ss-text3)] hover:text-[var(--ss-text)] transition p-1 rounded-lg hover:bg-[var(--ss-overlay)]"
             aria-label="Cerrar"
           >
             <X size={18} />
@@ -123,7 +123,7 @@ function Modal({
         <div className="p-5">{children}</div>
 
         {footer && (
-          <div className="px-5 py-4 border-t border-[#4a4748]/30 flex flex-wrap justify-end gap-2">
+          <div className="px-5 py-4 border-t border-[var(--ss-border)] flex flex-wrap justify-end gap-2">
             {footer}
           </div>
         )}
@@ -136,6 +136,7 @@ export function ClientesGraphView() {
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState("");
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isColab, setIsColab] = useState(false);
   const [loading, setLoading] = useState(true);
   const [clients, setClients] = useState<Client[]>([]);
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
@@ -177,7 +178,9 @@ export function ClientesGraphView() {
 
         const rol = String(jPerfil?.perfil?.rol ?? "").toUpperCase();
         const admin = rol === "ADMIN";
+        const colab = rol === "COLABORADOR";
         setIsAdmin(admin);
+        setIsColab(colab);
 
         const rOrgs = await fetch("/api/admin/organizaciones");
         const jOrgs = await safeJson(rOrgs);
@@ -203,13 +206,14 @@ export function ClientesGraphView() {
           descripcion: o?.descripcion ?? "",
         }));
 
-        if (!admin) {
+        if (!admin && !colab) {
           setClients(baseClients);
           setColaboradores([]);
           return;
         }
 
-        const rColabs = await fetch("/api/admin/colaboradores");
+        // ADMIN uses the full admin endpoint; COLABORADOR uses the read-only one
+        const rColabs = await fetch(admin ? "/api/admin/colaboradores" : "/api/colaboradores");
         const jColabs = await safeJson(rColabs);
 
         if (!rColabs.ok) {
@@ -324,16 +328,16 @@ export function ClientesGraphView() {
   }, [clients, searchTerm]);
 
   const activeColaboradores = useMemo(() => {
-    if (!isAdmin) return [];
+    if (!isAdmin && !isColab) return [];
     return colaboradores.filter((colab) =>
       filteredClients.some((client) =>
         (client.colaboradores ?? []).includes(colab.nombre)
       )
     );
-  }, [colaboradores, filteredClients, isAdmin]);
+  }, [colaboradores, filteredClients, isAdmin, isColab]);
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!isAdmin && !isColab) {
       setConnections([]);
       return;
     }
@@ -357,7 +361,7 @@ export function ClientesGraphView() {
     });
 
     setConnections(newConnections);
-  }, [filteredClients, activeColaboradores, isAdmin]);
+  }, [filteredClients, activeColaboradores, isAdmin, isColab]);
 
   const [, forceTick] = useState(0);
   useEffect(() => {
@@ -375,7 +379,7 @@ export function ClientesGraphView() {
 
   const getConnectionColor = (clientId: string, colaboradorNombre: string) => {
     const key = `${clientId}-${colaboradorNombre}`;
-    return hoveredConnections.has(key) ? "#ee2346" : "#4a4748";
+    return hoveredConnections.has(key) ? "#ee2346" : "#94a3b8";
   };
 
   const getConnectionOpacity = (clientId: string, colaboradorNombre: string) => {
@@ -521,41 +525,43 @@ export function ClientesGraphView() {
 
   if (loading) {
     return (
-      <div className="w-full flex flex-col gap-4 text-[#fffef9]">
-        <div className="bg-[#3d3b3c] border border-[#4a4748]/40 rounded-xl p-6">
-          <p className="text-sm text-[#fffef9]/70">Cargando clientes...</p>
+      <div className="w-full flex flex-col gap-4 text-[var(--ss-text)]">
+        <div className="bg-[var(--ss-surface)] border border-[var(--ss-border)] rounded-xl p-6">
+          <p className="text-sm text-[var(--ss-text2)]">Cargando clientes...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="w-full flex flex-col gap-4 text-[#fffef9]">
+    <div className="w-full flex flex-col gap-4 text-[var(--ss-text)]">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-[#fffef9] mb-1">
+          <h1 className="text-2xl font-bold text-[var(--ss-text)] mb-1">
             Relación Clientes - Colaboradores
           </h1>
-          <p className="text-xs text-[#fffef9]/60">
+          <p className="text-xs text-[var(--ss-text2)]">
             {isAdmin
               ? "Asigna colaboradores a clientes desde aquí y revisa detalles por tarjeta."
+              : isColab
+              ? "Visualiza los clientes y sus colaboradores asignados."
               : "Visualiza las organizaciones con las que estás trabajando."}
           </p>
         </div>
 
         {/* Search */}
         <div className="w-full md:w-64">
-          <label className="text-xs font-medium text-[#fffef9]/80 block mb-1">
+          <label className="text-xs font-medium text-[var(--ss-text2)] block mb-1">
             Buscar cliente
           </label>
           <div className="relative">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-[#fffef9]/40">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-[var(--ss-text)]/40">
               <Search size={14} />
             </span>
             <input
               type="text"
-              className="w-full rounded-md px-3 py-2 pl-8 text-sm bg-[#3d3b3c] text-[#fffef9] border border-[#4a4748]/40 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+              className="w-full rounded-xl px-3 py-2 pl-8 text-sm bg-[var(--ss-input)] text-[var(--ss-text)] border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#ee2346]/20 focus:border-[#ee2346]/60 transition"
               placeholder="Buscar cliente..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -565,18 +571,18 @@ export function ClientesGraphView() {
       </div>
 
       {/* Graph box */}
-      <div className="relative w-full bg-[#3d3b3c] border border-[#4a4748]/40 rounded-xl p-6 min-h-[600px]">
+      <div className="relative w-full bg-[var(--ss-surface)] border border-[var(--ss-border)] rounded-2xl p-6 min-h-[600px]">
         <div
           className={cx(
             "grid gap-8 h-full",
-            isAdmin ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+            (isAdmin || isColab) ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
           )}
         >
           {/* Clients column */}
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2 mb-2">
               <Briefcase size={16} className="text-[#ee2346]" />
-              <h2 className="text-sm font-semibold uppercase tracking-wide text-[#fffef9]">
+              <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ss-text)]">
                 Clientes ({filteredClients.length})
               </h2>
             </div>
@@ -588,10 +594,10 @@ export function ClientesGraphView() {
                   ref={(el) => {
                     clientRefs.current[index] = el;
                   }}
-                  className="bg-[#333132] border border-[#4a4748]/40 rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-200 hover:border-[#ee2346]/40 cursor-pointer"
+                  className="bg-[var(--ss-surface)] border border-[var(--ss-border)] rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200 hover:border-[#ee2346]/40 cursor-pointer"
                   onClick={() => openClientDetails(client)}
                   onMouseEnter={() => {
-                    if (!isAdmin) return;
+                    if (!isAdmin && !isColab) return;
                     const set = new Set<string>();
                     (client.colaboradores ?? []).forEach((colab) =>
                       set.add(`${client.id}-${colab}`)
@@ -603,11 +609,11 @@ export function ClientesGraphView() {
                   {/* Top row: name + asignar button */}
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-sm font-semibold text-[#fffef9] mb-0.5 break-words">
+                      <h3 className="text-sm font-semibold text-[var(--ss-text)] mb-0.5 break-words">
                         {client.nombre}
                       </h3>
                       {client.email ? (
-                        <p className="text-xs text-[#fffef9]/60 break-all">
+                        <p className="text-xs text-[var(--ss-text2)] break-all">
                           {client.email}
                         </p>
                       ) : null}
@@ -620,7 +626,7 @@ export function ClientesGraphView() {
                           e.stopPropagation();
                           openAssignModal(client);
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-md px-3 py-2 text-[11px] font-semibold bg-[#ee2346] hover:bg-[#d8203f] text-white transition shrink-0"
+                        className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-semibold bg-[#ee2346] hover:bg-[#d8203f] text-white transition shrink-0"
                         title="Asignar colaboradores"
                       >
                         <Users size={14} />
@@ -632,16 +638,16 @@ export function ClientesGraphView() {
                   {/* Bottom row: plan, estado badge, colaboradores count */}
                   <div className="flex flex-wrap items-center gap-2 mt-3">
                     {client.plan ? (
-                      <span className="text-xs text-[#fffef9]/70">
+                      <span className="text-xs text-[var(--ss-text2)]">
                         Plan: {client.plan}
                       </span>
                     ) : (
-                      <span className="text-xs text-[#fffef9]/50">
+                      <span className="text-xs text-[var(--ss-text3)]">
                         Organización
                       </span>
                     )}
 
-                    <span className="text-[#fffef9]/20 hidden sm:inline">·</span>
+                    <span className="text-[var(--ss-border)] hidden sm:inline">·</span>
 
                     <span
                       className={`px-2.5 py-1 rounded-full text-[10px] font-medium shrink-0 ${getEstadoClasses(
@@ -651,10 +657,10 @@ export function ClientesGraphView() {
                       {client.estado}
                     </span>
 
-                    {isAdmin && (
+                    {(isAdmin || isColab) && (
                       <>
-                        <span className="text-[#fffef9]/20 hidden sm:inline">·</span>
-                        <span className="text-[11px] text-[#fffef9]/50">
+                        <span className="text-[var(--ss-border)] hidden sm:inline">·</span>
+                        <span className="text-[11px] text-[var(--ss-text3)]">
                           {(client.colaboradores ?? []).length} colaborador
                           {(client.colaboradores ?? []).length !== 1 ? "es" : ""}
                         </span>
@@ -665,7 +671,7 @@ export function ClientesGraphView() {
               ))}
 
               {filteredClients.length === 0 && (
-                <p className="text-sm text-[#fffef9]/60">
+                <p className="text-sm text-[var(--ss-text2)]">
                   No hay organizaciones que coincidan con la búsqueda.
                 </p>
               )}
@@ -673,11 +679,11 @@ export function ClientesGraphView() {
           </div>
 
           {/* Collaborators column */}
-          {isAdmin && (
+          {(isAdmin || isColab) && (
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-2 mb-2">
                 <User size={16} className="text-[#6cbe45]" />
-                <h2 className="text-sm font-semibold uppercase tracking-wide text-[#fffef9]">
+                <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--ss-text)]">
                   Colaboradores ({activeColaboradores.length})
                 </h2>
               </div>
@@ -694,7 +700,7 @@ export function ClientesGraphView() {
                       ref={(el) => {
                         colaboradorRefs.current[index] = el;
                       }}
-                      className="bg-[#333132] border border-[#4a4748]/40 rounded-lg p-4 shadow-sm hover:shadow-md transition-all duration-200 hover:border-[#6cbe45]/40 cursor-pointer"
+                      className="bg-[var(--ss-surface)] border border-[var(--ss-border)] rounded-xl p-4 shadow-sm hover:shadow-md transition-all duration-200 hover:border-[#6cbe45]/40 cursor-pointer"
                       onClick={() => openColabDetails(colaborador)}
                       onMouseEnter={() => {
                         const set = new Set<string>();
@@ -711,15 +717,15 @@ export function ClientesGraphView() {
                       }}
                       onMouseLeave={() => setHoveredConnections(new Set())}
                     >
-                      <h3 className="text-sm font-semibold text-[#fffef9] mb-1">
+                      <h3 className="text-sm font-semibold text-[var(--ss-text)] mb-1">
                         {colaborador.nombre}
                       </h3>
-                      <p className="text-xs text-[#fffef9]/60 mb-2">
+                      <p className="text-xs text-[var(--ss-text2)] mb-2">
                         {colaborador.rol}
                       </p>
 
-                      <div className="mt-2 pt-2 border-t border-[#4a4748]/40">
-                        <span className="text-xs text-[#fffef9]/50">
+                      <div className="mt-2 pt-2 border-t border-[var(--ss-border)]">
+                        <span className="text-xs text-[var(--ss-text3)]">
                           {clientCount} cliente{clientCount !== 1 ? "s" : ""}
                         </span>
                       </div>
@@ -728,7 +734,7 @@ export function ClientesGraphView() {
                 })}
 
                 {activeColaboradores.length === 0 && (
-                  <p className="text-sm text-[#fffef9]/60">
+                  <p className="text-sm text-[var(--ss-text2)]">
                     No hay colaboradores relacionados con las organizaciones
                     filtradas.
                   </p>
@@ -739,7 +745,7 @@ export function ClientesGraphView() {
         </div>
 
         {/* SVG overlay — hidden on mobile where columns stack */}
-        {isAdmin && (
+        {(isAdmin || isColab) && (
           <svg
             className="absolute inset-0 pointer-events-none hidden md:block"
             style={{ width: "100%", height: "100%" }}
@@ -802,29 +808,27 @@ export function ClientesGraphView() {
         )}
       </div>
 
-      {isAdmin && (
-        <div className="bg-[#3d3b3c] border border-[#4a4748]/40 rounded-lg p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-[#fffef9] mb-2">
+      {(isAdmin || isColab) && (
+        <div className="bg-[var(--ss-surface)] border border-[var(--ss-border)] rounded-xl p-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--ss-text3)] mb-2">
             Leyenda
           </h3>
           <div className="flex flex-wrap gap-4 text-xs">
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-[#6cbe45]/20 border border-[#6cbe45]/50 rounded" />
-              <span className="text-[#fffef9]/70">Cliente Activo</span>
+              <div className="w-3 h-3 bg-[#6cbe45]/15 border border-[#6cbe45]/40 rounded" />
+              <span className="text-[var(--ss-text2)]">Cliente Activo</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-[#ee2346]/20 border border-[#ee2346]/60 rounded" />
-              <span className="text-[#fffef9]/70">Cliente Moroso</span>
+              <div className="w-3 h-3 bg-[#ee2346]/15 border border-[#ee2346]/40 rounded" />
+              <span className="text-[var(--ss-text2)]">Cliente Moroso</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-[#4b5563]/40 border border-[#9ca3af]/40 rounded" />
-              <span className="text-[#fffef9]/70">Cliente Inactivo</span>
+              <div className="w-3 h-3 bg-[var(--ss-overlay)] border border-[var(--ss-border)] rounded" />
+              <span className="text-[var(--ss-text2)]">Cliente Inactivo</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-8 h-0.5 bg-[#ee2346]" />
-              <span className="text-[#fffef9]/70">
-                Conexión (hover para resaltar)
-              </span>
+              <span className="text-[var(--ss-text2)]">Conexión (hover para resaltar)</span>
             </div>
           </div>
         </div>
@@ -841,7 +845,7 @@ export function ClientesGraphView() {
               <button
                 type="button"
                 onClick={() => setSelectedClient(null)}
-                className="rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm text-[#fffef9]/80 hover:text-white hover:bg-[#3a3738] transition"
+                className="rounded-xl border border-[var(--ss-border)] px-3 py-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-overlay)] transition"
               >
                 Cerrar
               </button>
@@ -854,7 +858,7 @@ export function ClientesGraphView() {
                     setSelectedClient(null);
                     openAssignModal(client);
                   }}
-                  className="rounded-md bg-[#ee2346] hover:bg-[#d8203f] px-3 py-2 text-sm font-semibold text-white transition inline-flex items-center gap-1.5"
+                  className="rounded-xl bg-[#ee2346] hover:bg-[#d8203f] px-3 py-2 text-sm font-semibold text-white transition inline-flex items-center gap-1.5"
                 >
                   <Users size={16} className="shrink-0" />
                   <span className="hidden sm:inline">
@@ -867,9 +871,9 @@ export function ClientesGraphView() {
           }
         >
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-4">
+            <div className="rounded-lg bg-[var(--ss-raised)] border border-[var(--ss-border)] p-4">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#fffef9]/60">Estado</span>
+                <span className="text-xs text-[var(--ss-text2)]">Estado</span>
                 <span
                   className={cx(
                     "px-2 py-0.5 rounded-full text-[10px] font-medium",
@@ -880,54 +884,54 @@ export function ClientesGraphView() {
                 </span>
               </div>
 
-              <div className="mt-3 text-xs text-[#fffef9]/70 space-y-1">
+              <div className="mt-3 text-xs text-[var(--ss-text2)] space-y-1">
                 {!!selectedClient.pais && (
                   <p>
-                    <span className="text-[#fffef9]/50">País:</span>{" "}
+                    <span className="text-[var(--ss-text3)]">País:</span>{" "}
                     {selectedClient.pais}
                   </p>
                 )}
                 {!!selectedClient.ciudad && (
                   <p>
-                    <span className="text-[#fffef9]/50">Ciudad:</span>{" "}
+                    <span className="text-[var(--ss-text3)]">Ciudad:</span>{" "}
                     {selectedClient.ciudad}
                   </p>
                 )}
                 {!!selectedClient.canton && (
                   <p>
-                    <span className="text-[#fffef9]/50">Cantón:</span>{" "}
+                    <span className="text-[var(--ss-text3)]">Cantón:</span>{" "}
                     {selectedClient.canton}
                   </p>
                 )}
                 {!!selectedClient.telefono && (
                   <p>
-                    <span className="text-[#fffef9]/50">Teléfono:</span>{" "}
+                    <span className="text-[var(--ss-text3)]">Teléfono:</span>{" "}
                     {selectedClient.telefono}
                   </p>
                 )}
                 {!!selectedClient.correo && (
                   <p>
-                    <span className="text-[#fffef9]/50">Correo:</span>{" "}
+                    <span className="text-[var(--ss-text3)]">Correo:</span>{" "}
                     {selectedClient.correo}
                   </p>
                 )}
               </div>
             </div>
 
-            <div className="rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-4">
-              <div className="text-xs text-[#fffef9]/60 mb-2">Descripción</div>
-              <p className="text-sm text-[#fffef9]/75">
+            <div className="rounded-lg bg-[var(--ss-raised)] border border-[var(--ss-border)] p-4">
+              <div className="text-xs text-[var(--ss-text2)] mb-2">Descripción</div>
+              <p className="text-sm text-[var(--ss-text)]/75">
                 {selectedClient.descripcion ? selectedClient.descripcion : "—"}
               </p>
             </div>
           </div>
 
           {/* Tareas */}
-          <div className="mt-4 rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-4">
+          <div className="mt-4 rounded-lg bg-[var(--ss-raised)] border border-[var(--ss-border)] p-4">
             <div className="flex items-center justify-between mb-2">
-              <div className="text-xs text-[#fffef9]/60">Tareas</div>
+              <div className="text-xs text-[var(--ss-text2)]">Tareas</div>
               {clientTasksLoading ? (
-                <span className="text-[11px] text-[#fffef9]/50">
+                <span className="text-[11px] text-[var(--ss-text3)]">
                   Cargando…
                 </span>
               ) : null}
@@ -946,7 +950,7 @@ export function ClientesGraphView() {
 
                 if (pendientes.length === 0) {
                   return (
-                    <p className="text-sm text-[#fffef9]/70">
+                    <p className="text-sm text-[var(--ss-text2)]">
                       No hay pendientes.
                     </p>
                   );
@@ -957,19 +961,19 @@ export function ClientesGraphView() {
                     {pendientes.map((t) => (
                       <div
                         key={String(t.id_tarea)}
-                        className="rounded-md border border-[#4a4748]/40 bg-[#333132] px-3 py-2"
+                        className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-3 py-2"
                       >
                         <div className="flex flex-wrap items-center justify-between gap-1">
-                          <div className="text-sm font-semibold text-[#fffef9] min-w-0 break-words">
+                          <div className="text-sm font-semibold text-[var(--ss-text)] min-w-0 break-words">
                             {t.titulo}
                           </div>
-                          <span className="text-[11px] text-[#fffef9]/60 shrink-0">
+                          <span className="text-[11px] text-[var(--ss-text2)] shrink-0">
                             {t.prioridad} • {t.status_kanban}
                           </span>
                         </div>
 
-                        <div className="mt-1 text-xs text-[#fffef9]/60">
-                          <span className="text-[#fffef9]/50">
+                        <div className="mt-1 text-xs text-[var(--ss-text2)]">
+                          <span className="text-[var(--ss-text3)]">
                             Entregable:
                           </span>{" "}
                           {t.tipo_entregable}
@@ -977,7 +981,7 @@ export function ClientesGraphView() {
                             <>
                               {" "}
                               •{" "}
-                              <span className="text-[#fffef9]/50">
+                              <span className="text-[var(--ss-text3)]">
                                 Entrega:
                               </span>{" "}
                               {fmtDate(t.fecha_entrega)}
@@ -986,7 +990,7 @@ export function ClientesGraphView() {
                         </div>
 
                         {t.descripcion ? (
-                          <div className="mt-1 text-xs text-[#fffef9]/70">
+                          <div className="mt-1 text-xs text-[var(--ss-text2)]">
                             {t.descripcion}
                           </div>
                         ) : null}
@@ -1010,21 +1014,21 @@ export function ClientesGraphView() {
             <button
               type="button"
               onClick={() => setSelectedColab(null)}
-              className="rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm text-[#fffef9]/80 hover:text-white hover:bg-[#3a3738] transition"
+              className="rounded-xl border border-[var(--ss-border)] px-3 py-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-overlay)] transition"
             >
               Cerrar
             </button>
           }
         >
-          <div className="rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-4">
-            <div className="text-xs text-[#fffef9]/60 mb-2">
+          <div className="rounded-lg bg-[var(--ss-raised)] border border-[var(--ss-border)] p-4">
+            <div className="text-xs text-[var(--ss-text2)] mb-2">
               Clientes asignados
             </div>
 
             {filteredClients.filter((c) =>
               (c.colaboradores ?? []).includes(selectedColab.nombre)
             ).length === 0 ? (
-              <p className="text-sm text-[#fffef9]/70">
+              <p className="text-sm text-[var(--ss-text2)]">
                 No tiene clientes asignados (según el filtro actual).
               </p>
             ) : (
@@ -1036,10 +1040,10 @@ export function ClientesGraphView() {
                   .map((c) => (
                     <div
                       key={c.id}
-                      className="rounded-md border border-[#4a4748]/40 bg-[#333132] px-3 py-2"
+                      className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-3 py-2"
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold text-[#fffef9]">
+                        <span className="text-sm font-semibold text-[var(--ss-text)]">
                           {c.nombre}
                         </span>
                         <span
@@ -1051,7 +1055,7 @@ export function ClientesGraphView() {
                           {c.estado}
                         </span>
                       </div>
-                      <p className="text-xs text-[#fffef9]/60">
+                      <p className="text-xs text-[var(--ss-text2)]">
                         {c.plan ? c.plan : "Organización"}
                       </p>
                     </div>
@@ -1079,14 +1083,14 @@ export function ClientesGraphView() {
                   setAssigningClient(null);
                   setDraftAssignedIds([]);
                 }}
-                className="rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm text-[#fffef9]/80 hover:text-white hover:bg-[#3a3738] transition"
+                className="rounded-xl border border-[var(--ss-border)] px-3 py-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-overlay)] transition"
               >
                 Cancelar
               </button>
               <button
                 type="button"
                 onClick={saveAssignments}
-                className="rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] px-3 py-2 text-sm font-semibold text-white transition inline-flex items-center gap-2"
+                className="rounded-xl bg-[#6cbe45] hover:bg-[#5fa93d] px-3 py-2 text-sm font-semibold text-white transition inline-flex items-center gap-2"
               >
                 <Check size={16} />
                 Guardar
@@ -1094,8 +1098,8 @@ export function ClientesGraphView() {
             </>
           }
         >
-          <div className="rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-4">
-            <p className="text-xs text-[#fffef9]/60 mb-3">
+          <div className="rounded-lg bg-[var(--ss-raised)] border border-[var(--ss-border)] p-4">
+            <p className="text-xs text-[var(--ss-text2)] mb-3">
               Selecciona uno o más colaboradores
             </p>
 
@@ -1108,17 +1112,17 @@ export function ClientesGraphView() {
                     key={c.id}
                     onClick={() => toggleDraftColabId(c.id)}
                     className={cx(
-                      "rounded-lg border p-3 text-left transition flex items-start justify-between gap-2",
+                      "rounded-xl border p-3 text-left transition flex items-start justify-between gap-2",
                       checked
-                        ? "border-[#6cbe45]/50 bg-[#6cbe45]/10"
-                        : "border-[#4a4748]/40 bg-[#333132] hover:bg-[#3a3738]"
+                        ? "border-[#6cbe45]/40 bg-[#6cbe45]/10"
+                        : "border-[var(--ss-border)] bg-[var(--ss-raised)] hover:bg-[var(--ss-overlay)]"
                     )}
                   >
                     <div>
-                      <div className="text-sm font-semibold text-[#fffef9]">
+                      <div className="text-sm font-semibold text-[var(--ss-text)]">
                         {c.nombre}
                       </div>
-                      <div className="text-xs text-[#fffef9]/60">{c.rol}</div>
+                      <div className="text-xs text-[var(--ss-text2)]">{c.rol}</div>
                     </div>
 
                     <span
@@ -1126,7 +1130,7 @@ export function ClientesGraphView() {
                         "mt-1 inline-flex items-center justify-center w-5 h-5 rounded-full border text-[10px]",
                         checked
                           ? "border-[#6cbe45]/60 bg-[#6cbe45]/20 text-[#6cbe45]"
-                          : "border-[#4a4748]/60 text-[#fffef9]/50"
+                          : "border-[var(--ss-border)] text-[var(--ss-text3)]"
                       )}
                       aria-hidden="true"
                     >
@@ -1138,9 +1142,9 @@ export function ClientesGraphView() {
             </div>
 
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs">
-              <span className="text-[#fffef9]/60">
+              <span className="text-[var(--ss-text2)]">
                 Seleccionados:{" "}
-                <span className="text-[#fffef9]/80 font-semibold">
+                <span className="text-[var(--ss-text2)] font-semibold">
                   {draftAssignedIds.length}
                 </span>
               </span>
@@ -1148,7 +1152,7 @@ export function ClientesGraphView() {
               <button
                 type="button"
                 onClick={() => setDraftAssignedIds([])}
-                className="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[11px] font-semibold border border-[#4a4748]/40 text-[#fffef9]/70 hover:text-white hover:bg-[#3a3738] transition"
+                className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-[11px] font-semibold border border-[var(--ss-border)] text-[var(--ss-text2)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-overlay)] transition"
               >
                 <Plus size={14} />
                 Limpiar

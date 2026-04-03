@@ -1,6 +1,5 @@
 "use client";
 
-import { Shell } from "@/components/Shell";
 import { useEffect, useMemo, useState } from "react";
 
 type FacturaEstado = "PENDIENTE" | "PARCIAL" | "PAGADA" | "VENCIDA" | "ANULADA";
@@ -34,10 +33,10 @@ function cx(...classes: Array<string | false | undefined | null>) {
 function Badge({ estado }: { estado: FacturaEstado }) {
   const map: Record<FacturaEstado, { label: string; cls: string }> = {
     PAGADA: { label: "Pagada", cls: "bg-emerald-500/15 text-emerald-300 border border-emerald-400/40" },
-    PARCIAL: { label: "Parcial", cls: "bg-sky-500/15 text-sky-300 border border-sky-400/40" },
-    VENCIDA: { label: "Vencida", cls: "bg-[#ee2346]/15 text-[#fecaca] border border-[#ee2346]/60" },
-    ANULADA: { label: "Anulada", cls: "bg-zinc-700 text-zinc-300 border border-zinc-500" },
-    PENDIENTE: { label: "Pendiente", cls: "bg-zinc-700/60 text-zinc-200 border border-zinc-500/70" },
+    PARCIAL: { label: "Parcial", cls: "bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/40 dark:border-sky-400/40" },
+    VENCIDA: { label: "Vencida", cls: "bg-[#ee2346]/15 text-[#ee2346] border border-[#ee2346]/60" },
+    ANULADA: { label: "Anulada", cls: "bg-[var(--ss-raised)] text-[var(--ss-text2)] border border-[var(--ss-border)]" },
+    PENDIENTE: { label: "Pendiente", cls: "bg-[var(--ss-raised)] text-[var(--ss-text2)] border border-[var(--ss-border)]" },
   };
   const b = map[estado] ?? map.PENDIENTE;
 
@@ -61,16 +60,16 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 px-4 flex items-center justify-center">
-      <div className="w-full max-w-xl rounded-xl bg-[#333132] border border-[#4a4748]/40 shadow-lg overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#4a4748]/30 flex items-center justify-between">
-          <h3 className="text-white font-semibold">{title}</h3>
-          <button onClick={onClose} className="text-[#fffef9]/70 hover:text-white">✕</button>
+      <div className="w-full max-w-xl rounded-2xl bg-[var(--ss-surface)] border border-[var(--ss-border)] shadow-lg overflow-hidden">
+        <div className="px-5 py-4 border-b border-[var(--ss-border)] flex items-center justify-between">
+          <h3 className="text-[var(--ss-text)] font-semibold">{title}</h3>
+          <button onClick={onClose} className="text-[var(--ss-text2)] hover:text-[var(--ss-text)]">✕</button>
         </div>
 
         <div className="p-5">{children}</div>
 
         {footer && (
-          <div className="px-5 py-4 border-t border-[#4a4748]/30 flex justify-end gap-2">
+          <div className="px-5 py-4 border-t border-[var(--ss-border)] flex justify-end gap-2">
             {footer}
           </div>
         )}
@@ -141,20 +140,20 @@ export default function MisFacturasPage() {
   }
 
   return (
-    <Shell>
-    <div className="min-h-screen bg-[#252324] text-[#fffef9] p-6">
+    <>
+    <div className="min-h-screen bg-[var(--ss-bg)] text-[var(--ss-text)] p-6">
       <div className="max-w-6xl mx-auto flex flex-col gap-4">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
           <div>
             <h1 className="text-xl font-semibold">Mis facturas</h1>
-            <p className="text-xs text-[#fffef9]/60">
+            <p className="text-xs text-[var(--ss-text2)]">
               Revisa tus cobros, vencimientos y estado de pago.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
             <select
-              className="rounded-md bg-[#3d3b3c] text-xs px-3 py-2 border border-[#4a4748]/40 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+              className="rounded-xl bg-[var(--ss-input)] text-xs px-3 py-2 border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/20"
               value={filtro}
               onChange={(e) => setFiltro(e.target.value as Filtro)}
             >
@@ -166,7 +165,7 @@ export default function MisFacturasPage() {
             <button
               type="button"
               onClick={openPago}
-              className="inline-flex items-center gap-2 rounded-md bg-[#6cbe45] text-white px-3 py-2 text-xs font-medium hover:bg-[#5fa93d] active:scale-[.98]"
+              className="inline-flex items-center gap-2 rounded-xl bg-[#6cbe45] text-white px-3 py-2 text-xs font-medium hover:bg-[#5fa93d] active:scale-[.98]"
             >
               Cómo pagar
             </button>
@@ -175,19 +174,19 @@ export default function MisFacturasPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.3fr)] gap-4">
           {/* Left list */}
-          <div className="bg-[#333132] rounded-xl border border-[#4a4748]/50 shadow-sm overflow-hidden flex flex-col">
-            <div className="px-4 py-3 border-b border-[#4a4748]/60 flex items-center justify-between">
-              <span className="text-xs font-semibold tracking-wide uppercase text-[#fffef9]/70">
+          <div className="bg-[var(--ss-surface)] rounded-2xl border border-[var(--ss-border)] shadow-sm overflow-hidden flex flex-col">
+            <div className="px-4 py-3 border-b border-[var(--ss-border)] flex items-center justify-between">
+              <span className="text-xs font-semibold tracking-wide uppercase text-[var(--ss-text2)]">
                 Facturas
               </span>
-              <span className="text-[11px] text-[#fffef9]/50">
+              <span className="text-[11px] text-[var(--ss-text3)]">
                 {loading ? "Cargando..." : `${facturas.length} registros`}
               </span>
             </div>
 
-            <div className="divide-y divide-[#4a4748]/50 max-h-[65vh] overflow-y-auto">
+            <div className="divide-y divide-[var(--ss-border)] max-h-[65vh] overflow-y-auto">
               {!loading && facturas.length === 0 && (
-                <div className="px-4 py-6 text-xs text-[#fffef9]/60">
+                <div className="px-4 py-6 text-xs text-[var(--ss-text2)]">
                   No hay facturas para mostrar con este filtro.
                 </div>
               )}
@@ -200,18 +199,18 @@ export default function MisFacturasPage() {
                     type="button"
                     onClick={() => setSelectedId(f.id_factura)}
                     className={cx(
-                      "w-full text-left px-4 py-3 text-xs flex items-start justify-between gap-3 hover:bg-[#4a4748]/40",
-                      active && "bg-[#4a4748]/70"
+                      "w-full text-left px-4 py-3 text-xs flex items-start justify-between gap-3 hover:bg-[var(--ss-raised)]",
+                      active && "bg-[var(--ss-raised)]"
                     )}
                   >
                     <div className="flex flex-col">
                       <span className="font-semibold">
                         Factura #{f.id_factura}
                       </span>
-                      <span className="text-[11px] text-[#fffef9]/70">
+                      <span className="text-[11px] text-[var(--ss-text2)]">
                         Periodo: {f.periodo ?? "—"}
                       </span>
-                      <span className="text-[11px] text-[#fffef9]/50 mt-1">
+                      <span className="text-[11px] text-[var(--ss-text3)] mt-1">
                         Vence: {f.fecha_vencimiento ?? "—"}
                       </span>
                     </div>
@@ -220,7 +219,7 @@ export default function MisFacturasPage() {
                       <span className="text-[11px] font-medium">
                         Total: {formatCRC(f.total)}
                       </span>
-                      <span className="text-[11px] text-[#fffef9]/70">
+                      <span className="text-[11px] text-[var(--ss-text2)]">
                         Saldo: {formatCRC(f.saldo)}
                       </span>
                       <Badge estado={f.estado_factura} />
@@ -232,9 +231,9 @@ export default function MisFacturasPage() {
           </div>
 
           {/* Right detail */}
-          <div className="bg-[#333132] rounded-xl border border-[#4a4748]/50 shadow-sm p-4 md:p-5">
+          <div className="bg-[var(--ss-surface)] rounded-2xl border border-[var(--ss-border)] shadow-sm p-4 md:p-5">
             {!selected && (
-              <div className="text-xs text-[#fffef9]/60">
+              <div className="text-xs text-[var(--ss-text2)]">
                 Selecciona una factura para ver el detalle.
               </div>
             )}
@@ -246,7 +245,7 @@ export default function MisFacturasPage() {
                     <h2 className="text-sm font-semibold">
                       Factura #{selected.id_factura}
                     </h2>
-                    <p className="text-[11px] text-[#fffef9]/60">
+                    <p className="text-[11px] text-[var(--ss-text2)]">
                       Periodo: {selected.periodo ?? "—"}
                     </p>
                   </div>
@@ -256,7 +255,7 @@ export default function MisFacturasPage() {
                     <button
                       type="button"
                       onClick={openPago}
-                      className="rounded-md bg-[#4a4748] text-[#fffef9] px-3 py-2 text-xs font-medium hover:bg-[#5a5758] active:scale-[.98]"
+                      className="rounded-xl bg-[var(--ss-input)] text-[var(--ss-text)] px-3 py-2 text-xs font-medium hover:bg-[var(--ss-raised)] active:scale-[.98]"
                     >
                       Cómo pagar
                     </button>
@@ -264,30 +263,30 @@ export default function MisFacturasPage() {
                 </div>
 
                 <div className="grid gap-3 md:grid-cols-2 text-xs">
-                  <div className="rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-4">
-                    <div className="text-[11px] text-[#fffef9]/60">Total</div>
+                  <div className="rounded-xl bg-[var(--ss-raised)] border border-[var(--ss-border)] p-4">
+                    <div className="text-[11px] text-[var(--ss-text2)]">Total</div>
                     <div className="text-sm font-semibold">{formatCRC(selected.total)}</div>
                   </div>
 
-                  <div className="rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-4">
-                    <div className="text-[11px] text-[#fffef9]/60">Saldo</div>
+                  <div className="rounded-xl bg-[var(--ss-raised)] border border-[var(--ss-border)] p-4">
+                    <div className="text-[11px] text-[var(--ss-text2)]">Saldo</div>
                     <div className="text-sm font-semibold">{formatCRC(selected.saldo)}</div>
                   </div>
 
-                  <div className="rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-4 md:col-span-2">
-                    <div className="text-[11px] text-[#fffef9]/60">Vencimiento</div>
+                  <div className="rounded-xl bg-[var(--ss-raised)] border border-[var(--ss-border)] p-4 md:col-span-2">
+                    <div className="text-[11px] text-[var(--ss-text2)]">Vencimiento</div>
                     <div className="text-sm font-semibold">{selected.fecha_vencimiento ?? "—"}</div>
                   </div>
 
-                  <div className="rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-4 md:col-span-2">
-                    <div className="text-[11px] text-[#fffef9]/60">Fecha de emisión</div>
+                  <div className="rounded-xl bg-[var(--ss-raised)] border border-[var(--ss-border)] p-4 md:col-span-2">
+                    <div className="text-[11px] text-[var(--ss-text2)]">Fecha de emisión</div>
                     <div className="text-sm font-semibold">
                       {selected.created_at ? String(selected.created_at).slice(0, 10) : "—"}
                     </div>
                   </div>
                 </div>
 
-                <div className="text-[11px] text-[#fffef9]/60">
+                <div className="text-[11px] text-[var(--ss-text2)]">
                   Si tu factura está pendiente, podés pagar usando SINPE o transferencia y enviar el comprobante.
                 </div>
               </div>
@@ -304,23 +303,23 @@ export default function MisFacturasPage() {
             <button
               type="button"
               onClick={() => setPagoOpen(false)}
-              className="rounded-md bg-[#4a4748] px-3 py-2 text-sm text-[#fffef9]/90 hover:bg-[#5a5758]"
+              className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-sm text-[var(--ss-text)]/90 hover:bg-[var(--ss-raised)]"
             >
               Cerrar
             </button>
           }
         >
-          {pagoLoading && <p className="text-sm text-[#fffef9]/70">Cargando…</p>}
+          {pagoLoading && <p className="text-sm text-[var(--ss-text2)]">Cargando…</p>}
 
           {!pagoLoading && !pagoInfo && (
-            <p className="text-sm text-[#fffef9]/70">
+            <p className="text-sm text-[var(--ss-text2)]">
               No se pudo cargar la información de pago.
             </p>
           )}
 
           {!pagoLoading && pagoInfo && (
-            <div className="text-sm text-[#fffef9] space-y-2">
-              <p className="text-[#fffef9]/70">
+            <div className="text-sm text-[var(--ss-text)] space-y-2">
+              <p className="text-[var(--ss-text2)]">
                 Podés pagar con cualquiera de estos métodos. Luego enviá el comprobante.
               </p>
               <ul className="list-disc ml-5 space-y-1">
@@ -334,6 +333,6 @@ export default function MisFacturasPage() {
         </Modal>
       )}
     </div>
-    </Shell>
+    </>
   );
 }

@@ -100,11 +100,21 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       success: true,
       rol: perfil.rol,
       message: "Verificación exitosa",
     });
+
+    // Set a 24-hour MFA session cookie so the user won't be asked again
+    res.cookies.set("ss_mfa_ok", user.id, {
+      httpOnly: true,
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 24, // 24 hours
+    });
+
+    return res;
   } catch (error: any) {
     console.error("Verify MFA code error:", error);
     return NextResponse.json(
