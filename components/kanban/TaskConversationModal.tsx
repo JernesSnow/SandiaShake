@@ -219,7 +219,7 @@ export default function TaskConversationModal({
     const seen = Boolean(r.visto_por_otro);
 
     return (
-      <span className="ml-2 text-[11px] text-[#fffef9]/50">
+      <span className="ml-2 text-[11px] text-[var(--ss-text3)]">
         {seen ? "✓✓" : "✓"}
       </span>
     );
@@ -235,10 +235,10 @@ export default function TaskConversationModal({
       "max-w-[78%] rounded-2xl px-4 py-3 border shadow-sm";
 
     const bubbleMine =
-      "bg-white/10 border-white/10 text-[#fffef9]/95";
+      "bg-[var(--ss-raised)] border-[var(--ss-border)] text-[var(--ss-text)]";
 
     const bubbleOther =
-      "bg-black/25 border-white/10 text-[#fffef9]/95";
+      "bg-black/25 border-[var(--ss-border)] text-[var(--ss-text)]";
 
     const badge =
       meta?.kind === "APROBADO"
@@ -250,7 +250,7 @@ export default function TaskConversationModal({
     return (
       <div className={`flex ${container} py-2`}>
         <div className={`${bubbleBase} ${mine ? bubbleMine : bubbleOther}`}>
-          <div className="flex justify-between text-[12px] text-[#fffef9]/70">
+          <div className="flex justify-between text-[12px] text-[var(--ss-text2)]">
             <span>
               <b>{r.autor_nombre}</b> • {r.tipo_autor}
             </span>
@@ -284,7 +284,7 @@ export default function TaskConversationModal({
           <div className="flex flex-col">
             <h2 className={kanbanStyles.modalTitle}>Conversación</h2>
             {taskTitle && (
-              <p className="text-[12px] text-[#fffef9]/60 mt-1 line-clamp-1">
+              <p className="text-[12px] text-[var(--ss-text2)] mt-1 line-clamp-1">
                 {taskTitle}
               </p>
             )}
@@ -302,19 +302,19 @@ export default function TaskConversationModal({
 
         <div className="px-4 pb-4 flex flex-col flex-1">
           {loading ? (
-            <div className="text-sm text-[#fffef9]/60 mt-2">
+            <div className="text-sm text-[var(--ss-text2)] mt-2">
               Cargando conversación…
             </div>
           ) : err ? (
             <div className="text-sm text-[#ffb3c2] mt-2">{err}</div>
           ) : emptyText ? (
-            <div className="text-sm text-[#fffef9]/60 mt-2">
+            <div className="text-sm text-[var(--ss-text2)] mt-2">
               No existe un historial de conversación.
             </div>
           ) : (
             <div
               ref={listRef}
-              className={`mt-3 overflow-auto rounded-2xl border border-white/10 bg-white/5 p-3 ${
+              className={`mt-3 overflow-auto rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-raised)] p-3 ${
                 embedded ? "flex-1" : "max-h-[52vh]"
               }`}
             >
@@ -324,7 +324,7 @@ export default function TaskConversationModal({
             </div>
           )}
 
-          <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 p-3">
+          <div className="mt-3 rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-raised)] p-3">
             <div className="flex gap-2">
               <textarea
                 className={kanbanStyles.modalTextarea}

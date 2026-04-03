@@ -74,26 +74,26 @@ function badgeEstado(estado: FacturaEstado) {
     case "PARCIAL":
       return {
         label: "Parcial",
-        classes: "bg-sky-500/15 text-sky-300 border border-sky-400/40",
+        classes: "bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/40 dark:border-sky-400/40",
         icon: <Clock size={13} />,
       };
     case "VENCIDA":
       return {
         label: "Vencida",
-        classes: "bg-[#ee2346]/15 text-[#fecaca] border border-[#ee2346]/60",
+        classes: "bg-[#ee2346]/15 text-[#ee2346] border border-[#ee2346]/60",
         icon: <AlertTriangle size={13} />,
       };
     case "ANULADA":
       return {
         label: "Anulada",
-        classes: "bg-zinc-700 text-zinc-300 border border-zinc-500",
+        classes: "bg-[var(--ss-raised)] text-[var(--ss-text2)] border border-[var(--ss-border)]",
         icon: <X size={13} />,
       };
     case "PENDIENTE":
     default:
       return {
         label: "Pendiente",
-        classes: "bg-zinc-700/60 text-zinc-200 border border-zinc-500/70",
+        classes: "bg-[var(--ss-raised)] text-[var(--ss-text2)] border border-[var(--ss-border)]",
         icon: <Clock size={13} />,
       };
   }
@@ -118,19 +118,19 @@ function Modal({
 }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/60 px-4 flex items-center justify-center">
-      <div className="w-[85vw] max-w-6xl rounded-xl bg-[#333132] border border-[#4a4748]/40 shadow-lg overflow-hidden">
-        <div className="px-5 py-4 border-b border-[#4a4748]/30 flex items-start justify-between gap-3">
+      <div className="w-[85vw] max-w-6xl rounded-2xl bg-[var(--ss-surface)] border border-[var(--ss-border)] shadow-lg overflow-hidden">
+        <div className="px-5 py-4 border-b border-[var(--ss-border)] flex items-start justify-between gap-3">
           <div>
-            <h3 className="text-white font-semibold">{title}</h3>
+            <h3 className="text-[var(--ss-text)] font-semibold">{title}</h3>
             {subtitle && (
-              <p className="text-xs text-[#fffef9]/60 mt-1">{subtitle}</p>
+              <p className="text-xs text-[var(--ss-text2)] mt-1">{subtitle}</p>
             )}
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="text-[#fffef9]/70 hover:text-white transition"
+            className="text-[var(--ss-text2)] hover:text-[var(--ss-text)] transition"
             aria-label="Cerrar"
           >
             <X size={18} />
@@ -140,7 +140,7 @@ function Modal({
         <div className="p-5">{children}</div>
 
         {footer && (
-          <div className="px-5 py-4 border-t border-[#4a4748]/30 flex justify-end gap-2">
+          <div className="px-5 py-4 border-t border-[var(--ss-border)] flex justify-end gap-2">
             {footer}
           </div>
         )}
@@ -606,12 +606,12 @@ await enviarNotificacion("pago");
   }
 
   return (
-    <div className="flex flex-col gap-4 text-[#fffef9]">
+    <div className="flex flex-col gap-4 text-[var(--ss-text)]">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <div>
-          <h1 className="text-xl font-semibold text-[#fffef9]">Facturación</h1>
-          <p className="text-xs text-[#fffef9]/60">
+          <h1 className="text-xl font-semibold text-[var(--ss-text)]">Facturación</h1>
+          <p className="text-xs text-[var(--ss-text2)]">
             Aquí verás facturas pendientes y podrás registrar pagos (SINPE o transferencia).
           </p>
         </div>
@@ -619,17 +619,17 @@ await enviarNotificacion("pago");
         <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
           {/* Search */}
           <div className="relative">
-            <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-[#fffef9]/40">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-2 text-[var(--ss-text3)]">
               <Search size={14} />
             </span>
             <input
               type="text"
               placeholder="Buscar por cliente/periodo/id..."
               className="
-                w-full sm:w-72 rounded-md bg-[#3d3b3c] text-xs
+                w-full sm:w-72 rounded-xl bg-[var(--ss-input)] text-xs
                 pl-7 pr-3 py-2
-                border border-[#4a4748]/40
-                outline-none focus:ring-2 focus:ring-[#ee2346]/70
+                border border-[var(--ss-border)]
+                outline-none focus:ring-2 focus:ring-[#6cbe45]/20
               "
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -639,9 +639,9 @@ await enviarNotificacion("pago");
           {/* Status filter */}
           <select
             className="
-              rounded-md bg-[#3d3b3c] text-xs
-              px-3 py-2 border border-[#4a4748]/40
-              outline-none focus:ring-2 focus:ring-[#ee2346]/70
+              rounded-xl bg-[var(--ss-input)] text-xs
+              px-3 py-2 border border-[var(--ss-border)]
+              outline-none focus:ring-2 focus:ring-[#6cbe45]/20
             "
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
@@ -659,7 +659,7 @@ await enviarNotificacion("pago");
             type="button"
             onClick={openCreateModal}
             className="
-              inline-flex items-center gap-2 rounded-md
+              inline-flex items-center gap-2 rounded-xl
               bg-[#6cbe45] text-white px-3 py-2
               text-xs font-medium shadow-sm hover:bg-[#5fa93d]
               active:scale-[.98]
@@ -674,8 +674,8 @@ await enviarNotificacion("pago");
             onClick={openPagoModal}
             disabled={!selectedInvoice}
             className="
-              inline-flex items-center gap-2 rounded-md
-              bg-[#ee2346] text-[#fffef9] px-3 py-2
+              inline-flex items-center gap-2 rounded-xl
+              bg-[#ee2346] text-[var(--ss-text)] px-3 py-2
               text-xs font-medium shadow-sm hover:bg-[#d8203f]
               active:scale-[.98]
               disabled:opacity-60 disabled:cursor-not-allowed
@@ -695,22 +695,22 @@ await enviarNotificacion("pago");
         {/* LEFT: Invoice list */}
         <div
           className="
-            bg-[#333132] rounded-xl border border-[#4a4748]/50
+            bg-[var(--ss-surface)] rounded-2xl border border-[var(--ss-border)]
             shadow-sm overflow-hidden flex flex-col
           "
         >
-          <div className="px-4 py-3 border-b border-[#4a4748]/60 flex items-center justify-between">
-            <span className="text-xs font-semibold tracking-wide uppercase text-[#fffef9]/70">
+          <div className="px-4 py-3 border-b border-[var(--ss-border)] flex items-center justify-between">
+            <span className="text-xs font-semibold tracking-wide uppercase text-[var(--ss-text2)]">
               Facturas pendientes
             </span>
-            <span className="text-[11px] text-[#fffef9]/50">
+            <span className="text-[11px] text-[var(--ss-text3)]">
               {loading ? "Cargando..." : `${filteredInvoices.length} registros`}
             </span>
           </div>
 
-          <div className="divide-y divide-[#4a4748]/50 max-h-[60vh] overflow-y-auto dark-scroll">
+          <div className="divide-y divide-[var(--ss-border)] max-h-[60vh] overflow-y-auto dark-scroll">
             {!loading && filteredInvoices.length === 0 && (
-              <div className="px-4 py-6 text-xs text-[#fffef9]/60">
+              <div className="px-4 py-6 text-xs text-[var(--ss-text2)]">
                 No hay facturas pendientes de organizaciones.
               </div>
             )}
@@ -726,28 +726,28 @@ await enviarNotificacion("pago");
                   onClick={() => setSelectedId(inv.id_factura)}
                   className={cx(
                     "w-full text-left px-4 py-3 text-xs",
-                    "flex items-start justify-between gap-3 hover:bg-[#4a4748]/40",
-                    isActive && "bg-[#4a4748]/70"
+                    "flex items-start justify-between gap-3 hover:bg-[var(--ss-raised)]",
+                    isActive && "bg-[var(--ss-raised)]"
                   )}
                 >
                   <div className="flex flex-col">
-                    <span className="font-semibold text-[#fffef9]">
+                    <span className="font-semibold text-[var(--ss-text)]">
                       {inv.organizacion_nombre}
                     </span>
-                    <span className="text-[11px] text-[#fffef9]/70">
+                    <span className="text-[11px] text-[var(--ss-text2)]">
                       Periodo: {inv.periodo}
                     </span>
-                    <span className="text-[11px] text-[#fffef9]/50 mt-1">
+                    <span className="text-[11px] text-[var(--ss-text3)] mt-1">
                       ID factura: {inv.id_factura}
                       {inv.fecha_vencimiento ? ` · Vence: ${inv.fecha_vencimiento}` : ""}
                     </span>
                   </div>
 
                   <div className="flex flex-col items-end gap-1">
-                    <span className="text-[11px] font-medium text-[#fffef9]">
+                    <span className="text-[11px] font-medium text-[var(--ss-text)]">
                       Total: {formatCRC(inv.total)}
                     </span>
-                    <span className="text-[11px] text-[#fffef9]/70">
+                    <span className="text-[11px] text-[var(--ss-text2)]">
                       Saldo: {formatCRC(inv.saldo)}
                     </span>
                     <span
@@ -770,12 +770,12 @@ await enviarNotificacion("pago");
         {/* RIGHT: Detail */}
         <div
           className="
-            bg-[#333132] rounded-xl border border-[#4a4748]/50
+            bg-[var(--ss-surface)] rounded-2xl border border-[var(--ss-border)]
             shadow-sm p-4 md:p-5
           "
         >
           {!selectedInvoice && (
-            <div className="text-xs text-[#fffef9]/60">
+            <div className="text-xs text-[var(--ss-text2)]">
               Selecciona una factura de la lista para ver el detalle.
             </div>
           )}
@@ -784,10 +784,10 @@ await enviarNotificacion("pago");
             <div className="flex flex-col gap-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-semibold text-[#fffef9]">
+                  <h2 className="text-sm font-semibold text-[var(--ss-text)]">
                     {selectedInvoice.organizacion_nombre}
                   </h2>
-                  <p className="text-[11px] text-[#fffef9]/60">
+                  <p className="text-[11px] text-[var(--ss-text2)]">
                     Periodo {selectedInvoice.periodo} · Factura #{selectedInvoice.id_factura}
                   </p>
                 </div>
@@ -809,8 +809,8 @@ await enviarNotificacion("pago");
                       type="button"
                       onClick={openPagoModal}
                       className="
-                        inline-flex items-center gap-2 rounded-md
-                        bg-[#ee2346] text-[#fffef9] px-3 py-2
+                        inline-flex items-center gap-2 rounded-xl
+                        bg-[#ee2346] text-[var(--ss-text)] px-3 py-2
                         text-xs font-medium hover:bg-[#d8203f]
                         active:scale-[.98]
                       "
@@ -822,9 +822,9 @@ await enviarNotificacion("pago");
                       onClick={openEditModal}
                       disabled={!selectedInvoice}
                       className="
-                        inline-flex items-center gap-2 rounded-md
-                        bg-[#4a4748] text-[#fffef9] px-3 py-2
-                        text-xs font-medium hover:bg-[#5a5758]
+                        inline-flex items-center gap-2 rounded-xl
+                        bg-[var(--ss-input)] text-[var(--ss-text)] px-3 py-2
+                        text-xs font-medium hover:bg-[var(--ss-raised)]
                         active:scale-[.98]
                         disabled:opacity-50 disabled:cursor-not-allowed
                       "
@@ -837,9 +837,9 @@ await enviarNotificacion("pago");
   onClick={() => enviarNotificacion("recordatorio")}
   disabled={!selectedInvoice || sendingEmail}
   className="
-    inline-flex items-center gap-2 rounded-md
-    bg-[#4a4748] text-[#fffef9] px-3 py-2
-    text-xs font-medium hover:bg-[#5a5758]
+    inline-flex items-center gap-2 rounded-xl
+    bg-[var(--ss-input)] text-[var(--ss-text)] px-3 py-2
+    text-xs font-medium hover:bg-[var(--ss-raised)]
     active:scale-[.98]
     disabled:opacity-60 disabled:cursor-not-allowed
   "
@@ -854,7 +854,7 @@ await enviarNotificacion("pago");
                       type="button"
                       onClick={() => setDeleteOpen(true)}
                       className="
-                        inline-flex items-center gap-2 rounded-md
+                        inline-flex items-center gap-2 rounded-xl
                         border border-[#ee2346]/60 text-[#ee2346] px-3 py-2
                         text-xs font-medium hover:bg-[#ee2346]/10
                         active:scale-[.98]
@@ -867,18 +867,18 @@ await enviarNotificacion("pago");
               </div>
 
               <div className="grid gap-3 md:grid-cols-2 text-xs">
-                <div className="rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-4">
-                  <div className="text-[11px] text-[#fffef9]/60">Total</div>
+                <div className="rounded-xl bg-[var(--ss-raised)] border border-[var(--ss-border)] p-4">
+                  <div className="text-[11px] text-[var(--ss-text2)]">Total</div>
                   <div className="text-sm font-semibold">{formatCRC(selectedInvoice.total)}</div>
                 </div>
 
-                <div className="rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-4">
-                  <div className="text-[11px] text-[#fffef9]/60">Saldo</div>
+                <div className="rounded-xl bg-[var(--ss-raised)] border border-[var(--ss-border)] p-4">
+                  <div className="text-[11px] text-[var(--ss-text2)]">Saldo</div>
                   <div className="text-sm font-semibold">{formatCRC(selectedInvoice.saldo)}</div>
                 </div>
 
-                <div className="rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-4 md:col-span-2">
-                  <div className="text-[11px] text-[#fffef9]/60">Vencimiento</div>
+                <div className="rounded-xl bg-[var(--ss-raised)] border border-[var(--ss-border)] p-4 md:col-span-2">
+                  <div className="text-[11px] text-[var(--ss-text2)]">Vencimiento</div>
                   <div className="text-sm font-semibold">
                     {selectedInvoice.fecha_vencimiento ?? "—"}
                   </div>
@@ -887,16 +887,16 @@ await enviarNotificacion("pago");
 
               {/* Tareas linked to this factura */}
               <div>
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-[#fffef9]/70 mb-2">
+                <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--ss-text2)] mb-2">
                   Tareas ({facturaTareas.length})
                 </h3>
 
                 {loadingTareas && (
-                  <p className="text-[11px] text-[#fffef9]/50">Cargando tareas...</p>
+                  <p className="text-[11px] text-[var(--ss-text3)]">Cargando tareas...</p>
                 )}
 
                 {!loadingTareas && facturaTareas.length === 0 && (
-                  <p className="text-[11px] text-[#fffef9]/50">
+                  <p className="text-[11px] text-[var(--ss-text3)]">
                     No hay tareas asociadas a esta factura.
                   </p>
                 )}
@@ -906,13 +906,13 @@ await enviarNotificacion("pago");
                     {facturaTareas.map((t) => (
                       <div
                         key={t.id_tarea}
-                        className="flex items-center justify-between gap-2 rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 px-3 py-2"
+                        className="flex items-center justify-between gap-2 rounded-xl bg-[var(--ss-raised)] border border-[var(--ss-border)] px-3 py-2"
                       >
                         <div className="min-w-0">
-                          <p className="text-xs font-medium text-[#fffef9] truncate">
+                          <p className="text-xs font-medium text-[var(--ss-text)] truncate">
                             {t.titulo}
                           </p>
-                          <p className="text-[10px] text-[#fffef9]/50">
+                          <p className="text-[10px] text-[var(--ss-text3)]">
                             {t.tipo_entregable}
                           </p>
                           {t.drive_url && (
@@ -930,11 +930,11 @@ await enviarNotificacion("pago");
                           <span
                             className={cx(
                               "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
-                              t.status_kanban === "pendiente" && "bg-zinc-700/60 text-zinc-200 border border-zinc-500/70",
-                              t.status_kanban === "en_progreso" && "bg-sky-500/15 text-sky-300 border border-sky-400/40",
+                              t.status_kanban === "pendiente" && "bg-[var(--ss-raised)] text-[var(--ss-text2)] border border-[var(--ss-border)]",
+                              t.status_kanban === "en_progreso" && "bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/40 dark:border-sky-400/40",
                               t.status_kanban === "en_revision" && "bg-amber-500/15 text-amber-300 border border-amber-400/40",
                               t.status_kanban === "aprobada" && "bg-emerald-500/15 text-emerald-300 border border-emerald-400/40",
-                              t.status_kanban === "archivada" && "bg-zinc-700 text-zinc-300 border border-zinc-500"
+                              t.status_kanban === "archivada" && "bg-[var(--ss-raised)] text-[var(--ss-text2)] border border-[var(--ss-border)]"
                             )}
                           >
                             {t.status_kanban.replace("_", " ")}
@@ -971,7 +971,7 @@ await enviarNotificacion("pago");
               <button
                 type="button"
                 onClick={() => setPayOpen(false)}
-                className="rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm text-[#fffef9]/80 hover:text-white hover:bg-[#3a3738] transition"
+                className="rounded-xl border border-[var(--ss-border)] px-3 py-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-raised)] transition"
               >
                 Cancelar
               </button>
@@ -979,7 +979,7 @@ await enviarNotificacion("pago");
                 type="button"
                 onClick={submitPago}
                 disabled={savingPay}
-                className="rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
+                className="rounded-xl bg-[#6cbe45] hover:bg-[#5fa93d] px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {savingPay ? "Guardando..." : "Guardar"}
               </button>
@@ -988,9 +988,9 @@ await enviarNotificacion("pago");
         >
           <div className="grid gap-3 text-xs">
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">Factura</label>
+              <label className="text-[11px] text-[var(--ss-text2)]">Factura</label>
               <select
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-xs border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/20"
                 value={payFacturaId}
                 onChange={(e) =>
                   setPayFacturaId(e.target.value ? Number(e.target.value) : "")
@@ -1007,12 +1007,12 @@ await enviarNotificacion("pago");
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">Monto</label>
+              <label className="text-[11px] text-[var(--ss-text2)]">Monto</label>
               <input
                 type="number"
                 min={1}
                 step={1}
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-xs border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/20"
                 value={payMonto}
                 onChange={(e) => setPayMonto(e.target.value)}
                 placeholder="Ej: 15000"
@@ -1020,9 +1020,9 @@ await enviarNotificacion("pago");
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">Método</label>
+              <label className="text-[11px] text-[var(--ss-text2)]">Método</label>
               <select
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-xs border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/20"
                 value={payMetodo}
                 onChange={(e) => setPayMetodo(e.target.value as MetodoPago)}
               >
@@ -1033,12 +1033,12 @@ await enviarNotificacion("pago");
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">
+              <label className="text-[11px] text-[var(--ss-text2)]">
                 Referencia 
               </label>
               <input
                 type="text"
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-xs border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/20"
                 value={payReferencia}
                 onChange={(e) => setPayReferencia(e.target.value)}
                 placeholder="Comprobante / número referencia"
@@ -1059,7 +1059,7 @@ await enviarNotificacion("pago");
               <button
                 type="button"
                 onClick={() => setCreateOpen(false)}
-                className="rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm text-[#fffef9]/80 hover:text-white hover:bg-[#3a3738] transition"
+                className="rounded-xl border border-[var(--ss-border)] px-3 py-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-raised)] transition"
               >
                 Cancelar
               </button>
@@ -1068,7 +1068,7 @@ await enviarNotificacion("pago");
                 type="button"
                 onClick={submitCreate}
                 disabled={savingCreate}
-                className="rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
+                className="rounded-xl bg-[#6cbe45] hover:bg-[#5fa93d] px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {savingCreate ? "Guardando..." : "Guardar"}
               </button>
@@ -1079,12 +1079,12 @@ await enviarNotificacion("pago");
 
             {/* ORGANIZACION */}
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">
+              <label className="text-[11px] text-[var(--ss-text2)]">
                 Organización
               </label>
 
               <select
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-xs border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/20"
                 value={createOrgId}
                 onChange={(e) =>
                   setCreateOrgId(e.target.value ? Number(e.target.value) : "")
@@ -1102,7 +1102,7 @@ await enviarNotificacion("pago");
 
             {/* PLAN */}
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">
+              <label className="text-[11px] text-[var(--ss-text2)]">
                 Plan (opcional)
               </label>
 
@@ -1125,7 +1125,7 @@ await enviarNotificacion("pago");
 
   setCreateItems(serviciosItems)
 }}
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15"
+                className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-xs border border-[var(--ss-border)]"
               >
                 <option value="">Selecciona un plan</option>
 
@@ -1139,7 +1139,7 @@ await enviarNotificacion("pago");
 
             {/* PERIODO */}
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">
+              <label className="text-[11px] text-[var(--ss-text2)]">
                 Periodo
               </label>
 
@@ -1148,14 +1148,14 @@ await enviarNotificacion("pago");
                 value={createPeriodo}
                 onChange={(e) => setCreatePeriodo(e.target.value)}
                 placeholder="Mes 20XX"
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-xs border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/20"
               />
             </div>
 
 
             {/* FECHA VENCIMIENTO */}
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">
+              <label className="text-[11px] text-[var(--ss-text2)]">
                 Fecha vencimiento (opcional)
               </label>
 
@@ -1163,14 +1163,14 @@ await enviarNotificacion("pago");
                 type="date"
                 value={createVencimiento}
                 onChange={(e) => setCreateVencimiento(e.target.value)}
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-xs border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/20"
               />
             </div>
 
 
             {/* GLOBAL FECHA ENTREGA */}
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">
+              <label className="text-[11px] text-[var(--ss-text2)]">
                 Fecha entrega (tareas)
               </label>
 
@@ -1188,10 +1188,10 @@ await enviarNotificacion("pago");
                     }))
                   )
                 }}
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-xs border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/20"
               />
 
-              <span className="text-[10px] text-[#fffef9]/50">
+              <span className="text-[10px] text-[var(--ss-text3)]">
                 Se usará como la fecha de vencimiento predeterminada para las tareas creadas.
               </span>
             </div>
@@ -1201,7 +1201,7 @@ await enviarNotificacion("pago");
             <div className="flex flex-col gap-2 mt-2">
 
               <div className="flex items-center justify-between">
-                <label className="text-[11px] text-[#fffef9]/70 font-semibold uppercase tracking-wide">
+                <label className="text-[11px] text-[var(--ss-text2)] font-semibold uppercase tracking-wide">
                   Items / Entregables
                 </label>
 
@@ -1229,12 +1229,12 @@ await enviarNotificacion("pago");
               {createItems.map((item, idx) => (
                 <div
                   key={idx}
-                  className="flex items-start gap-2 rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-3"
+                  className="flex items-start gap-2 rounded-xl bg-[var(--ss-raised)] border border-[var(--ss-border)] p-3"
                 >
 
                   {/* SERVICIO */}
                   <div className="flex-1 flex flex-col gap-1">
-                    <label className="text-[10px] text-[#fffef9]/50">
+                    <label className="text-[10px] text-[var(--ss-text3)]">
                       Servicio
                     </label>
 
@@ -1255,7 +1255,7 @@ await enviarNotificacion("pago");
 
                         setCreateItems(updated)
                       }}
-                      className="rounded-md bg-[#4a4748] px-2 py-1.5 text-xs border border-[#fffef9]/15"
+                      className="rounded-xl bg-[var(--ss-input)] px-2 py-1.5 text-xs border border-[var(--ss-border)]"
                     >
                       <option value="">Selecciona servicio</option>
 
@@ -1270,7 +1270,7 @@ await enviarNotificacion("pago");
 
                   {/* CANTIDAD */}
                   <div className="w-20 flex flex-col gap-1">
-                    <label className="text-[10px] text-[#fffef9]/50">
+                    <label className="text-[10px] text-[var(--ss-text3)]">
                       Cantidad
                     </label>
 
@@ -1286,14 +1286,14 @@ await enviarNotificacion("pago");
                         }
                         setCreateItems(updated)
                       }}
-                      className="rounded-md bg-[#4a4748] px-2 py-1.5 text-xs border border-[#fffef9]/15"
+                      className="rounded-xl bg-[var(--ss-input)] px-2 py-1.5 text-xs border border-[var(--ss-border)]"
                     />
                   </div>
 
 
                   {/* PRECIO */}
                   <div className="w-28 flex flex-col gap-1">
-                    <label className="text-[10px] text-[#fffef9]/50">
+                    <label className="text-[10px] text-[var(--ss-text3)]">
                       Precio
                     </label>
 
@@ -1310,14 +1310,14 @@ await enviarNotificacion("pago");
                         setCreateItems(updated)
                       }}
                       placeholder="₡"
-                      className="rounded-md bg-[#4a4748] px-2 py-1.5 text-xs border border-[#fffef9]/15"
+                      className="rounded-xl bg-[var(--ss-input)] px-2 py-1.5 text-xs border border-[var(--ss-border)]"
                     />
                   </div>
 
 
                   {/* FECHA ENTREGA ITEM */}
                   <div className="w-36 flex flex-col gap-1">
-                    <label className="text-[10px] text-[#fffef9]/50">
+                    <label className="text-[10px] text-[var(--ss-text3)]">
                       Fecha entrega
                     </label>
 
@@ -1332,14 +1332,14 @@ await enviarNotificacion("pago");
                         }
                         setCreateItems(updated)
                       }}
-                      className="rounded-md bg-[#4a4748] px-2 py-1.5 text-xs border border-[#fffef9]/15"
+                      className="rounded-xl bg-[var(--ss-input)] px-2 py-1.5 text-xs border border-[var(--ss-border)]"
                     />
                   </div>
 
 
                   {/* DELETE ITEM */}
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] text-[#fffef9]/50 invisible">
+                    <label className="text-[10px] text-[var(--ss-text3)] invisible">
                       X
                     </label>
 
@@ -1363,11 +1363,11 @@ await enviarNotificacion("pago");
 
             {/* TOTAL */}
             <div className="flex flex-col gap-1 mt-1">
-              <label className="text-[11px] text-[#fffef9]/70">
+              <label className="text-[11px] text-[var(--ss-text2)]">
                 Total (CRC)
               </label>
 
-              <div className="rounded-md bg-[#4a4748]/60 px-3 py-2 text-xs border border-[#fffef9]/15 text-[#fffef9] font-semibold">
+              <div className="rounded-xl bg-[var(--ss-raised)] px-3 py-2 text-xs border border-[var(--ss-border)] text-[var(--ss-text)] font-semibold">
                 {formatCRC(createTotal)}
               </div>
             </div>
@@ -1387,7 +1387,7 @@ await enviarNotificacion("pago");
               <button
                 type="button"
                 onClick={() => setEditOpen(false)}
-                className="rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm text-[#fffef9]/80 hover:text-white hover:bg-[#3a3738] transition"
+                className="rounded-xl border border-[var(--ss-border)] px-3 py-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-raised)] transition"
               >
                 Cancelar
               </button>
@@ -1395,7 +1395,7 @@ await enviarNotificacion("pago");
                 type="button"
                 onClick={submitEdit}
                 disabled={savingEdit}
-                className="rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
+                className="rounded-xl bg-[#6cbe45] hover:bg-[#5fa93d] px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {savingEdit ? "Guardando..." : "Guardar"}
               </button>
@@ -1404,10 +1404,10 @@ await enviarNotificacion("pago");
         >
           <div className="grid gap-3 text-xs">
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">Periodo</label>
+              <label className="text-[11px] text-[var(--ss-text2)]">Periodo</label>
               <input
                 type="text"
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-xs border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/20"
                 value={editPeriodo}
                 onChange={(e) => setEditPeriodo(e.target.value)}
                 placeholder="Ej: Febrero 2026"
@@ -1415,12 +1415,12 @@ await enviarNotificacion("pago");
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">Total (CRC)</label>
+              <label className="text-[11px] text-[var(--ss-text2)]">Total (CRC)</label>
               <input
                 type="number"
                 min={1}
                 step={1}
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-xs border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/20"
                 value={editTotal}
                 onChange={(e) => setEditTotal(e.target.value)}
                 placeholder="Ej: 50000"
@@ -1428,7 +1428,7 @@ await enviarNotificacion("pago");
               {(() => {
                 const paid = selectedInvoice.total - selectedInvoice.saldo;
                 return paid > 0 ? (
-                  <p className="text-[10px] text-[#fffef9]/50 mt-0.5">
+                  <p className="text-[10px] text-[var(--ss-text3)] mt-0.5">
                     Ya pagado: {formatCRC(paid)}. El total no puede ser menor a ese monto.
                   </p>
                 ) : null;
@@ -1436,12 +1436,12 @@ await enviarNotificacion("pago");
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[#fffef9]/70">
+              <label className="text-[11px] text-[var(--ss-text2)]">
                 Fecha vencimiento (opcional)
               </label>
               <input
                 type="date"
-                className="rounded-md bg-[#4a4748] px-3 py-2 text-xs border border-[#fffef9]/15 outline-none focus:ring-2 focus:ring-[#ee2346]/70"
+                className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-xs border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/20"
                 value={editVencimiento}
                 onChange={(e) => setEditVencimiento(e.target.value)}
               />
@@ -1461,7 +1461,7 @@ await enviarNotificacion("pago");
               <button
                 type="button"
                 onClick={() => setDeleteOpen(false)}
-                className="rounded-md border border-[#4a4748]/40 px-3 py-2 text-sm text-[#fffef9]/80 hover:text-white hover:bg-[#3a3738] transition"
+                className="rounded-xl border border-[var(--ss-border)] px-3 py-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-raised)] transition"
               >
                 Cancelar
               </button>
@@ -1469,17 +1469,17 @@ await enviarNotificacion("pago");
                 type="button"
                 onClick={submitDelete}
                 disabled={savingDelete}
-                className="rounded-md bg-[#ee2346] hover:bg-[#d8203f] px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
+                className="rounded-xl bg-[#ee2346] hover:bg-[#d8203f] px-3 py-2 text-sm font-semibold text-white transition disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {savingDelete ? "Eliminando..." : "Eliminar"}
               </button>
             </>
           }
         >
-          <p className="text-sm text-[#fffef9]/80">
+          <p className="text-sm text-[var(--ss-text2)]">
             ¿Estás seguro de que deseas eliminar esta factura? Esta acción no se puede deshacer fácilmente.
           </p>
-          <div className="mt-3 rounded-lg bg-[#2b2b30] border border-[#4a4748]/40 p-3 text-xs text-[#fffef9]/70">
+          <div className="mt-3 rounded-xl bg-[var(--ss-raised)] border border-[var(--ss-border)] p-3 text-xs text-[var(--ss-text2)]">
             <p>Periodo: {selectedInvoice.periodo}</p>
             <p>Total: {formatCRC(selectedInvoice.total)}</p>
             <p>Saldo: {formatCRC(selectedInvoice.saldo)}</p>

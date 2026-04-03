@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Shell } from "@/components/Shell";
 
 type OrgItem = {
   id_organizacion: number;
@@ -135,36 +134,36 @@ export default function HistorialPagosPage() {
   }, [orgs, selectedOrgId]);
 
   return (
-    <Shell>
+    <>
     <div>
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-xl font-bold text-[#fffef9]">Reporte de pagos</h1>
-          <p className="text-sm text-[#fffef9]/60">
+          <h1 className="text-xl font-bold text-[var(--ss-text)]">Reporte de pagos</h1>
+          <p className="text-sm text-[var(--ss-text2)]">
             Seleccioná una organización y revisá facturas + pagos relacionados.
           </p>
         </div>
       </div>
 
       {/* Filtros */}
-      <div className="rounded-xl border border-[#444242] bg-[#2e2c2d] p-4 mb-6">
+      <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-4 mb-6">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
           <div className="md:col-span-1">
-            <label className="block text-xs text-[#fffef9]/60 mb-1">Buscar organización</label>
+            <label className="block text-xs text-[var(--ss-text2)] mb-1">Buscar organización</label>
             <input
               value={orgQuery}
               onChange={(e) => setOrgQuery(e.target.value)}
               placeholder="Ej: IBM o 12"
-              className="w-full rounded-md bg-[#1f1d1e] border border-[#4a4748]/60 px-3 py-2 text-sm text-[#fffef9] outline-none focus:border-[#ee2346]"
+              className="w-full rounded-xl bg-[var(--ss-input)] border border-[var(--ss-border)] px-3 py-2 text-sm text-[var(--ss-text)] outline-none focus:border-[#6cbe45]/60"
             />
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-xs text-[#fffef9]/60 mb-1">Organización</label>
+            <label className="block text-xs text-[var(--ss-text2)] mb-1">Organización</label>
             <select
               value={selectedOrgId}
               onChange={(e) => setSelectedOrgId(e.target.value ? Number(e.target.value) : "")}
-              className="w-full rounded-md bg-[#1f1d1e] border border-[#4a4748]/60 px-3 py-2 text-sm text-[#fffef9] outline-none focus:border-[#ee2346]"
+              className="w-full rounded-xl bg-[var(--ss-input)] border border-[var(--ss-border)] px-3 py-2 text-sm text-[var(--ss-text)] outline-none focus:border-[#6cbe45]/60"
             >
               <option value="">
                 {loadingOrgs ? "Cargando organizaciones..." : "Seleccioná una organización"}
@@ -182,7 +181,7 @@ export default function HistorialPagosPage() {
         </div>
 
         {error && (
-          <div className="mt-3 rounded-md border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-200">
+          <div className="mt-3 rounded-xl border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-[#ee2346]">
             {error}
           </div>
         )}
@@ -191,15 +190,15 @@ export default function HistorialPagosPage() {
       {/* Contenido */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* FACTURAS */}
-        <div className="rounded-xl border border-[#444242] bg-[#2e2c2d] p-4">
+        <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-[#fffef9]">Facturas</h2>
+            <h2 className="text-sm font-semibold text-[var(--ss-text)]">Facturas</h2>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-[#fffef9]/70">
-                <tr className="border-b border-[#444242]">
+              <thead className="text-[var(--ss-text2)]">
+                <tr className="border-b border-[var(--ss-border)]">
                   <th className="text-left py-2 pr-2">Factura</th>
                   <th className="text-left py-2 pr-2">Periodo</th>
                   <th className="text-left py-2 pr-2">Vence</th>
@@ -208,16 +207,16 @@ export default function HistorialPagosPage() {
                   <th className="text-right py-2">Saldo</th>
                 </tr>
               </thead>
-              <tbody className="text-[#fffef9]/85">
+              <tbody className="text-[var(--ss-text)]">
                 {selectedOrgId === "" ? (
                   <tr>
-                    <td colSpan={6} className="py-4 text-center text-[#fffef9]/50">
+                    <td colSpan={6} className="py-4 text-center text-[var(--ss-text3)]">
                       Seleccioná una organización para ver facturas.
                     </td>
                   </tr>
                 ) : facturas.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-4 text-center text-[#fffef9]/50">
+                    <td colSpan={6} className="py-4 text-center text-[var(--ss-text3)]">
                       Sin facturas para esta organización.
                     </td>
                   </tr>
@@ -243,15 +242,15 @@ export default function HistorialPagosPage() {
         </div>
 
         {/* PAGOS */}
-        <div className="rounded-xl border border-[#444242] bg-[#2e2c2d] p-4">
+        <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-4">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-[#fffef9]">Pagos</h2>
+            <h2 className="text-sm font-semibold text-[var(--ss-text)]">Pagos</h2>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="text-[#fffef9]/70">
-                <tr className="border-b border-[#444242]">
+              <thead className="text-[var(--ss-text2)]">
+                <tr className="border-b border-[var(--ss-border)]">
                   <th className="text-left py-2 pr-2">Pago</th>
                   <th className="text-left py-2 pr-2">Factura</th>
                   <th className="text-left py-2 pr-2">Fecha</th>
@@ -261,16 +260,16 @@ export default function HistorialPagosPage() {
                   <th className="text-right py-2">Monto</th>
                 </tr>
               </thead>
-              <tbody className="text-[#fffef9]/85">
+              <tbody className="text-[var(--ss-text)]">
                 {selectedOrgId === "" ? (
                   <tr>
-                    <td colSpan={7} className="py-4 text-center text-[#fffef9]/50">
+                    <td colSpan={7} className="py-4 text-center text-[var(--ss-text3)]">
                       Seleccioná una organización para ver pagos.
                     </td>
                   </tr>
                 ) : pagos.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-4 text-center text-[#fffef9]/50">
+                    <td colSpan={7} className="py-4 text-center text-[var(--ss-text3)]">
                       Sin pagos registrados para estas facturas.
                     </td>
                   </tr>
@@ -297,6 +296,6 @@ export default function HistorialPagosPage() {
         </div>
       </div>
     </div>
-    </Shell>
+    </>
   );
 }

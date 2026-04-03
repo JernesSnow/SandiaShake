@@ -248,7 +248,7 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   try {
-    const { error } = await requireAdmin();
+    const { perfil, error } = await requireAdmin();
     if (error) return error;
 
     const body = await req.json().catch(() => null);
@@ -287,7 +287,10 @@ export async function PATCH(req: Request) {
       );
     }
 
-    const patch: any = {};
+    const patch: any = {
+      updated_by: perfil!.id_usuario,
+      updated_at: new Date().toISOString(),
+    };
 
     if (nombre) patch.nombre = nombre;
     if (correo) patch.correo = correo;
@@ -324,7 +327,7 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
   try {
-    const { error } = await requireAdmin();
+    const { perfil, error } = await requireAdmin();
     if (error) return error;
 
     const url = new URL(req.url);
@@ -354,7 +357,7 @@ export async function DELETE(req: Request) {
 
     await admin
       .from("usuarios")
-      .update({ estado: "ELIMINADO" })
+      .update({ estado: "ELIMINADO", updated_by: perfil!.id_usuario, updated_at: new Date().toISOString() })
       .eq("id_usuario", id_usuario);
 
     if (current.auth_user_id) {

@@ -1,7 +1,9 @@
+import { Shell } from "@/components/Shell";
+
 export default function PanelLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  return <>{children}</>;
+  return <Shell>{children}</Shell>;
 }

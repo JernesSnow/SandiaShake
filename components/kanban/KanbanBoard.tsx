@@ -122,12 +122,12 @@ function assertNumericId(label: string, v: any) {
 
 function getPriorityClasses(prio?: Task["prioridad"]) {
   if (prio === "Alta")
-    return "bg-[#ee2346]/20 text-[#ffb3c2] border border-[#ee2346]/60";
+    return "bg-[#ee2346]/15 text-[#ee2346] border border-[#ee2346]/40";
   if (prio === "Media")
-    return "bg-[#6cbe45]/15 text-[#b9f7a6] border border-[#6cbe45]/50";
+    return "bg-amber-500/15 text-amber-600 dark:text-amber-300 border border-amber-500/40";
   if (prio === "Baja")
-    return "bg-[#4b5563]/40 text-[#e5e7eb] border border-[#9ca3af]/40";
-  return "bg-[#374151] text-[#e5e7eb] border border-[#4b5563]";
+    return "bg-[#6cbe45]/15 text-[#4a8c2a] dark:text-[#b9f7a6] border border-[#6cbe45]/40";
+  return "bg-[var(--ss-raised)] text-[var(--ss-text2)] border border-[var(--ss-border)]";
 }
 
 async function safeJson(res: Response) {
@@ -766,7 +766,7 @@ export function KanbanBoard() {
   return (
     <div className={kanbanStyles.root}>
       {/* Header + filtros */}
-      <div className="mb-4 rounded-2xl border border-white/10 bg-white/[0.035] p-4 shadow-[0_12px_40px_rgba(0,0,0,0.25)]">
+      <div className="mb-4 rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
           <div className="flex-1">
             <label className={kanbanStyles.label}>Buscar por cliente</label>
@@ -821,22 +821,22 @@ export function KanbanBoard() {
 
     </div> 
         <div className="mt-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div className="text-[11px] text-[#fffef9]/45">
-            Rol: <b className="text-[#fffef9]/70">{role}</b>
+          <div className="text-[11px] text-[var(--ss-text3)]">
+            Rol: <b className="text-[var(--ss-text2)]">{role}</b>
           </div>
 
           <div className="flex flex-col gap-2 md:flex-row">
             {loading ? (
-              <div className="text-sm text-[#fffef9]/60">Cargando tareas…</div>
+              <div className="text-sm text-[var(--ss-text2)]">Cargando tareas…</div>
             ) : loadErr ? (
-              <div className="text-sm text-[#ffb3c2]">{loadErr}</div>
+              <div className="text-sm text-[#ee2346]">{loadErr}</div>
             ) : null}
 
             {saveOkMsg ? (
-              <div className="text-sm text-[#b9f7a6]">{saveOkMsg}</div>
+              <div className="text-sm text-[#6cbe45]">{saveOkMsg}</div>
             ) : null}
             {saveErrMsg ? (
-              <div className="text-sm text-[#ffb3c2]">{saveErrMsg}</div>
+              <div className="text-sm text-[#ee2346]">{saveErrMsg}</div>
             ) : null}
           </div>
         </div>
@@ -968,7 +968,7 @@ export function KanbanBoard() {
                                                 onClick={(e) =>
                                                   openConversation(task as Task, e)
                                                 }
-                                                className="relative inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] transition-colors hover:bg-white/[0.10]"
+                                                className="relative inline-flex items-center gap-1 rounded-lg border border-[var(--ss-border)] bg-[var(--ss-raised)] px-2 py-1 text-[11px] transition-colors hover:bg-[var(--ss-raised)]"
                                                 title="Abrir conversación"
                                               >
                                                 <MessageCircle size={14} />
@@ -1238,16 +1238,16 @@ function TaskModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="flex h-[80vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#0f1117] shadow-2xl">
+      <div className="flex h-[80vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] shadow-2xl">
         {/* HEADER */}
-        <div className="flex items-start justify-between border-b border-white/10 p-6">
+        <div className="flex items-start justify-between border-b border-[var(--ss-border)] p-6">
           <div>
-            <h2 className="text-xl font-semibold text-white">
+            <h2 className="text-xl font-semibold text-[var(--ss-text)]">
               {isNew ? "Nueva tarea" : form.titulo || "Detalle de tarea"}
             </h2>
 
             {!isNew && (
-              <div className="mt-2 flex items-center gap-2 text-xs text-white/60">
+              <div className="mt-2 flex items-center gap-2 text-xs text-[var(--ss-text2)]">
                 <span>{form.cliente || "—"}</span>
                 <span>•</span>
                 <span>{form.asignadoA || "—"}</span>
@@ -1256,7 +1256,7 @@ function TaskModal({
 
             <div className="mt-3 flex flex-wrap gap-2">
               {form.tipoEntregable && (
-                <span className="rounded-lg bg-white/10 px-2 py-1 text-xs">
+                <span className="rounded-lg bg-[var(--ss-raised)] px-2 py-1 text-xs">
                   {form.tipoEntregable}
                 </span>
               )}
@@ -1271,7 +1271,7 @@ function TaskModal({
                 </span>
               )}
 
-              <span className="rounded-lg bg-[#6cbe45]/20 px-2 py-1 text-xs text-[#c7f9b4]">
+              <span className="rounded-xl bg-[#6cbe45]/20 px-2 py-1 text-xs text-[#5aa63d] dark:text-[#c7f9b4]">
                 {STATUS_OPTIONS.find((s) => s.id === form.statusId)?.label}
               </span>
             </div>
@@ -1279,7 +1279,7 @@ function TaskModal({
 
           <button
             onClick={onClose}
-            className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm hover:bg-white/10"
+            className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-3 py-2 text-sm hover:bg-[var(--ss-raised)]"
           >
             Cerrar
           </button>
@@ -1288,9 +1288,9 @@ function TaskModal({
         {/* BODY */}
         <form onSubmit={handleSubmit} className="flex flex-1 overflow-hidden">
           {/* LEFT SIDE */}
-          <div className="w-[55%] space-y-6 overflow-y-auto border-r border-white/10 p-6">
+          <div className="w-[55%] space-y-6 overflow-y-auto border-r border-[var(--ss-border)] p-6">
             <div>
-              <h3 className="mb-3 text-sm font-semibold text-white/80">
+              <h3 className="mb-3 text-sm font-semibold text-[var(--ss-text2)]">
                 Información
               </h3>
 
@@ -1300,7 +1300,7 @@ function TaskModal({
                   <label className={kanbanStyles.label}>Título *</label>
 
                   {readOnly ? (
-                    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm">
+                    <div className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-3 py-2 text-sm">
                       {form.titulo || "—"}
                     </div>
                   ) : (
@@ -1317,7 +1317,7 @@ function TaskModal({
                   <label className={kanbanStyles.label}>Prioridad</label>
 
                   {readOnly ? (
-                    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm">
+                    <div className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-3 py-2 text-sm">
                       {form.prioridad ?? "—"}
                     </div>
                   ) : (
@@ -1340,7 +1340,7 @@ function TaskModal({
                   <label className={kanbanStyles.label}>Estado</label>
 
                   {readOnly ? (
-                    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm">
+                    <div className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-3 py-2 text-sm">
                       {STATUS_OPTIONS.find((s) => s.id === form.statusId)?.label}
                     </div>
                   ) : (
@@ -1363,7 +1363,7 @@ function TaskModal({
                   <label className={kanbanStyles.label}>Fecha entrega</label>
 
                   {readOnly ? (
-                    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm">
+                    <div className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-3 py-2 text-sm">
                       {form.fechaEntrega || "—"}
                     </div>
                   ) : (
@@ -1381,7 +1381,7 @@ function TaskModal({
                   <label className={kanbanStyles.label}>Tipo entregable</label>
 
                   {readOnly ? (
-                    <div className="rounded-xl border border-white/10 bg-black/30 px-3 py-2 text-sm">
+                    <div className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-3 py-2 text-sm">
                       {form.tipoEntregable ?? "—"}
                     </div>
                   ) : (
@@ -1406,13 +1406,13 @@ function TaskModal({
 
             {/* DESCRIPTION */}
             <div>
-              <h3 className="mb-2 text-sm font-semibold text-white/80">
+              <h3 className="mb-2 text-sm font-semibold text-[var(--ss-text2)]">
                 Descripción
               </h3>
 
               <textarea
                 rows={5}
-                className="w-full resize-none rounded-xl border border-white/10 bg-black/30 p-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#6cbe45]/40"
+                className="w-full resize-none rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] p-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#6cbe45]/40"
                 value={form.descripcion ?? ""}
                 disabled={readOnly}
                 onChange={(e) => updateField("descripcion", e.target.value)}
@@ -1422,7 +1422,7 @@ function TaskModal({
             {/* ENTREGABLES */}
             {!isNew && (
               <div>
-                <h3 className="mb-3 text-sm font-semibold text-white/80">
+                <h3 className="mb-3 text-sm font-semibold text-[var(--ss-text2)]">
                   Entregables
                 </h3>
 
@@ -1437,10 +1437,10 @@ function TaskModal({
 
           {/* RIGHT SIDE CHAT */}
           {!isNew && (
-            <div className="flex flex-1 flex-col bg-[#0b0d12]">
-              <div className="flex items-center gap-2 border-b border-white/10 p-4">
+            <div className="flex flex-1 flex-col bg-[var(--ss-raised)]">
+              <div className="flex items-center gap-2 border-b border-[var(--ss-border)] p-4">
                 <MessageCircle size={16} />
-                <h3 className="text-sm font-semibold text-white/80">
+                <h3 className="text-sm font-semibold text-[var(--ss-text2)]">
                   Conversación
                 </h3>
               </div>
@@ -1457,7 +1457,7 @@ function TaskModal({
         </form>
 
         {/* FOOTER */}
-        <div className="flex justify-between border-t border-white/10 p-4">
+        <div className="flex justify-between border-t border-[var(--ss-border)] p-4">
           {!isNew && isAdmin && (
             <button
               type="button"
@@ -1473,7 +1473,7 @@ function TaskModal({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-white/10 bg-white/5 px-4 py-2"
+              className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-4 py-2"
             >
               Cancelar
             </button>
@@ -1481,7 +1481,7 @@ function TaskModal({
             {(isAdmin || isColab) && (
               <button
                 type="submit"
-                className="rounded-xl bg-[#6cbe45] px-4 py-2 font-medium text-black hover:bg-[#7bd456]"
+                className="rounded-xl bg-[#6cbe45] px-4 py-2 font-medium text-white hover:bg-[#5aa63d]"
               >
                 Guardar
               </button>
@@ -1627,7 +1627,7 @@ const handleDownload = async () => {
     <div className="relative">
     {alertMsg && (
   <div className="fixed top-6 right-6 z-[9999] animate-fade-in">
-    <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-[#1a0f12] px-4 py-3 shadow-lg backdrop-blur-md">
+    <div className="flex items-center gap-3 rounded-xl border border-red-500/30 bg-[var(--ss-surface)] px-4 py-3 shadow-lg backdrop-blur-md">
 
       <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500/20">
         ❌
@@ -1647,20 +1647,20 @@ const handleDownload = async () => {
 
       <button
         onClick={() => setOpen(!open)}
-        className="flex items-center gap-2 rounded-xl bg-[#6cbe45] px-4 py-2 text-sm font-medium text-black hover:bg-[#7bd456]"
+        className="flex items-center gap-2 rounded-xl bg-[#6cbe45] px-4 py-2 text-sm font-medium text-white hover:bg-[#5aa63d]"
       >
         Generar reporte
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-64 rounded-xl border border-white/10 bg-[#0f1117] p-4 shadow-xl z-50">
+        <div className="absolute right-0 mt-2 w-64 rounded-xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-4 shadow-xl z-50">
 
-          <p className="mb-2 text-sm text-white/70">
+          <p className="mb-2 text-sm text-[var(--ss-text2)]">
             Seleccionar período
           </p>
 
           <select
-            className="w-full rounded-lg border border-white/10 bg-black/30 px-2 py-2 text-sm text-white mb-3"
+            className="w-full rounded-lg border border-[var(--ss-border)] bg-[var(--ss-raised)] px-2 py-2 text-sm text-[var(--ss-text)] mb-3"
             value={selected}
             onChange={(e) => setSelected(e.target.value)}
           >
@@ -1684,14 +1684,14 @@ const handleDownload = async () => {
 
             <button
               onClick={handlePreview}
-              className="flex-1 rounded-lg bg-[#ee2346] px-3 py-2 text-sm font-medium text-white hover:bg-[#ff3b5c]"
+              className="flex-1 rounded-xl bg-[#ee2346] px-3 py-2 text-sm font-medium text-white hover:bg-[#d8203f]"
             >
               Ver
             </button>
 
             <button
               onClick={handleDownload}
-              className="flex-1 rounded-lg bg-[#6cbe45] px-3 py-2 text-sm font-medium text-black hover:bg-[#7bd456]"
+              className="flex-1 rounded-xl bg-[#6cbe45] px-3 py-2 text-sm font-medium text-white hover:bg-[#5aa63d]"
             >
               Descargar PDF
             </button>

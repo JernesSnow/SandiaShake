@@ -232,11 +232,18 @@ export async function POST(req: Request) {
 
     const admin = createSupabaseAdmin();
 
+    // When an ADMIN creates a task they can assign it to a specific colaborador
+    const idColaboradorBody = body?.id_colaborador ? Number(body.id_colaborador) : null;
+    const idColaboradorToSave =
+      rol === "ADMIN" && idColaboradorBody && Number.isFinite(idColaboradorBody)
+        ? idColaboradorBody
+        : userId;
+
     const { data: inserted, error: insErr } = await admin
       .from("tareas")
       .insert({
         id_organizacion: idOrganizacion,
-        id_colaborador: userId,
+        id_colaborador: idColaboradorToSave,
         titulo,
         descripcion: body?.descripcion ?? "",
         status_kanban: body?.status_kanban ?? "pendiente",
