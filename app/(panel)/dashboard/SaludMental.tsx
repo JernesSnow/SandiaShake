@@ -71,8 +71,7 @@ export default function SaludMental({ estable, atento, enRiesgo, sinRegistro }: 
           {/* custom legend */}
           <div className="shrink-0 space-y-2.5 text-sm">
             {LEGEND.map((l) => {
-              const item = raw.find((r) => r.label === l.label) ?? raw.find((r) => r.name === l.label);
-              const val  = raw.find((r) => r.name === l.label)?.value ?? 0;
+              const val = raw.find((r) => r.name === l.label)?.value ?? 0;
               return (
                 <div key={l.label} className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: l.color }} />
