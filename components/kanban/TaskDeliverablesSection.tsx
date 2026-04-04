@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useDropzone } from "react-dropzone";
 import { UploadCloud, Trash2, FileText } from "react-feather";
 
-type Role = "ADMIN" | "COLABORADOR" | "CLIENTE";
+type Role = "ADMIN" | "COLABORADOR" | "CLIENTE" | "DESCONOCIDO";
 
 type Deliverable = {
   id_entregable: number;

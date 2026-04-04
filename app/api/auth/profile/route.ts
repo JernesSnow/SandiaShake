@@ -54,9 +54,12 @@ export async function GET() {
         .maybeSingle();
 
       if (orgLink?.id_organizacion) {
+        const org = Array.isArray(orgLink.organizaciones)
+          ? orgLink.organizaciones[0]
+          : orgLink.organizaciones;
         organizacion = {
           id_organizacion: orgLink.id_organizacion,
-          nombre: orgLink.organizaciones?.nombre ?? null,
+          nombre: org?.nombre ?? null,
         };
       }
     }
