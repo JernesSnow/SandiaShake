@@ -19,6 +19,12 @@ const baseUrl = `${proto}://${host}`;
     pathname.startsWith("/_next") ||
     pathname.startsWith("/assets") ||
     pathname === "/favicon.ico" ||
+    pathname.endsWith(".png") ||
+    pathname.endsWith(".jpg") ||
+    pathname.endsWith(".jpeg") ||
+    pathname.endsWith(".svg") ||
+    pathname.endsWith(".webp") ||
+    pathname.endsWith(".ico") ||
     pathname.startsWith("/api");
 
   if (isPublic) return NextResponse.next();
