@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Shell } from "@/components/Shell";
 import PlanesEntregablesSection from "@/components/configuracion/PlanesEntregablesSection";
@@ -79,7 +79,7 @@ function RolBadge({ rol }: { rol: RolUsuario }) {
 
 /* ═══════════════════════════════════════════════════════ */
 
-export default function ConfiguracionPage() {
+function ConfiguracionPage() {
   const router      = useRouter();
   const searchParams = useSearchParams();
 
@@ -632,5 +632,13 @@ export default function ConfiguracionPage() {
         </div>
       )}
     </Shell>
+  );
+}
+
+export default function ConfiguracionPageWrapper() {
+  return (
+    <Suspense>
+      <ConfiguracionPage />
+    </Suspense>
   );
 }
