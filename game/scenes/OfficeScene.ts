@@ -62,9 +62,9 @@ private readonly BASE_H = 1080;
   //this.load.image("player", window.location.origin + "/assets/PersonajePrincipal.png");
   this.load.image("bg", "/assets/office_bg.png");
   // Spritesheet (6 frames en 3 columnas x 2 filas)
-  this.load.spritesheet("player", "/assets/player_walk_animation.png", {
-    frameWidth: 1536 / 4.9,  
-    frameHeight: 1024 /2, 
+  this.load.spritesheet("player", "/assets/sprite_fixed.png", {
+    frameWidth: 256,  
+    frameHeight: 256, 
   });
   this.load.image("demo", "/assets/prop_demo_desk.png");
   this.load.image("org", "/assets/prop_organizacion_shelf.png");
@@ -109,21 +109,11 @@ const bg = this.add.image(0, 0, "bg")
 
 this.anims.create({
   key: "walk",
-  frames: [
-    { key: "player", frame: 0 },
-    { key: "player", frame: 0 },
-
-    { key: "player", frame: 1 },
-    { key: "player", frame: 1 },
-
-    { key: "player", frame: 0 },
-    { key: "player", frame: 0 },
-
-    { key: "player", frame: 2 },
-    { key: "player", frame: 2 },
-
-  ],
-  frameRate: 8,
+  frames: this.anims.generateFrameNumbers("player", {
+    start: 0,
+    end: 35
+  }),
+  frameRate: 36,
   repeat: -1
 });
 
@@ -385,7 +375,7 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
 );
 
 this.player.setScale(
-  (this.PLAYER_BASE + depth * this.PLAYER_DEPTH_EXTRA) * this.uiScale
+  (this.PLAYER_BASE + depth * this.PLAYER_DEPTH_EXTRA) * this.uiScale * 2
 );
 
   this.hoveredFeature = null;

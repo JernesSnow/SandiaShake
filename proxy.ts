@@ -32,21 +32,39 @@ const cookie = _req.headers.get("cookie") ?? "";
     return NextResponse.redirect(new URL("/auth", _req.url));
   }
 
-  const res = await fetch(`${baseUrl}/api/estado-cuenta`, {
-    headers: { cookie: _req.headers.get("cookie") ?? "" },
+   const estadoRes = await fetch(`${baseUrl}/api/estado-cuenta`, {
+    headers: { cookie },
     cache: "no-store",
   });
 
-  if (res.status === 401) {
-    
+  if (estadoRes.status === 401) {
     return NextResponse.redirect(new URL("/auth", _req.url));
   }
 
-  const json = await res.json().catch(() => null);
+  const estadoJson = await estadoRes.json().catch(() => null);
 
- if (json?.blocked) {
-  return NextResponse.redirect(new URL("/morosidad", _req.url));
+  if (estadoJson?.blocked) {
+    return NextResponse.redirect(new URL("/morosidad", _req.url));
+  }
+
+// revisar error pendiente de resumen diario
+  // evita loop cuando ya está en /tareasporhacer
+  if (!pathname.startsWith("/tareasporhacer")) {
+const resumenErrorRes = await fetch(`${baseUrl}/api/colaboradores/resumen-error`, {
+  headers: { cookie },
+  cache: "no-store",
+});
+
+
+if (resumenErrorRes.ok) {
+  const resumenErrorJson = await resumenErrorRes.json().catch(() => null);
+
+  if (resumenErrorJson?.hasError) {
+    return NextResponse.redirect(new URL("/tareasporhacer", _req.url));
+  }
 }
+  }
+
 
   return NextResponse.next();
 }
