@@ -5,11 +5,12 @@ import oauth2Client, { ensureDriveCredentials } from "@/lib/google-drive/auth";
 
 export async function DELETE(
   req: Request,
-  ctx: { params: { id: string } }
+  ctx: { params: Promise<{ id: string }> }
 ) {
   try {
 
-    const id = Number(ctx.params.id);
+    const { id: idStr } = await ctx.params;
+    const id = Number(idStr);
 
     const admin = createSupabaseAdmin();
 
