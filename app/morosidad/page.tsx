@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 export default function MorosidadPage() {
   const [data, setData] = useState<any>(null);
+  const [checking, setChecking] = useState(false);
 
  useEffect(() => {
   async function run() {
@@ -58,11 +59,36 @@ export default function MorosidadPage() {
         </div>
 
         <button
-          onClick={() => window.location.reload()}
-          className="mt-5 px-4 py-2 rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] text-white text-sm font-semibold"
-        >
-          Ya pagué / Reintentar
-        </button>
+  type="button"
+  disabled={checking}
+  onClick={async () => {
+    try {
+      setChecking(true);
+
+      const res = await fetch("/api/estado-cuenta", {
+        credentials: "include",
+        cache: "no-store",
+      });
+
+      const json = await res.json();
+
+      if (!json?.blocked) {
+        window.location.href = "/dashboard";
+        return;
+      }
+
+      setData(json);
+      alert("Tu cuenta aún aparece bloqueada. Intenta nuevamente en unos minutos.");
+    } catch {
+      alert("No se pudo verificar el estado de cuenta.");
+    } finally {
+      setChecking(false);
+    }
+  }}
+  className="mt-5 px-4 py-2 rounded-md bg-[#6cbe45] hover:bg-[#5fa93d] text-white text-sm font-semibold disabled:opacity-60"
+>
+  {checking ? "Verificando..." : "Ya pagué / Reintentar"}
+</button>
         <button
           onClick={() => window.location.href = "/auth"}
           className="mt-3 px-4 py-2 rounded-md bg-[#e04e4e] hover:bg-[#c84343] text-white text-sm font-semibold"
