@@ -93,7 +93,7 @@ export default function AuthPage() {
             <img
               src="/mock-logo-sandia-con-chole.png"
               alt="SandiaShake"
-              style={{ height: 40, width: "auto" }}
+              style={{ height: 64, width: "auto" }}
             />
           </div>
 
