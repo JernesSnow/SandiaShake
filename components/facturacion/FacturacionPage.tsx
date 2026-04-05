@@ -413,18 +413,33 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
 
     setSavingCreate(true);
     try {
-      const body: Record<string, unknown> = {
-      id_organizacion: Number(createOrgId),
-      periodo: createPeriodo.trim(),
-      items: createItems.map((item) => ({
+      const serviceItems = createItems.map((item) => ({
         tipo: "SERVICIO",
         referencia_id: item.referencia_id ? Number(item.referencia_id) : null,
         concepto: item.concepto,
         cantidad: Number(item.cantidad),
         precio_unitario: Number(item.precio),
         fecha_entrega: item.fecha_entrega || createFechaEntrega || null,
-      })),
-    };
+      }));
+
+      // If a plan is selected, prepend a line item with the plan price
+      const selectedPlan = createPlanId ? planes.find(p => p.id_plan === createPlanId) : null;
+      const planItem = selectedPlan
+        ? [{
+            tipo: "PLAN",
+            referencia_id: selectedPlan.id_plan,
+            concepto: `Plan: ${selectedPlan.nombre}`,
+            cantidad: 1,
+            precio_unitario: Number(selectedPlan.precio),
+            fecha_entrega: createFechaEntrega || null,
+          }]
+        : [];
+
+      const body: Record<string, unknown> = {
+        id_organizacion: Number(createOrgId),
+        periodo: createPeriodo.trim(),
+        items: [...planItem, ...serviceItems],
+      };
       if (createVencimiento) {
         body.fecha_vencimiento = createVencimiento;
       }

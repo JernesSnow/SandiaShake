@@ -11,6 +11,7 @@ import SaludMental from "./SaludMental";
 import Rendimiento from "./Rendimiento";
 import ChilliPoints from "./ChilliPoints";
 import SaludMentalModal from "@/components/SaludMentalModal";
+import ClienteDashboard from "./ClienteDashboard";
 
 import { CheckSquare, FileText, Users, User } from "react-feather";
 import { requestNotificationPermissionAndToken } from "@/lib/firebase/messaging";
@@ -31,10 +32,12 @@ type DashboardData = {
 
 export default function DashboardPage() {
   const supabase = createSupabaseClient();
-  const router = useRouter();
+  const router   = useRouter();
 
-  const [ready, setReady] = useState(false);
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [ready, setReady]             = useState(false);
+  const [rol, setRol]                 = useState<string | null>(null);
+  const [data, setData]               = useState<DashboardData | null>(null);
+  const [clienteData, setClienteData] = useState<any>(null);
   const [showBienestar, setShowBienestar] = useState(false);
 
   useEffect(() => {
@@ -57,7 +60,7 @@ export default function DashboardPage() {
         return;
       }
 
-      if (!cancelled) setReady(true);
+      if (!cancelled) { setRol(perfil.rol); setReady(true); }
 
       if (perfil.rol === "ADMIN") {
         const res = await fetch("/api/admin/dashboard", { cache: "no-store" });
@@ -68,6 +71,11 @@ export default function DashboardPage() {
         const res = await fetch("/api/bienestar/hoy");
         const hoy = await res.json();
         if (hoy.aplica && !hoy.registrado && !cancelled) setShowBienestar(true);
+      }
+
+      if (perfil.rol === "CLIENTE") {
+        const res = await fetch("/api/cliente/dashboard", { cache: "no-store" });
+        if (res.ok && !cancelled) setClienteData(await res.json());
       }
     }
 
@@ -83,6 +91,12 @@ export default function DashboardPage() {
     );
   }
 
+  /* ── CLIENT DASHBOARD ── */
+  if (rol === "CLIENTE") {
+    return <ClienteDashboard data={clienteData} />;
+  }
+
+  /* ── ADMIN / COLABORADOR DASHBOARD ── */
   const kpis = data?.kpis;
   const tc   = data?.tareasChart;
   const ec   = data?.entregablesChart;

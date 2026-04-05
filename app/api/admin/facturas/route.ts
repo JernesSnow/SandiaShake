@@ -276,15 +276,27 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: detallesErr.message }, { status: 500 });
     }
 
-    // Create tareas for each line item (cantidad tareas per item)
+    // Resolve assigned collaborador for this org (fall back to admin if none)
+    const { data: asignacion } = await admin
+      .from("asignacion_organizacion")
+      .select("id_colaborador")
+      .eq("id_organizacion", id_organizacion)
+      .neq("estado", "ELIMINADO")
+      .limit(1)
+      .maybeSingle();
+
+    const idColaboradorTareas = asignacion?.id_colaborador ?? perfil!.id_usuario;
+
+    // Create tareas for each line item (cantidad tareas per item), skip PLAN items
     const tareasRows: Record<string, unknown>[] = [];
     for (const item of items) {
+      if (item.tipo === "PLAN") continue;
       const cantidad = Number(item.cantidad);
       const titulo = String(item.concepto).trim();
       for (let i = 0; i < cantidad; i++) {
         tareasRows.push({
           id_organizacion,
-          id_colaborador: perfil!.id_usuario,
+          id_colaborador: idColaboradorTareas,
           id_factura: facturaId,
           titulo,
           status_kanban: "pendiente",
