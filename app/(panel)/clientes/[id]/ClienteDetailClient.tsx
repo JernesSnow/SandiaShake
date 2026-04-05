@@ -333,8 +333,6 @@ export default function ClienteDetailClient({ id }: { id: string }) {
     if (r.ok) setNotas(prev => prev.filter(n => n.id_nota !== idNota));
   }
 
-  //prueba
-
   async function activarNotificacionesPush() {
   try {
     const token = await requestNotificationPermissionAndToken();
@@ -367,7 +365,6 @@ export default function ClienteDetailClient({ id }: { id: string }) {
   }
 }
 
-  //
   /* ── LOADING / GUARD ── */
   if (loading || (role === "CLIENTE" && !resolvedOrgId)) {
     return <div className="text-[var(--ss-text3)] text-sm">Cargando organización…</div>;
@@ -438,9 +435,9 @@ export default function ClienteDetailClient({ id }: { id: string }) {
               )}
 
               <button
-    onClick={activarNotificacionesPush}
-    className="ml-auto rounded-lg border border-[#6cbe45] text-[#6cbe45] hover:bg-[#6cbe45]/10 transition px-3 py-1.5 text-xs font-medium whitespace-nowrap"
-  >Activar Notificacion</button>
+                onClick={activarNotificacionesPush}
+                className="ml-auto rounded-lg border border-[#6cbe45] text-[#6cbe45] hover:bg-[#6cbe45]/10 transition px-3 py-1.5 text-xs font-medium whitespace-nowrap"
+              >Activar Notificacion</button>
             </div>
           </div>
 
