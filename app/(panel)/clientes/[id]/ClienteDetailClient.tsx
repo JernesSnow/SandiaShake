@@ -1,5 +1,5 @@
 "use client";
-
+import { requestNotificationPermissionAndToken } from "@/lib/firebase/messaging";
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
@@ -333,6 +333,41 @@ export default function ClienteDetailClient({ id }: { id: string }) {
     if (r.ok) setNotas(prev => prev.filter(n => n.id_nota !== idNota));
   }
 
+  //prueba
+
+  async function activarNotificacionesPush() {
+  try {
+    const token = await requestNotificationPermissionAndToken();
+
+    if (!token) {
+      alert("No se pudieron activar las notificaciones en este dispositivo.");
+      return;
+    }
+
+    const res = await fetch("/api/fcm/register", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ token }),
+    });
+
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      console.error("Error registrando token FCM:", data);
+      alert("Se generó el permiso, pero no se pudo registrar este dispositivo.");
+      return;
+    }
+
+    alert("Notificaciones activadas correctamente en este dispositivo.");
+  } catch (error) {
+    console.error("Error activando notificaciones:", error);
+    alert("Ocurrió un error activando las notificaciones.");
+  }
+}
+
+  //
   /* ── LOADING / GUARD ── */
   if (loading || (role === "CLIENTE" && !resolvedOrgId)) {
     return <div className="text-[var(--ss-text3)] text-sm">Cargando organización…</div>;
@@ -379,8 +414,10 @@ export default function ClienteDetailClient({ id }: { id: string }) {
             {cliente.descripcion && (
               <p className="text-sm text-[var(--ss-text3)] leading-snug mb-3">{cliente.descripcion}</p>
             )}
+
+          
             {/* Info chips */}
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               {(cliente.pais || cliente.ciudad) && (
                 <span className="flex items-center gap-1.5 text-xs text-[var(--ss-text3)]">
                   <MapPin size={12} />
@@ -399,6 +436,11 @@ export default function ClienteDetailClient({ id }: { id: string }) {
                   {cliente.correo}
                 </span>
               )}
+
+              <button
+    onClick={activarNotificacionesPush}
+    className="ml-auto rounded-lg border border-[#6cbe45] text-[#6cbe45] hover:bg-[#6cbe45]/10 transition px-3 py-1.5 text-xs font-medium whitespace-nowrap"
+  >Activar Notificacion</button>
             </div>
           </div>
 
