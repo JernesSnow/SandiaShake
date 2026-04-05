@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Link as LinkIcon, Loader, CheckCircle } from "react-feather";
-import DriveStatusBadge from "@/components/drive/DriveStatusBadge";
 
 type Props = { isAdmin?: boolean };
 
@@ -105,7 +104,7 @@ export default function GoogleDriveSection({ isAdmin = false }: Props) {
         </div>
       ) : (
         <div className="rounded-xl bg-[var(--ss-raised)] border border-[var(--ss-border)] p-4 space-y-3">
-          <DriveStatusBadge connected={false} />
+          <span className="inline-flex px-2.5 py-1 text-[11px] rounded-full bg-[#ee2346]/15 text-[#ee2346] border border-[#ee2346]/30 font-medium">No conectado</span>
           <p className="text-xs text-[var(--ss-text3)]">
             Google Drive no está conectado. Conectá tu cuenta de Google para almacenar archivos de tareas directamente en tu Drive.
           </p>
