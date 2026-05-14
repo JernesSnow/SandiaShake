@@ -31,6 +31,36 @@ type JuiceDrop = {
 
 const JUICE_COLORS = ["#b80f24", "#d3182d", "#ef3340", "#ff5964", "#ff7a80"];
 
+const GAME_ASSETS = [
+  "/assets/office_bg.png",
+  "/assets/sprite_fixed.png",
+  "/assets/prop_demo_desk.png",
+  "/assets/prop_organizacion_shelf.png",
+  "/assets/prop_crecimiento_board.png",
+  "/assets/prop_seguimiento_tv.png",
+  "/assets/prop_exit_door.png",
+];
+
+function preloadImage(src: string) {
+  return new Promise<void>((resolve) => {
+    const img = new Image();
+
+    img.onload = async () => {
+      try {
+        await img.decode?.();
+      } catch {
+        // Si decode falla, Phaser todavía puede intentar usar la imagen.
+      }
+
+      resolve();
+    };
+
+    img.onerror = () => resolve();
+    img.src = src;
+  });
+}
+
+
 function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
@@ -180,10 +210,8 @@ function drawDrop(
   ctx.translate(drop.x, drop.y);
   ctx.rotate(drop.angle);
 
-  // stretch muy bajo → gota casi esférica, apenas elongada en la dirección del vuelo
-  // El scale horizontal apenas supera 1, el vertical es casi 1 también
-  const sx = 1 + drop.stretch * 0.55; // máx ~1.1 con stretch=0.18
-  const sy = 1 - drop.stretch * 0.18; // máx ~0.97 — casi circular
+  const sx = 1 + drop.stretch * 0.55; 
+  const sy = 1 - drop.stretch * 0.18; 
   ctx.scale(sx, sy);
 
   const steps = 32;
@@ -204,7 +232,7 @@ function drawDrop(
   }
   ctx.closePath();
 
-  // Gradiente radial con luz desde arriba-izquierda
+  
   const grad = ctx.createRadialGradient(
     -drop.r * 0.22, -drop.r * 0.28, drop.r * 0.03,
      drop.r * 0.05,  drop.r * 0.05, drop.r * 1.4
@@ -216,7 +244,7 @@ function drawDrop(
   ctx.fillStyle = grad;
   ctx.fill();
 
-  // Brillo especular pequeño — lo que hace que parezca húmedo
+  // Brillo especular pequeño 
   ctx.beginPath();
   ctx.ellipse(-drop.r * 0.16, -drop.r * 0.24, drop.r * 0.14, drop.r * 0.06, -0.5, 0, Math.PI * 2);
   ctx.fillStyle = `rgba(255,255,255,${drop.alpha * 0.38})`;
@@ -441,7 +469,7 @@ function drawCurtain(
     drawDrop(ctx, coreDrop, time);
   }
 
-  // Relleno final orgánico, no rectángulo puro.
+  // Relleno final orgánico
   if (solidAlpha > 0) {
     drawOrganicFullFilm(solidAlpha);
   }
@@ -464,6 +492,7 @@ export default function LandingHero() {
   const [showCanvas, setShowCanvas] = useState(false);
   const [mapMounted, setMapMounted] = useState(false);
   const [heroHidden, setHeroHidden] = useState(false); // true solo cuando la cortina cubrió todo
+  const [assetsReady, setAssetsReady] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const sceneRef = useRef<HTMLDivElement | null>(null);
@@ -477,6 +506,8 @@ export default function LandingHero() {
   const rafRef = useRef<number | null>(null);
   const timersRef = useRef<number[]>([]);
   const gameReadyRef = useRef(false);
+  const assetsReadyRef = useRef(false);
+
 
   useEffect(() => {
     const mq = window.matchMedia("(max-width: 768px)");
@@ -492,6 +523,23 @@ export default function LandingHero() {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
   }, []);
+
+  useEffect(() => {
+  let cancelled = false;
+
+  Promise.all(GAME_ASSETS.map(preloadImage)).then(() => {
+    if (!cancelled) {
+      assetsReadyRef.current = true;
+      setAssetsReady(true);
+    }
+  });
+
+  return () => {
+    cancelled = true;
+  };
+}, []);
+
+
 
   const later = (ms: number, fn: () => void) => {
     const id = window.setTimeout(fn, ms);
@@ -650,8 +698,9 @@ export default function LandingHero() {
 
   loopRef.current = loop;
 
-  const startTransition = () => {
-    if (transitioning) return;
+ const startTransition = () => {
+  if (transitioning || !assetsReadyRef.current) return;
+
 
     setTransitioning(true);
     setShake(true);
@@ -665,8 +714,6 @@ export default function LandingHero() {
       ? { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 }
       : { x: window.innerWidth * 0.72, y: window.innerHeight * 0.45 }; 
 
-    setMapMounted(true);
-
     later(180, () => { setShake(false); setSplit(true); });
 
     later(320, () => {
@@ -675,6 +722,10 @@ export default function LandingHero() {
       setShowCanvas(true);
       setPhase("splash");
       rafRef.current = requestAnimationFrame((ts) => loopRef.current?.(ts));
+    });
+
+    later(650, () => {
+    setMapMounted(true);
     });
 
     later(820, () => { setPhase("cover"); });
@@ -765,9 +816,9 @@ export default function LandingHero() {
                 <button
                   className="px-5 py-3 rounded-2xl bg-black text-white disabled:opacity-50"
                   onClick={startTransition}
-                  disabled={transitioning}
+                  disabled={transitioning || !assetsReady}
                 >
-                  Explorar demo
+                  {assetsReady ? "Explorar demo" : "Cargando demo..."}
                 </button>
                 <button className="px-5 py-3 rounded-2xl bg-black text-white">
                   Contactar
@@ -790,7 +841,7 @@ export default function LandingHero() {
                     } ${transitioning ? "cursor-default" : "cursor-pointer hover:scale-105 transition-transform duration-150"}`}
                     onClick={startTransition}
                     aria-label="Entrar a la demo"
-                    disabled={transitioning}
+                    disabled={transitioning || !assetsReady}
                   >
                     <div className="absolute inset-6 rounded-full bg-red-500 opacity-90" />
                     <div className="absolute inset-0 rounded-full border-[6px] border-green-700 opacity-40" />
