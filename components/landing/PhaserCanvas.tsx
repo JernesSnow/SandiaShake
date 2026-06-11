@@ -16,9 +16,6 @@ export default function PhaserCanvas({
   const phaserRef = useRef<any>(null);
   const sceneRef = useRef<any>(null);
 
-  const lastFeatureRef = useRef<FeatureKey | null>(null);
-  const lastAtRef = useRef<number>(0);
-
   const onFeatureRef = useRef(onFeature);
   const onReadyRef = useRef(onReady);
 
@@ -49,18 +46,8 @@ export default function PhaserCanvas({
         }
 
         if (evt.type === "FEATURE_TRIGGER") {
-          const now = Date.now();
-          if (
-            lastFeatureRef.current === evt.feature &&
-            now - lastAtRef.current < 1200
-          ) {
-            return;
-          }
-
-          lastFeatureRef.current = evt.feature;
-          lastAtRef.current = now;
-          onFeatureRef.current(evt.feature);
-        }
+  onFeatureRef.current(evt.feature);
+}
       };
 
       const config: Phaser.Types.Core.GameConfig = {

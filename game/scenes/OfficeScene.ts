@@ -301,7 +301,7 @@ this.anims.create({
     const padX = 18;
     this.player.x = Phaser.Math.Clamp(this.player.x, padX, this.WORLD_W - padX);
     this.player.y = Phaser.Math.Clamp(this.player.y, this.floorTop, this.floorBottom);
-    this.nextAllowedAt = this.time.now + 500;
+    this.nextAllowedAt = this.time.now + 800;
   });
 
   this.emitToUI({ type: "READY" });
@@ -426,7 +426,6 @@ const padX = 18;
         return;
       }
 
-      this.locked = true;
       this.emitToUI({ type: "FEATURE_TRIGGER", feature: this.hoveredFeature });
     }
   }
