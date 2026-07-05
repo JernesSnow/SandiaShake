@@ -11,6 +11,7 @@ import SaludMental from "./SaludMental";
 import Rendimiento from "./Rendimiento";
 import ChilliPoints from "./ChilliPoints";
 import SaludMentalModal from "@/components/SaludMentalModal";
+import ClienteDashboard from "./ClienteDashboard";
 
 import { CheckSquare, FileText, Users, User } from "react-feather";
 import { requestNotificationPermissionAndToken } from "@/lib/firebase/messaging";
@@ -31,10 +32,12 @@ type DashboardData = {
 
 export default function DashboardPage() {
   const supabase = createSupabaseClient();
-  const router = useRouter();
+  const router   = useRouter();
 
-  const [ready, setReady] = useState(false);
-  const [data, setData] = useState<DashboardData | null>(null);
+  const [ready, setReady]             = useState(false);
+  const [rol, setRol]                 = useState<string | null>(null);
+  const [data, setData]               = useState<DashboardData | null>(null);
+  const [clienteData, setClienteData] = useState<any>(null);
   const [showBienestar, setShowBienestar] = useState(false);
 
   useEffect(() => {
@@ -57,7 +60,7 @@ export default function DashboardPage() {
         return;
       }
 
-      if (!cancelled) setReady(true);
+      if (!cancelled) { setRol(perfil.rol); setReady(true); }
 
       if (perfil.rol === "ADMIN") {
         const res = await fetch("/api/admin/dashboard", { cache: "no-store" });
@@ -68,6 +71,11 @@ export default function DashboardPage() {
         const res = await fetch("/api/bienestar/hoy");
         const hoy = await res.json();
         if (hoy.aplica && !hoy.registrado && !cancelled) setShowBienestar(true);
+      }
+
+      if (perfil.rol === "CLIENTE") {
+        const res = await fetch("/api/cliente/dashboard", { cache: "no-store" });
+        if (res.ok && !cancelled) setClienteData(await res.json());
       }
     }
 
@@ -83,6 +91,12 @@ export default function DashboardPage() {
     );
   }
 
+  /* ── CLIENT DASHBOARD ── */
+  if (rol === "CLIENTE") {
+    return <ClienteDashboard data={clienteData} />;
+  }
+
+  /* ── ADMIN / COLABORADOR DASHBOARD ── */
   const kpis = data?.kpis;
   const tc   = data?.tareasChart;
   const ec   = data?.entregablesChart;
@@ -128,93 +142,6 @@ export default function DashboardPage() {
           totalCanjeados={cp?.totalCanjeados ?? 0}
           disponibles={cp?.disponibles ?? 0}
         />
-      </div>
-
-      {/* Debug FCM buttons */}
-      <div className="flex flex-wrap gap-2 mt-4">
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              const res = await fetch("/api/fcm/test-send", { method: "POST" });
-              const data = await res.json();
-              console.log("FCM test-send response:", data);
-              alert(JSON.stringify(data, null, 2));
-            } catch (err) {
-              console.error(err);
-              alert("Error enviando push");
-            }
-          }}
-          className="rounded-lg bg-green-600 px-3 py-1.5 text-white text-xs font-medium"
-        >
-          Probar envío push
-        </button>
-
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              const hasNotification = typeof window !== "undefined" && "Notification" in window;
-              const permission = hasNotification ? Notification.permission : "no-api";
-              alert(`Notification API: ${hasNotification}\nPermiso actual: ${permission}`);
-            } catch (e) {
-              console.error(e);
-              alert("Error revisando Notification API");
-            }
-          }}
-          className="rounded-lg bg-orange-600 px-3 py-1.5 text-white text-xs font-medium"
-        >
-          Diagnóstico notificaciones
-        </button>
-
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              const token = await requestNotificationPermissionAndToken();
-              console.log("TOKEN TELEFONO:", token);
-              alert(token ? "Token generado" : "No se generó token");
-            } catch (e) {
-              console.error(e);
-              alert("Error generando token");
-            }
-          }}
-          className="rounded-lg bg-blue-600 px-3 py-1.5 text-white text-xs font-medium"
-        >
-          Generar token push
-        </button>
-
-        <button
-          type="button"
-          onClick={async () => {
-            try {
-              if (!("Notification" in window)) {
-                alert("Este navegador no soporta Notification API");
-                return;
-              }
-              const permission = await Notification.requestPermission();
-              alert(`Permiso después de pedirlo: ${permission}`);
-              if (permission !== "granted") return;
-              const token = await requestNotificationPermissionAndToken();
-              console.log("TOKEN TELEFONO:", token);
-              if (!token) { alert("No se generó token"); return; }
-              const res = await fetch("/api/fcm/register", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ token }),
-              });
-              const data = await res.json();
-              console.log("Respuesta register:", data);
-              alert(`Token generado y enviado al backend.\nRegistro ok: ${res.ok}`);
-            } catch (e) {
-              console.error(e);
-              alert("Error generando o guardando token");
-            }
-          }}
-          className="rounded-lg bg-blue-600 px-3 py-1.5 text-white text-xs font-medium"
-        >
-          Registrar push en este dispositivo
-        </button>
       </div>
     </>
   );

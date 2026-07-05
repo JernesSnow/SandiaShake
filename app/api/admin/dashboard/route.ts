@@ -43,7 +43,7 @@ export async function GET() {
       admin.from("tareas").select("id_tarea, status_kanban, fecha_entrega, id_colaborador").eq("estado", "ACTIVO"),
       admin.from("entregables").select("id_entregable, estado_aprobacion, created_at").eq("estado", "ACTIVO"),
       admin.from("organizaciones").select("id_organizacion").eq("estado", "ACTIVO"),
-      admin.from("usuarios").select("id_usuario, nombre, correo").eq("rol", "COLABORADOR").eq("estado", "ACTIVO"),
+      admin.from("usuarios").select("id_usuario, nombre, correo, rol").in("rol", ["COLABORADOR", "ADMIN"]).eq("estado", "ACTIVO"),
       // latest bienestar per user
       admin.from("usuario_bienestar").select("id_usuario, estado_animo, fecha_revision").eq("estado", "ACTIVO").order("fecha_revision", { ascending: false }),
       admin.from("chilli_movimientos").select("id_colaborador, puntos").eq("estado", "ACTIVO"),

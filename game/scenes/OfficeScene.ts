@@ -46,8 +46,11 @@ export class OfficeScene extends Phaser.Scene {
   private uiScale = 1;
 
   private readonly PLAYER_BASE = 1;       // tamaño general
-private readonly PLAYER_DEPTH_EXTRA = 0.06; // cuánto crece al acercarse
-private readonly BASE_H = 1080;
+  private readonly PLAYER_DEPTH_EXTRA = 0.06; // cuánto crece al acercarse
+  private readonly BASE_H = 1080;
+
+ // Guardamos referencia a stations para usarla en UNLOCK_AND_BUMP
+  private stations: Station[] = [];
 
   constructor(emitToUI: EmitFn) {
     super("OfficeScene");
@@ -56,6 +59,35 @@ private readonly BASE_H = 1080;
 
   private insideAABB(px: number, py: number, x: number, y: number, w: number, h: number) {
     return Math.abs(px - x) <= w / 2 && Math.abs(py - y) <= h / 2;
+  }
+
+  private resolveOverlap(
+    px: number, py: number,
+    s: Station
+  ): { x: number; y: number } {
+    const hw = (s.blockW * this.uiScale) / 2;
+    const hh = (s.blockH * this.uiScale) / 2;
+    const dx = px - s.x;
+    const dy = py - s.y;
+
+    // Cuánto hay que empujar en cada eje para salir del bloque
+    const overlapX = hw - Math.abs(dx);
+    const overlapY = hh - Math.abs(dy);
+
+    // Empujar por el eje con menor overlap (el camino más corto hacia afuera)
+    // + 4px de margen para que no quede justo en el borde
+    const MARGIN = 4;
+    if (overlapX < overlapY) {
+      return {
+        x: px + (dx >= 0 ? overlapX + MARGIN : -(overlapX + MARGIN)),
+        y: py,
+      };
+    } else {
+      return {
+        x: px,
+        y: py + (dy >= 0 ? overlapY + MARGIN : -(overlapY + MARGIN)),
+      };
+    }
   }
 
   preload() {
@@ -123,92 +155,80 @@ this.anims.create({
     .setScale(0.55);
   followDecor.setDepth(10); // fondo
 
-  const DOOR_X = this.WORLD_W * 0.95;
-  const DOOR_BASE_Y = h * 0.62; // donde está la base visual 
+ const doorDecor = this.add.image(this.WORLD_W * 0.95, h * 0.80, "door")
+      .setOrigin(0.5, 1)
+      .setScale(0.40 * this.uiScale)
+      .setDepth(50);
 
-  const doorDecor = this.add.image(this.WORLD_W * 0.95, h * 0.80, "door")
-  .setOrigin(0.5, 1)
-  .setScale(0.40 * this.uiScale);
-
-doorDecor.setDepth(50); // encima del bg, detrás del player
-
+    const DOOR_X = this.WORLD_W * 0.95;
   // Estaciones (repartidas en el mundo ancho)
-  const stations: Station[] = [
-    {
-      key: "demo",
-      x: this.WORLD_W * 0.10,
-      y: h * 0.80,
-      label: "Demo",
-      blockW: 260, blockH: 150,
-      interactW: 360, interactH: 260,
-      spriteKey: "demo",
-      scale: 0.42,
-    },
-
-    {
-      key: "crecimiento",
-      x: this.WORLD_W * 0.30,
-      y: h * 0.65,
-      label: "Crecimiento",
-      blockW: 220, blockH: 160,
-      interactW: 320, interactH: 260,
-      spriteKey: "growth",
-      scale: 0.42,
-    },
-
-    {
-      
-      key: "seguimiento",
-      x: this.WORLD_W * 0.62,
-      y: h * 0.82,
-      label: "Seguimiento",
-      blockW: 170, blockH: 140,
-      interactW: 280, interactH: 240,
-      spriteKey: "follow",
-      scale: 0.22,
-      yOffset: 0,
-    },
-
-    {
-      key: "organizacion",
-      x: this.WORLD_W * 0.82,
-      y: h * 0.83,
-      label: "Organización",
-      blockW: 240, blockH: 160,
-      interactW: 340, interactH: 260,
-      spriteKey: "org",
-      scale: 0.42,
-    },
-
-    {
-  key: "exit" as FeatureKey,
-  x: DOOR_X,
-  y: this.floorBottom - (300 * this.uiScale),  // centro del trigger en el piso (ajustable)
-  label: "Salir",
-  blockW: 0,
-  blockH: 0,
-  interactW: 180,
-  interactH: 100,            
-  spriteKey: "door",         
-  scale: 0.40,
-},
-  ];
+  this.stations = [
+      {
+        key: "demo",
+        x: this.WORLD_W * 0.10,
+        y: h * 0.80,
+        label: "Demo",
+        blockW: 260, blockH: 150,
+        interactW: 360, interactH: 260,
+        spriteKey: "demo",
+        scale: 0.42,
+      },
+      {
+        key: "crecimiento",
+        x: this.WORLD_W * 0.30,
+        y: h * 0.65,
+        label: "Crecimiento",
+        blockW: 220, blockH: 160,
+        interactW: 320, interactH: 260,
+        spriteKey: "growth",
+        scale: 0.42,
+      },
+      {
+        key: "seguimiento",
+        x: this.WORLD_W * 0.62,
+        y: h * 0.82,
+        label: "Seguimiento",
+        blockW: 170, blockH: 140,
+        interactW: 280, interactH: 240,
+        spriteKey: "follow",
+        scale: 0.22,
+        yOffset: 0,
+      },
+      {
+        key: "organizacion",
+        x: this.WORLD_W * 0.82,
+        y: h * 0.83,
+        label: "Organización",
+        blockW: 240, blockH: 160,
+        interactW: 340, interactH: 260,
+        spriteKey: "org",
+        scale: 0.42,
+      },
+      {
+        key: "exit" as FeatureKey,
+        x: DOOR_X,
+        y: this.floorBottom - (300 * this.uiScale),
+        label: "Salir",
+        blockW: 0,
+        blockH: 0,
+        interactW: 180,
+        interactH: 100,
+        spriteKey: "door",
+        scale: 0.40,
+      },
+    ];
 
   // Dibujo props + labels
-  stations.forEach((s) => {
-    if (s.key === ("exit" as any)) return;
-  const propY = s.y + (s.yOffset ?? 0);
+  this.stations.forEach((s) => {
+      if (s.key === ("exit" as any)) return;
+      const propY = s.y + (s.yOffset ?? 0);
 
-  let propDepth = propY;
-
-  if (s.spriteKey !== "__none__") {
-    const prop = this.add.image(s.x, propY, s.spriteKey)
-      .setOrigin(0.5, 1)
-      .setScale(s.scale * this.uiScale);
-
-    prop.setDepth(propY);
-    propDepth = prop.depth;
-  }
+      if (s.spriteKey !== "__none__") {
+        const prop = this.add.image(s.x, propY, s.spriteKey)
+          .setOrigin(0.5, 1)
+          .setScale(s.scale * this.uiScale)
+          .setDepth(propY);
+      }
 
   const labelY = (s.labelY ?? propY) - (s.blockH / 2) - 18;
 
@@ -223,9 +243,7 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
   top: Math.round(4 * this.uiScale),
   bottom: Math.round(4 * this.uiScale),
 },
-  }).setOrigin(0.5);
-
-  label.setDepth(propDepth + 1);
+  }).setOrigin(0.5).setDepth(propY + 1);
 });
 
   // Player: nace en el piso, centrado
@@ -259,7 +277,6 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
   hint.setDepth(9999); 
 
   this.registry.set("hint", hint);
-  this.registry.set("stations", stations);
 
   // Lock/unlock
   this.events.on("LOCK", () => { this.locked = true; });
@@ -267,21 +284,24 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
   this.events.on("UNLOCK_AND_BUMP", () => {
     this.locked = false;
 
-    const bump = this.lastMove.clone().scale(-28);
-    this.player.x += bump.x;
-    this.player.y += bump.y;
+    for (const s of this.stations) {
+        const hw = (s.blockW * this.uiScale) / 2;
+        const hh = (s.blockH * this.uiScale) / 2;
+        if (hw <= 0 || hh <= 0) continue;
+
+        if (this.insideAABB(this.player.x, this.player.y, s.x, s.y, s.blockW * this.uiScale, s.blockH * this.uiScale)) {
+          const resolved = this.resolveOverlap(this.player.x, this.player.y, s);
+          this.player.x = resolved.x;
+          this.player.y = resolved.y;
+          break;
+        }
+      }
 
     // clamp mundo + piso
     const padX = 18;
     this.player.x = Phaser.Math.Clamp(this.player.x, padX, this.WORLD_W - padX);
     this.player.y = Phaser.Math.Clamp(this.player.y, this.floorTop, this.floorBottom);
-
-    // 2.5D scale
-    const base = 0.14 * this.uiScale;
-    const depth = Phaser.Math.Clamp((this.player.y - this.floorTop) / (this.floorBottom - this.floorTop), 0, 1);
-    this.player.setScale(base + depth * (0.05 * this.uiScale));
-
-    this.nextAllowedAt = this.time.now + 500;
+    this.nextAllowedAt = this.time.now + 800;
   });
 
   this.emitToUI({ type: "READY" });
@@ -289,16 +309,12 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
 
   update(_t: number, dt: number) {
   const hint = this.registry.get("hint") as Phaser.GameObjects.Text;
-  const stations = this.registry.get("stations") as Station[];
   const now = this.time.now;
 
   if (this.locked) {
     hint.setVisible(false);
     return;
   }
-
-  const prevX = this.player.x;
-  const prevY = this.player.y;
 
   const d = dt / 1000;
   let vx = 0, vy = 0;
@@ -326,94 +342,91 @@ doorDecor.setDepth(50); // encima del bg, detrás del player
 
 }
 
-  // Posición lógica 
-  let nx = this.player.x + vx * this.speed * d;
-  let ny = this.player.y + vy * this.speed * d;
+const padX = 18;
+    let nx = Phaser.Math.Clamp(this.player.x + vx * this.speed * d, padX, this.WORLD_W - padX);
+    let ny = Phaser.Math.Clamp(this.player.y + vy * this.speed * d, this.floorTop, this.floorBottom);
 
-  // Clamp correcto: mundo + piso
-  const padX = 18;
-  nx = Phaser.Math.Clamp(nx, padX, this.WORLD_W - padX);
-  ny = Phaser.Math.Clamp(ny, this.floorTop, this.floorBottom);
+    const blockedFull = this.stations.some(s =>
+      this.insideAABB(nx, ny, s.x, s.y, s.blockW * this.uiScale, s.blockH * this.uiScale)
+    );
 
-  // FOOT (lógico) para colisiones/hover
-  const footX = nx;
-  const footY = ny;
+    if (blockedFull) {
+      // Intentar solo movimiento horizontal
+      const nx2 = nx;
+      const ny2 = this.player.y;
+      const blockedX = this.stations.some(s =>
+        this.insideAABB(nx2, ny2, s.x, s.y, s.blockW * this.uiScale, s.blockH * this.uiScale)
+      );
 
-  // Colisión (usa FOOT lógico) 
-  let blocked = false;
-  for (const s of stations) {
-    if (this.insideAABB(footX, footY, s.x, s.y, s.blockW * this.uiScale, s.blockH * this.uiScale)) {
-      blocked = true;
-      break;
-    }
-  }
+      // Intentar solo movimiento vertical
+      const nx3 = this.player.x;
+      const ny3 = ny;
+      const blockedY = this.stations.some(s =>
+        this.insideAABB(nx3, ny3, s.x, s.y, s.blockW * this.uiScale, s.blockH * this.uiScale)
+      );
 
-  if (blocked) {
-    // volver
-    nx = prevX;
-    ny = prevY;
-  }
-
-  // aplicar posición base
-  this.player.x = nx;
-  this.player.y = ny;
-
-  // flip + animación 
-  if (moving) {
-    if (vx < 0) this.player.setFlipX(false);
-    if (vx > 0) this.player.setFlipX(true);
-    this.player.rotation = 0;
-  }
-
-  this.player.setDepth(ny + 10);
-
-  const base = 0.14;
-  const depth = Phaser.Math.Clamp(
-  (ny - this.floorTop) / (this.floorBottom - this.floorTop),
-  0,
-  1
-);
-
-this.player.setScale(
-  (this.PLAYER_BASE + depth * this.PLAYER_DEPTH_EXTRA) * this.uiScale * 2
-);
-
-  this.hoveredFeature = null;
-  for (const s of stations) {
-    if (this.insideAABB(footX, footY, s.x, s.y, s.interactW * this.uiScale, s.interactH * this.uiScale)) {
-      this.hoveredFeature = s.key;
-      break;
-    }
-  }
-
-  // Hint (posicionar basado en ny/foot)
-  if (this.hoveredFeature && now >= this.nextAllowedAt) {
-    hint.setVisible(true);
-    hint.setText((this.hoveredFeature as any) === "exit" ? "⏎ Salir" : "⏎ Enter");
-    hint.setPosition(this.player.x, ny - 28);
-  } else {
-    hint.setVisible(false);
-  }
-
-  // Enter para interactuar
-  if (
-    this.hoveredFeature &&
-    now >= this.nextAllowedAt &&
-    Phaser.Input.Keyboard.JustDown(this.keyEnter)
-  ) {
-    if ((this.hoveredFeature as any) === "exit") {
-      this.locked = true;
-      this.nextAllowedAt = now + 600;
-
-      this.cameras.main.fadeOut(200, 0, 0, 0);
-      this.time.delayedCall(200, () => {
-        this.emitToUI({ type: "FEATURE_TRIGGER", feature: this.hoveredFeature! });
-      });
-      return;
+      if (!blockedX) {
+        nx = nx2; ny = ny2; // deslizar en X
+      } else if (!blockedY) {
+        nx = nx3; ny = ny3; // deslizar en Y
+      } else {
+        nx = this.player.x; ny = this.player.y; // completamente bloqueado
+      }
     }
 
-    this.locked = true;
-    this.emitToUI({ type: "FEATURE_TRIGGER", feature: this.hoveredFeature });
+    this.player.x = nx;
+    this.player.y = ny;
+
+    if (moving) {
+      if (vx < 0) this.player.setFlipX(false);
+      if (vx > 0) this.player.setFlipX(true);
+      this.player.rotation = 0;
+    }
+
+    this.player.setDepth(ny + 10);
+
+    const base = 0.14;
+    const depth = Phaser.Math.Clamp(
+      (ny - this.floorTop) / (this.floorBottom - this.floorTop),
+      0, 1
+    );
+    this.player.setScale(
+      (this.PLAYER_BASE + depth * this.PLAYER_DEPTH_EXTRA) * this.uiScale * 2
+    );
+
+    // Hover
+    this.hoveredFeature = null;
+    for (const s of this.stations) {
+      if (this.insideAABB(nx, ny, s.x, s.y, s.interactW * this.uiScale, s.interactH * this.uiScale)) {
+        this.hoveredFeature = s.key;
+        break;
+      }
+    }
+
+    if (this.hoveredFeature && now >= this.nextAllowedAt) {
+      hint.setVisible(true);
+      hint.setText((this.hoveredFeature as any) === "exit" ? "⏎ Salir" : "⏎ Enter");
+      hint.setPosition(this.player.x, ny - 28);
+    } else {
+      hint.setVisible(false);
+    }
+
+    if (
+      this.hoveredFeature &&
+      now >= this.nextAllowedAt &&
+      Phaser.Input.Keyboard.JustDown(this.keyEnter)
+    ) {
+      if ((this.hoveredFeature as any) === "exit") {
+        this.locked = true;
+        this.nextAllowedAt = now + 600;
+        this.cameras.main.fadeOut(200, 0, 0, 0);
+        this.time.delayedCall(200, () => {
+          this.emitToUI({ type: "FEATURE_TRIGGER", feature: this.hoveredFeature! });
+        });
+        return;
+      }
+
+      this.emitToUI({ type: "FEATURE_TRIGGER", feature: this.hoveredFeature });
+    }
   }
-}
 }

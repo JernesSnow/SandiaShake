@@ -6,23 +6,26 @@ import type { FeatureKey, GameToUIEvent } from "@/game/types";
 export default function PhaserCanvas({
   onFeature,
   modalOpen,
+  onReady,
 }: {
   onFeature: (k: FeatureKey) => void;
   modalOpen: boolean;
+  onReady?: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const phaserRef = useRef<any>(null);
   const sceneRef = useRef<any>(null);
 
-  // anti-spam
-  const lastFeatureRef = useRef<FeatureKey | null>(null);
-  const lastAtRef = useRef<number>(0);
-
-  // mantener callback estable
   const onFeatureRef = useRef(onFeature);
+  const onReadyRef = useRef(onReady);
+
   useEffect(() => {
     onFeatureRef.current = onFeature;
   }, [onFeature]);
+
+  useEffect(() => {
+    onReadyRef.current = onReady;
+  }, [onReady]);
 
   useEffect(() => {
     let cancelled = false;
@@ -37,14 +40,14 @@ export default function PhaserCanvas({
       const emitToUI = (evt: GameToUIEvent) => {
         if (cancelled) return;
 
-        if (evt.type === "FEATURE_TRIGGER") {
-          const now = Date.now();
-          if (lastFeatureRef.current === evt.feature && now - lastAtRef.current < 1200) return;
-          lastFeatureRef.current = evt.feature;
-          lastAtRef.current = now;
-
-          onFeatureRef.current(evt.feature);
+        if (evt.type === "READY") {
+          onReadyRef.current?.();
+          return;
         }
+
+        if (evt.type === "FEATURE_TRIGGER") {
+  onFeatureRef.current(evt.feature);
+}
       };
 
       const config: Phaser.Types.Core.GameConfig = {
@@ -60,7 +63,6 @@ export default function PhaserCanvas({
 
       phaserRef.current = new Phaser.Game(config);
 
-      // ResizeObserver para mantener tamaño exacto del contenedor
       ro = new ResizeObserver(() => {
         if (!phaserRef.current || !containerRef.current) return;
         phaserRef.current.scale.resize(
@@ -68,9 +70,9 @@ export default function PhaserCanvas({
           containerRef.current.clientHeight
         );
       });
+
       ro.observe(containerRef.current);
 
-      // primer resize + referencia a escena
       setTimeout(() => {
         if (!phaserRef.current || !containerRef.current) return;
 
@@ -94,11 +96,11 @@ export default function PhaserCanvas({
         phaserRef.current.destroy(true);
         phaserRef.current = null;
       }
+
       sceneRef.current = null;
     };
   }, []);
 
-  // lock/unlock
   useEffect(() => {
     const scene = sceneRef.current;
     if (!scene) return;
