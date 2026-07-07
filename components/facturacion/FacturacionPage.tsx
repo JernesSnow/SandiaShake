@@ -221,6 +221,8 @@ export function FacturacionPage() {
   const [loadingTareas, setLoadingTareas] = useState(false);
 
 const [sendingEmail, setSendingEmail] = useState(false);
+const [emailMsg, setEmailMsg] = useState<{ ok: boolean; text: string } | null>(null);
+const [payError, setPayError] = useState<string | null>(null);
 
 async function fetchPlanes() {
   try {
@@ -252,10 +254,12 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error || "No se pudo enviar el correo");
 
-    alert(`Correo enviado a: ${json?.to || "cliente"}`);
+    setEmailMsg({ ok: true, text: `Correo enviado a: ${json?.to || "cliente"}` });
+    setTimeout(() => setEmailMsg(null), 5000);
   } catch (e: any) {
     console.error(e);
-    alert(e?.message ?? "Error enviando correo");
+    setEmailMsg({ ok: false, text: e?.message ?? "Error enviando correo" });
+    setTimeout(() => setEmailMsg(null), 5000);
   } finally {
     setSendingEmail(false);
   }
@@ -582,15 +586,16 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
 
   async function submitPago() {
     if (!payFacturaId) {
-      alert("Selecciona una factura.");
+      setPayError("Selecciona una factura.");
       return;
     }
     const monto = Number(payMonto);
     if (!Number.isFinite(monto) || monto <= 0) {
-      alert("Monto inválido.");
+      setPayError("Monto inválido.");
       return;
     }
 
+    setPayError(null);
     setSavingPay(true);
     try {
       const res = await fetch("/api/admin/pagos", {
@@ -609,12 +614,9 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
 
       setPayOpen(false);
       await fetchFacturas();
-      //prueba
-await enviarNotificacion("pago");
-      //fin prueba
     } catch (e: any) {
       console.error(e);
-      alert(e?.message ?? "Error registrando pago");
+      setPayError(e?.message ?? "Error registrando pago");
     } finally {
       setSavingPay(false);
     }
@@ -861,9 +863,11 @@ await enviarNotificacion("pago");
 >
   {sendingEmail ? "Enviando..." : "Enviar recordatorio"}
 </button>
-
-
-
+{emailMsg && (
+  <span className={`text-[11px] ${emailMsg.ok ? "text-[#6cbe45]" : "text-[#ee2346]"}`}>
+    {emailMsg.text}
+  </span>
+)}
                     {/*fin prueba boton */}
                     <button
                       type="button"
@@ -980,12 +984,12 @@ await enviarNotificacion("pago");
         <Modal
           title="Registrar pago"
           subtitle="Ingresa monto y método. Se guardará en la BD y actualizará el saldo."
-          onClose={() => setPayOpen(false)}
+          onClose={() => { setPayOpen(false); setPayError(null); }}
           footer={
             <>
               <button
                 type="button"
-                onClick={() => setPayOpen(false)}
+                onClick={() => { setPayOpen(false); setPayError(null); }}
                 className="rounded-xl border border-[var(--ss-border)] px-3 py-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-raised)] transition"
               >
                 Cancelar
@@ -1059,6 +1063,12 @@ await enviarNotificacion("pago");
                 placeholder="Comprobante / número referencia"
               />
             </div>
+
+            {payError && (
+              <div className="rounded-xl bg-[#ee2346]/10 border border-[#ee2346]/20 px-3 py-2">
+                <p className="text-xs text-[#ee2346]">{payError}</p>
+              </div>
+            )}
           </div>
         </Modal>
       )}
