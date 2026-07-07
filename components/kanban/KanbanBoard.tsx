@@ -12,7 +12,6 @@ import {
   Calendar,
   Edit2,
   Link as LinkIcon,
-  Plus,
   Search,
   Trash2,
   User,
@@ -192,31 +191,6 @@ async function deleteTaskInDb(taskId: string) {
   return true;
 }
 
-async function createTaskInDb(task: Task, isAdmin: boolean) {
-  const payload: any = {
-    id_organizacion: task.idOrganizacion,
-    titulo: task.titulo,
-    descripcion: task.descripcion ?? "",
-    status_kanban: task.statusId,
-    prioridad: task.prioridad ?? "Media",
-    tipo_entregable: task.tipoEntregable ?? null,
-    fecha_entrega: task.fechaEntrega ?? null,
-    mes: task.mes ?? null,
-  };
-
-  if (isAdmin) payload.id_colaborador = task.idColaborador ?? null;
-
-  const res = await fetch("/api/admin/tareas", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  const json = await safeJson(res);
-  if (!res.ok) throw new Error(json?.error ?? "No se pudo crear la tarea");
-  return json?.data;
-}
-
 async function decideTaskInDb(
   taskId: string,
   accion: "APROBAR" | "RECHAZAR",
@@ -350,7 +324,6 @@ export function KanbanBoard() {
   const isColab = role === "COLABORADOR";
   const isCliente = role === "CLIENTE";
 
-  const canCreate = isAdmin || isColab;
   const canEdit = isAdmin || isColab;
   const canReassign = isAdmin;
   const canDelete = isAdmin;
@@ -585,31 +558,6 @@ export function KanbanBoard() {
     );
   }
 
-  function openNewTask() {
-    if (!canCreate) return;
-
-    const firstOrg = orgs[0];
-    const me = colabs.find((c) => String(c.id_usuario) === String(perfilId));
-    const defaultColab = me ?? colabs[0];
-
-    setIsNew(true);
-    setEditingTask({
-      id: "",
-      titulo: "",
-      cliente: firstOrg?.nombre ?? "",
-      asignadoA: defaultColab?.nombre ?? "",
-      statusId: "pendiente",
-      fechaEntrega: "",
-      mes: "",
-      tipoEntregable: "Arte",
-      prioridad: "Media",
-      googleDriveUrl: "",
-      descripcion: "",
-      idOrganizacion: firstOrg?.id_organizacion,
-      idColaborador: defaultColab?.id_usuario,
-    });
-  }
-
   function openTaskDetails(task: Task) {
     setIsNew(false);
     setEditingTask(task);
@@ -654,55 +602,6 @@ export function KanbanBoard() {
 
   function handleSaveTask(taskInput: Task) {
     if (!canEdit) {
-      setEditingTask(null);
-      setIsNew(false);
-      return;
-    }
-
-    if (isNew) {
-      if (
-        !taskInput.idOrganizacion ||
-        !Number.isFinite(taskInput.idOrganizacion)
-      ) {
-        alert("Debes seleccionar una organización.");
-        return;
-      }
-
-      if (isAdmin && colabs.length > 0 && !taskInput.idColaborador) {
-        alert("Debes seleccionar un colaborador.");
-        return;
-      }
-
-      setSaveOkMsg("");
-      setSaveErrMsg("");
-
-      createTaskInDb(taskInput, isAdmin)
-        .then((row) => {
-          const created = apiRowToTask(row);
-          if (!created) {
-            throw new Error("Formato inválido de API (id_tarea)");
-          }
-
-          setState((prev) => {
-            const col = prev.columns[created.statusId];
-            return {
-              ...prev,
-              tasks: { ...prev.tasks, [created.id]: created },
-              columns: {
-                ...prev.columns,
-                [col.id]: { ...col, taskIds: [...col.taskIds, created.id] },
-              },
-            };
-          });
-
-          setSaveOkMsg("Tarea creada correctamente");
-          window.setTimeout(() => setSaveOkMsg(""), 1500);
-        })
-        .catch((err) => {
-          console.error(err);
-          setSaveErrMsg(err?.message ?? "No se pudo crear la tarea");
-        });
-
       setEditingTask(null);
       setIsNew(false);
       return;
@@ -804,18 +703,6 @@ export function KanbanBoard() {
 ) : (
   <ReporteDropdown />
 )}
-
-  {/* BOTÓN NUEVA TAREA */}
-  {(isAdmin || isColab) && (
-    <button
-      type="button"
-      onClick={openNewTask}
-      className={`${kanbanStyles.primaryButton} flex items-center gap-2`}
-    >
-      <Plus size={16} />
-      Nueva tarea
-    </button>
-  )}
 
 </div>
 

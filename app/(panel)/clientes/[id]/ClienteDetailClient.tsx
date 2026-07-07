@@ -379,13 +379,15 @@ export default function ClienteDetailClient({ id }: { id: string }) {
     <div className="flex flex-col gap-8 text-[var(--ss-text)]">
 
       {/* BACK */}
-      <button
-        onClick={() => router.push("/clientes")}
-        className="flex items-center gap-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)] transition-colors w-fit"
-      >
-        <ArrowLeft size={16} />
-        Volver a clientes
-      </button>
+      {role !== "CLIENTE" && (
+        <button
+          onClick={() => router.push("/clientes")}
+          className="flex items-center gap-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)] transition-colors w-fit"
+        >
+          <ArrowLeft size={16} />
+          Volver a clientes
+        </button>
+      )}
 
       {/* PROFILE HEADER */}
       <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-6">

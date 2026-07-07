@@ -79,6 +79,13 @@ export async function POST(req: Request) {
     );
   }
 
+  if (puntos_costo <= 0) {
+    return NextResponse.json(
+      { error: "puntos_costo debe ser mayor a 0" },
+      { status: 400 }
+    );
+  }
+
   const admin = createSupabaseAdmin();
   const now = new Date().toISOString();
 
@@ -131,7 +138,16 @@ export async function PATCH(req: Request) {
 
   if (body.nombre !== undefined) patch.nombre = body.nombre;
   if (body.descripcion !== undefined) patch.descripcion = body.descripcion;
-  if (body.puntos_costo !== undefined) patch.puntos_costo = body.puntos_costo;
+  if (body.puntos_costo !== undefined) {
+    const puntos_costo = Number(body.puntos_costo);
+    if (Number.isNaN(puntos_costo) || puntos_costo <= 0) {
+      return NextResponse.json(
+        { error: "puntos_costo debe ser mayor a 0" },
+        { status: 400 }
+      );
+    }
+    patch.puntos_costo = puntos_costo;
+  }
   if (body.visible !== undefined) patch.visible = body.visible;
 
   const admin = createSupabaseAdmin();

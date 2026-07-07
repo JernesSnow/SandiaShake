@@ -25,6 +25,15 @@ export async function PATCH(
 
   const body = await req.json();
 
+  const precio = Number(body.precio);
+
+  if (Number.isNaN(precio) || precio <= 0) {
+    return NextResponse.json(
+      { error: "precio debe ser mayor a 0" },
+      { status: 400 }
+    );
+  }
+
   const { error } = await supabase
     .from("planes_contenido")
     .update({
@@ -35,7 +44,7 @@ export async function PATCH(
       cantidad_copy: body.cantidad_copy,
       cantidad_video: body.cantidad_video,
       cantidad_carrusel: body.cantidad_carrusel,
-      precio: body.precio,
+      precio,
       estado: body.estado,
       updated_at: new Date().toISOString(),
     })
