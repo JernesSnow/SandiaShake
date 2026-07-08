@@ -102,12 +102,27 @@ function CourseModal({
   function set<K extends keyof CourseFormData>(key: K, value: CourseFormData[K]) {
     setForm((p) => ({ ...p, [key]: value }));
   }
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!form.titulo.trim()) return alert("El curso debe tener un título.");
-    if (!form.chat_url.trim()) return alert("Debes colocar el link de WhatsApp.");
-    onSave(form);
+function handleSubmit(e: React.FormEvent) {
+  e.preventDefault();
+
+  if (!form.titulo.trim()) {
+    return alert("El curso debe tener un título.");
   }
+
+  if (!form.chat_url.trim()) {
+    return alert("Debes colocar el link de WhatsApp.");
+  }
+
+  if (!form.nivel) {
+    return alert("Debes seleccionar un nivel.");
+  }
+
+  if (!form.categoria) {
+    return alert("Debes seleccionar una categoría.");
+  }
+
+  onSave(form);
+}
 
   return (
     <Modal
@@ -160,7 +175,7 @@ function CourseModal({
             <input type="text" className={inputCls} value={form.duracion_label ?? ""} onChange={(e) => set("duracion_label", e.target.value)} placeholder="90 min" />
           </div>
           <div>
-            <label className={labelCls}>Nivel</label>
+            <label className={labelCls}>Nivel *</label>
             <select className={inputCls} value={form.nivel ?? ""} onChange={(e) => set("nivel", (e.target.value as CourseLevel) || null)}>
               <option value="">—</option>
               <option value="Intro">Intro</option>
@@ -169,7 +184,7 @@ function CourseModal({
             </select>
           </div>
           <div>
-            <label className={labelCls}>Categoría</label>
+            <label className={labelCls}>Categoría *</label>
             <select className={inputCls} value={form.categoria ?? ""} onChange={(e) => set("categoria", (e.target.value as CourseCategory) || null)}>
               <option value="">—</option>
               <option value="Instagram">Instagram</option>

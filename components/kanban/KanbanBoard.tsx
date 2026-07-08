@@ -1085,21 +1085,38 @@ function TaskModal({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (readOnly) return;
+function handleSubmit(e: React.FormEvent) {
+  e.preventDefault();
+  if (readOnly) return;
 
-    if (!form.titulo.trim()) return alert("Título es obligatorio.");
+  if (!form.titulo.trim()) {
+    return alert("El título es obligatorio.");
+  }
 
-    if (isNew) {
-      if (!form.idOrganizacion) return alert("Selecciona una organización.");
-      if (isAdmin && !form.idColaborador) {
-        return alert("Selecciona un colaborador.");
-      }
+  if (!form.fechaEntrega) {
+    return alert("La fecha de entrega es obligatoria.");
+  }
+
+  if (!form.descripcion?.trim()) {
+    return alert("La descripción es obligatoria.");
+  }
+
+  if (!form.tipoEntregable) {
+    return alert("Debes seleccionar un tipo de entregable.");
+  }
+
+  if (isNew) {
+    if (!form.idOrganizacion) {
+      return alert("Selecciona una organización.");
     }
 
-    onSave(form);
+    if (isAdmin && !form.idColaborador) {
+      return alert("Selecciona un colaborador.");
+    }
   }
+
+  onSave(form);
+}
 
   const canClientDecide =
     isCliente &&
@@ -1247,7 +1264,7 @@ function TaskModal({
 
                 {/* DELIVERY DATE */}
                 <div>
-                  <label className={kanbanStyles.label}>Fecha entrega</label>
+                  <label className={kanbanStyles.label}>Fecha entrega *</label>
 
                   {readOnly ? (
                     <div className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-3 py-2 text-sm">
@@ -1265,7 +1282,7 @@ function TaskModal({
 
                 {/* DELIVERABLE TYPE */}
                 <div>
-                  <label className={kanbanStyles.label}>Tipo entregable</label>
+                  <label className={kanbanStyles.label}>Tipo entregable *</label>
 
                   {readOnly ? (
                     <div className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-3 py-2 text-sm">
@@ -1294,7 +1311,7 @@ function TaskModal({
             {/* DESCRIPTION */}
             <div>
               <h3 className="mb-2 text-sm font-semibold text-[var(--ss-text2)]">
-                Descripción
+                Descripción *
               </h3>
 
               <textarea
