@@ -22,6 +22,7 @@ export default function RewardsSection() {
   const [editing, setEditing] = useState<Premio | null>(null);
   const [isNew, setIsNew]     = useState(false);
   const [form, setForm]       = useState({ nombre: "", descripcion: "", puntos_costo: 0 });
+  const [error, setError]     = useState("");
 
   async function loadPremios() {
     setLoading(true);
@@ -34,22 +35,32 @@ export default function RewardsSection() {
   useEffect(() => { loadPremios(); }, []);
 
   async function createPremio() {
+    setError("");
+    if (!form.puntos_costo || form.puntos_costo <= 0) {
+      setError("El costo en Chilli Points debe ser mayor a 0");
+      return;
+    }
     const res = await fetch("/api/admin/premios", {
       method: "POST", credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(form),
     });
-    if (!res.ok) { const j = await res.json(); alert(j.error); return; }
+    if (!res.ok) { const j = await res.json(); setError(j.error); return; }
     await loadPremios(); closeModal();
   }
 
   async function updatePremio() {
+    setError("");
+    if (!form.puntos_costo || form.puntos_costo <= 0) {
+      setError("El costo en Chilli Points debe ser mayor a 0");
+      return;
+    }
     const res = await fetch("/api/admin/premios", {
       method: "PATCH", credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id_premio: editing?.id_premio, ...form }),
     });
-    if (!res.ok) { const j = await res.json(); alert(j.error); return; }
+    if (!res.ok) { const j = await res.json(); setError(j.error); return; }
     await loadPremios(); closeModal();
   }
 
@@ -71,16 +82,16 @@ export default function RewardsSection() {
   }
 
   function openCreate() {
-    setIsNew(true); setEditing(null);
+    setIsNew(true); setEditing(null); setError("");
     setForm({ nombre: "", descripcion: "", puntos_costo: 0 });
   }
 
   function openEdit(p: Premio) {
-    setIsNew(false); setEditing(p);
+    setIsNew(false); setEditing(p); setError("");
     setForm({ nombre: p.nombre, descripcion: p.descripcion ?? "", puntos_costo: p.puntos_costo });
   }
 
-  function closeModal() { setEditing(null); setIsNew(false); }
+  function closeModal() { setEditing(null); setIsNew(false); setError(""); }
 
   return (
     <div className="rounded-2xl bg-[var(--ss-surface)] border border-[var(--ss-border)] shadow-sm p-6 mb-5">
@@ -202,7 +213,7 @@ export default function RewardsSection() {
                 <div className="flex items-center gap-2">
                   <input
                     type="number"
-                    min={0}
+                    min={1}
                     placeholder="Ej: 500"
                     value={form.puntos_costo}
                     onChange={e => setForm({ ...form, puntos_costo: Number(e.target.value) })}
@@ -214,6 +225,12 @@ export default function RewardsSection() {
                   Cantidad de Chilli Points necesarios para canjear este premio.
                 </p>
               </div>
+
+              {error && (
+                <p className="text-sm text-[#ee2346] bg-[#ee2346]/10 border border-[#ee2346]/30 rounded-md px-3 py-2">
+                  {error}
+                </p>
+              )}
             </div>
 
             <div className="px-5 py-4 border-t border-[var(--ss-border)] flex justify-end gap-2">

@@ -82,9 +82,12 @@ export async function GET() {
     ).length;
 
     /* ── EntregablesChart ── */
-    const entregablesAprobados = entregables.filter((e) => e.estado_aprobacion === "APROBADO").length;
-    const entregablesPendientes = entregables.filter((e) => e.estado_aprobacion === "PENDIENTE").length;
-    const entregablesRechazados = entregables.filter((e) => e.estado_aprobacion === "RECHAZADO").length;
+
+const entregablesAprobados = tareas.filter( (t) => t.status_kanban === "aprobada").length;
+
+const entregablesRechazados = tareas.filter((t) => t.status_kanban === "en_progreso").length;
+
+const entregablesPendientes = tareas.filter((t) =>t.status_kanban === "pendiente" ||t.status_kanban === "en_revision").length;
 
     /* ── SaludMental — latest record per user ── */
     const latestBienestar = new Map<number, string>();

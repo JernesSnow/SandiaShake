@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import {
   Gift, CheckCircle, Clock, TrendingUp,
-  AlertTriangle, CheckSquare, RefreshCw, Archive, ArrowLeft,
+  AlertTriangle, CheckSquare, RefreshCw, Archive, ArrowLeft, Edit2,
 } from "react-feather";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend,
@@ -42,6 +42,14 @@ type Redencion = {
   puntos_usados: number;
   fecha_canje: string;
   estado: "ACTIVO" | "INACTIVO";
+};
+
+type Ajuste = {
+  id_movimiento: number;
+  puntos: number;
+  motivo: string;
+  fecha: string;
+  admin_nombre: string;
 };
 
 type Colaborador = {
@@ -83,8 +91,14 @@ export default function ColaboradorDetail() {
   const [premios, setPremios] = useState<Premio[]>([]);
   const [redenciones, setRedenciones] = useState<Redencion[]>([]);
   const [metricas, setMetricas] = useState<Metricas | null>(null);
+  const [ajustes, setAjustes] = useState<Ajuste[]>([]);
   const [canjeando, setCanjeando] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const [showAjuste, setShowAjuste] = useState(false);
+  const [ajusteForm, setAjusteForm] = useState({ tipo: "sumar" as "sumar" | "restar", puntos: "", motivo: "" });
+  const [ajusteError, setAjusteError] = useState("");
+  const [ajustando, setAjustando] = useState(false);
 
   async function safeJson(res: Response) {
     try {
@@ -99,11 +113,12 @@ export default function ColaboradorDetail() {
     if (!id) return;
     try {
       setLoading(true);
-      const [colabRes, premiosRes, redencionesRes, metricasRes] = await Promise.all([
+      const [colabRes, premiosRes, redencionesRes, metricasRes, ajustesRes] = await Promise.all([
         fetch("/api/admin/colaboradores", { cache: "no-store" }),
         fetch("/api/admin/premios", { cache: "no-store" }),
         fetch("/api/rewards/redemptions?id_colaborador=" + id, { cache: "no-store" }),
         fetch("/api/admin/colaboradores/metricas?id_colaborador=" + id, { cache: "no-store" }),
+        fetch("/api/admin/chilli-points?id_usuario=" + id, { cache: "no-store" }),
       ]);
 
       if (colabRes.ok) {
@@ -140,6 +155,11 @@ export default function ColaboradorDetail() {
         const j = await safeJson(metricasRes);
         setMetricas(j.metricas ?? null);
       }
+
+      if (ajustesRes.ok) {
+        const j = await safeJson(ajustesRes);
+        setAjustes(j.ajustes ?? []);
+      }
     } catch {
       setPerfil(null);
     } finally {
@@ -171,6 +191,54 @@ export default function ColaboradorDetail() {
       alert("Error al canjear");
     } finally {
       setCanjeando(null);
+    }
+  }
+
+  function abrirAjuste() {
+    setAjusteForm({ tipo: "sumar", puntos: "", motivo: "" });
+    setAjusteError("");
+    setShowAjuste(true);
+  }
+
+  function cerrarAjuste() {
+    setShowAjuste(false);
+    setAjusteError("");
+  }
+
+  async function guardarAjuste() {
+    setAjusteError("");
+
+    const cantidad = Number(ajusteForm.puntos);
+
+    if (!Number.isInteger(cantidad) || cantidad <= 0) {
+      setAjusteError("Ingresa una cantidad de puntos válida (entero mayor a 0).");
+      return;
+    }
+
+    if (!ajusteForm.motivo.trim()) {
+      setAjusteError("Ingresa un motivo para el ajuste.");
+      return;
+    }
+
+    try {
+      setAjustando(true);
+      const puntos = ajusteForm.tipo === "restar" ? -cantidad : cantidad;
+      const res = await fetch("/api/admin/chilli-points", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_usuario: Number(id), puntos, motivo: ajusteForm.motivo.trim() }),
+      });
+      const j = await safeJson(res);
+      if (!res.ok) {
+        setAjusteError(j?.error ?? "No se pudo aplicar el ajuste");
+        return;
+      }
+      await cargarTodo();
+      cerrarAjuste();
+    } catch {
+      setAjusteError("Error al aplicar el ajuste");
+    } finally {
+      setAjustando(false);
     }
   }
 
@@ -233,7 +301,7 @@ export default function ColaboradorDetail() {
             <StatCard title="Tareas totales" value={metricas.totalTareas} sub="asignadas" />
             <StatCard title="Pendientes" value={metricas.tareasPendientes} sub="sin completar" accent="yellow" />
             <StatCard title="Aprobadas" value={metricas.tareasAprobadas} sub={"de " + metricas.totalTareas + " tareas"} accent="green" />
-            <ChilliCard points={perfil.chilliPoints} />
+            <ChilliCard points={perfil.chilliPoints} onAdjust={abrirAjuste} />
           </div>
 
           {/* DIVIDER */}
@@ -450,6 +518,124 @@ export default function ColaboradorDetail() {
         </div>
       </div>
 
+      {/* HISTORIAL DE AJUSTES MANUALES */}
+      <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-6">
+        <h2 className="mb-4 font-semibold text-[var(--ss-text)]">Historial de ajustes manuales</h2>
+        <div className="space-y-3">
+          {ajustes.length === 0 && (
+            <div className="text-sm text-[var(--ss-text3)] py-2">No hay ajustes manuales registrados</div>
+          )}
+          {ajustes.map((a) => (
+            <div
+              key={a.id_movimiento}
+              className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] p-4 flex justify-between items-center gap-4"
+            >
+              <div className="min-w-0">
+                <div className="font-semibold text-sm text-[var(--ss-text)]">{a.motivo}</div>
+                <div className="text-xs text-[var(--ss-text3)] mt-0.5">
+                  {new Date(a.fecha).toLocaleDateString("es-MX", { day: "numeric", month: "short", year: "numeric" })}
+                  {" · "}{a.admin_nombre}
+                </div>
+              </div>
+              <span className={"shrink-0 text-xs font-bold " + (a.puntos > 0 ? "text-[#6cbe45]" : "text-[#ee2346]")}>
+                {(a.puntos > 0 ? "+" : "") + a.puntos + " 🌶"}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* MODAL: AJUSTAR CHILLI POINTS */}
+      {showAjuste && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+          <div className="w-full max-w-md rounded-2xl bg-[var(--ss-surface)] border border-[var(--ss-border)] shadow-2xl overflow-hidden">
+
+            <div className="px-5 py-4 border-b border-[var(--ss-border)] flex items-center justify-between">
+              <h3 className="font-semibold text-[var(--ss-text)] flex items-center gap-2">
+                <span>🌶</span> Ajustar Chilli Points
+              </h3>
+              <button onClick={cerrarAjuste} className="text-[var(--ss-text3)] hover:text-[var(--ss-text)] transition p-1 rounded-lg hover:bg-[var(--ss-overlay)]">
+                ✕
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAjusteForm({ ...ajusteForm, tipo: "sumar" })}
+                  className={
+                    "rounded-xl px-3 py-2.5 text-sm font-semibold border transition " +
+                    (ajusteForm.tipo === "sumar"
+                      ? "bg-[#6cbe45]/15 border-[#6cbe45]/50 text-[#6cbe45]"
+                      : "border-[var(--ss-border)] text-[var(--ss-text2)] hover:bg-[var(--ss-overlay)]")
+                  }
+                >
+                  + Sumar puntos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAjusteForm({ ...ajusteForm, tipo: "restar" })}
+                  className={
+                    "rounded-xl px-3 py-2.5 text-sm font-semibold border transition " +
+                    (ajusteForm.tipo === "restar"
+                      ? "bg-[#ee2346]/15 border-[#ee2346]/50 text-[#ee2346]"
+                      : "border-[var(--ss-border)] text-[var(--ss-text2)] hover:bg-[var(--ss-overlay)]")
+                  }
+                >
+                  − Restar puntos
+                </button>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[var(--ss-text2)] block">Cantidad de puntos</label>
+                <input
+                  type="number"
+                  min={1}
+                  placeholder="Ej: 10"
+                  value={ajusteForm.puntos}
+                  onChange={e => setAjusteForm({ ...ajusteForm, puntos: e.target.value })}
+                  className="w-full rounded-xl px-3 py-2.5 text-sm bg-[var(--ss-input)] text-[var(--ss-text)] border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/25 focus:border-[#6cbe45]/60 transition"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-[var(--ss-text2)] block">Motivo del ajuste</label>
+                <textarea
+                  rows={2}
+                  placeholder="Ej: Corrección por error en tarea #123"
+                  value={ajusteForm.motivo}
+                  onChange={e => setAjusteForm({ ...ajusteForm, motivo: e.target.value })}
+                  className="w-full rounded-xl px-3 py-2.5 text-sm bg-[var(--ss-input)] text-[var(--ss-text)] border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/25 focus:border-[#6cbe45]/60 transition resize-none"
+                />
+              </div>
+
+              {ajusteError && (
+                <p className="text-sm text-[#ee2346] bg-[#ee2346]/10 border border-[#ee2346]/30 rounded-md px-3 py-2">
+                  {ajusteError}
+                </p>
+              )}
+            </div>
+
+            <div className="px-5 py-4 border-t border-[var(--ss-border)] flex justify-end gap-2">
+              <button
+                onClick={cerrarAjuste}
+                className="rounded-xl border border-[var(--ss-border)] px-4 py-2 text-sm text-[var(--ss-text2)] hover:bg-[var(--ss-overlay)] transition"
+              >
+                Cancelar
+              </button>
+              <button
+                disabled={ajustando}
+                onClick={guardarAjuste}
+                className="rounded-xl bg-[#6cbe45] hover:bg-[#5aa63d] px-5 py-2 text-sm font-semibold text-white transition disabled:opacity-60"
+              >
+                {ajustando ? "Guardando…" : "Aplicar ajuste"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
@@ -525,7 +711,7 @@ function MetricCard({ icon, title, value, sub, color, progress }: {
   );
 }
 
-function ChilliCard({ points }: { points: number }) {
+function ChilliCard({ points, onAdjust }: { points: number; onAdjust?: () => void }) {
   const heatColor =
     points >= 100 ? "text-yellow-300" :
     points >= 50  ? "text-orange-300" :
@@ -544,6 +730,14 @@ function ChilliCard({ points }: { points: number }) {
       <span className="absolute right-2 top-1 text-6xl opacity-25 select-none rotate-12 pointer-events-none">
         🌶
       </span>
+      {onAdjust && (
+        <button
+          onClick={onAdjust}
+          className="absolute right-2 bottom-2 z-10 flex items-center gap-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold px-2.5 py-1.5 transition-colors"
+        >
+          <Edit2 size={12} /> Ajustar
+        </button>
+      )}
       <div className="flex items-center gap-2 text-xs text-white/70 relative z-10">
         <span className="text-sm">🌶</span>
         Chilli Points

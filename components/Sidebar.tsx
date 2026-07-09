@@ -86,7 +86,7 @@ export function Sidebar({ mobileOpen, onClose, collapsed, onToggleCollapse }: Si
     if (!userRole) return [];
     const base = NAV_ITEMS.filter((i) => !i.roles || i.roles.includes(userRole));
     if (userRole === "CLIENTE" && clienteOrg) {
-      return [...base, { href: `/clientes/${clienteOrg.id}`, label: "Mi organización", icon: <Home size={18} />, roles: ["CLIENTE"] as Role[] }];
+      return [...base, { href: "/mi-cuenta", label: "Mi cuenta", icon: <Home size={18} />, roles: ["CLIENTE"] as Role[] }];
     }
     return base;
   }, [userRole, clienteOrg]);

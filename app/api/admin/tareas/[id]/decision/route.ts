@@ -208,6 +208,31 @@ export async function POST(req: Request, ctx: Ctx) {
         { status: 500 }
       );
     }
+    
+  /* =========================================
+    ACTUALIZAR ESTADO DEL ENTREGABLE
+  ========================================= */
+
+  const estadoEntregable =
+    accion === "APROBAR" ? "APROBADO" : "RECHAZADO";
+
+  const { error: entregableErr } = await admin
+    .from("entregables")
+    .update({
+      estado_aprobacion: estadoEntregable,
+      fecha_respuesta_cliente: now,
+      updated_at: now,
+    })
+    .eq("id_tarea", idTarea)
+    .eq("estado", "ACTIVO");
+
+  if (entregableErr) {
+    return NextResponse.json(
+      { error: entregableErr.message },
+      { status: 500 }
+    );
+  }
+
 
     /* =========================================
        CHILLI RULE

@@ -48,6 +48,7 @@ export default function PlanesEntregablesSection() {
   const [loading, setLoading]     = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlanContenido | null>(null);
   const [isNew, setIsNew]         = useState(false);
+  const [modalError, setModalError] = useState("");
 
   async function cargarPlanes() {
     setLoading(true);
@@ -73,24 +74,36 @@ export default function PlanesEntregablesSection() {
 
   function openNew() {
     setIsNew(true);
+    setModalError("");
     setEditingPlan({ id_plan: 0, nombre: "", descripcion: "", precio: 0, estado: "ACTIVO", servicios: [] });
   }
 
   function openEdit(p: PlanContenido) {
     setIsNew(false);
+    setModalError("");
     setEditingPlan(JSON.parse(JSON.stringify(p)));
   }
 
+  function closeModal() {
+    setEditingPlan(null);
+    setModalError("");
+  }
+
   async function savePlan(p: PlanContenido) {
+    setModalError("");
+    if (!p.precio || p.precio <= 0) {
+      setModalError("El precio del plan debe ser mayor a 0");
+      return;
+    }
     const res  = await fetch("/api/admin/planes-contenido", {
       method: isNew ? "POST" : "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(p),
     });
     const json = await res.json();
-    if (!res.ok) { alert(json?.error ?? "Error guardando plan."); return; }
+    if (!res.ok) { setModalError(json?.error ?? "Error guardando plan."); return; }
     await cargarPlanes();
-    setEditingPlan(null);
+    closeModal();
   }
 
   async function deletePlan(id: number) {
@@ -171,7 +184,7 @@ export default function PlanesEntregablesSection() {
               <h3 className="font-semibold text-[var(--ss-text)]">
                 {isNew ? "Nuevo plan de contenido" : "Editar plan"}
               </h3>
-              <button onClick={() => setEditingPlan(null)} className="text-[var(--ss-text3)] hover:text-[var(--ss-text)] transition p-1 rounded-lg hover:bg-[var(--ss-overlay)]">
+              <button onClick={closeModal} className="text-[var(--ss-text3)] hover:text-[var(--ss-text)] transition p-1 rounded-lg hover:bg-[var(--ss-overlay)]">
                 <X size={18} />
               </button>
             </div>
@@ -190,6 +203,7 @@ export default function PlanesEntregablesSection() {
                   <label className="text-xs font-medium text-[var(--ss-text2)] block">Precio mensual (CRC)</label>
                   <input
                     type="number"
+                    min={1}
                     value={editingPlan.precio}
                     onChange={e => setEditingPlan({ ...editingPlan, precio: Number(e.target.value || 0) })}
                     className={inputCls}
@@ -267,11 +281,17 @@ export default function PlanesEntregablesSection() {
                   Precio <span className="text-[var(--ss-text)] font-semibold ml-2">₡{editingPlan.precio.toLocaleString("es-CR")}</span>
                 </div>
               </div>
+
+              {modalError && (
+                <p className="text-sm text-[#ee2346] bg-[#ee2346]/10 border border-[#ee2346]/30 rounded-md px-3 py-2">
+                  {modalError}
+                </p>
+              )}
             </div>
 
             <div className="px-5 py-4 border-t border-[var(--ss-border)] flex justify-end gap-2">
               <button
-                onClick={() => setEditingPlan(null)}
+                onClick={closeModal}
                 className="rounded-xl border border-[var(--ss-border)] px-4 py-2 text-sm text-[var(--ss-text2)] hover:bg-[var(--ss-overlay)] transition"
               >
                 Cancelar

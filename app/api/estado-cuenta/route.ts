@@ -35,15 +35,17 @@ export async function GET() {
 
   const { data: u } = await admin
     .from("usuarios")
-    .select("id_usuario, rol")
+    .select("id_usuario, rol, force_password_change, temp_password")
     .eq("auth_user_id", user.id)
     .maybeSingle();
 
   if (!u) return jsonError("Usuario no encontrado", 404);
 
-  // Solo bloqueamos clientes 
+  const forcePasswordChange = u.force_password_change === true || u.temp_password === true;
+
+  // Solo bloqueamos clientes
   if (u.rol !== "CLIENTE") {
-    return NextResponse.json({ blocked: false });
+    return NextResponse.json({ blocked: false, force_password_change: forcePasswordChange });
   }
 
   // organizacion del cliente 
@@ -55,7 +57,7 @@ export async function GET() {
     .maybeSingle();
 
   if (!ou?.id_organizacion) {
-    return NextResponse.json({ blocked: false });
+    return NextResponse.json({ blocked: false, force_password_change: forcePasswordChange });
   }
 
   const idOrg = ou.id_organizacion;
@@ -159,6 +161,7 @@ const pagoInfo = {
 
   return NextResponse.json({
     blocked,
+    force_password_change: forcePasswordChange,
     id_organizacion: idOrg,
     organizacion_nombre: nombreOrganizacion,
     facturasMorosas: facturasMorosas ?? [],

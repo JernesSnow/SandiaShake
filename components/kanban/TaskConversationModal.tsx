@@ -205,7 +205,7 @@ export default function TaskConversationModal({
       setMsg("");
       await load();
 
-      if (json?.data && onTaskUpdated) onTaskUpdated(json.data);
+     if (json?.tarea && onTaskUpdated) onTaskUpdated(json.tarea);
     } catch (e: any) {
       setErr(e?.message ?? "No se pudo registrar la decisión");
     } finally {

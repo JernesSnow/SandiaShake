@@ -239,8 +239,13 @@ export async function POST(req: Request) {
       updated_by: perfil!.id_usuario,
     };
 
-    if (fecha_vencimiento) {
-      insertData.fecha_vencimiento = fecha_vencimiento;
+    // Si no se especifica fecha de vencimiento, se usa la fecha de entrega
+    // de las tareas (los premios por puntualidad dependen de esta fecha).
+    const fechaVencimientoFinal =
+      fecha_vencimiento || items.find((item: any) => item.fecha_entrega)?.fecha_entrega || null;
+
+    if (fechaVencimientoFinal) {
+      insertData.fecha_vencimiento = fechaVencimientoFinal;
     }
 
     const { data: factura, error: insertErr } = await admin
