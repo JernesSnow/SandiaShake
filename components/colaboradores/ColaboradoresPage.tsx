@@ -55,6 +55,12 @@ export function ColaboradoresPage() {
   const [desactivando, setDesactivando] = useState<string | null>(null);
   const router = useRouter();
 
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+function esCorreoValido(correo: string) {
+  return EMAIL_REGEX.test(correo.trim());
+}
+
   async function cargar() {
     const res = await fetch("/api/admin/colaboradores");
     if (!res.ok) return;
@@ -87,6 +93,10 @@ export function ColaboradoresPage() {
 
   async function guardarEdicion() {
     if (!editando) return;
+    if (!esCorreoValido(editEmail)) {
+  alert("Ingresá un correo electrónico válido.");
+  return;
+}
     setSaving(true);
     try {
       const res = await fetch("/api/admin/colaboradores", {
@@ -285,8 +295,22 @@ export function ColaboradoresPage() {
                   value={editEmail}
                   onChange={(e) => setEditEmail(e.target.value)}
                   type="email"
-                  className="w-full rounded-xl border border-[var(--ss-border)] bg-[var(--ss-input)] px-3 py-2.5 text-sm text-[var(--ss-text)] placeholder:text-[var(--ss-text3)] focus:outline-none focus:border-[#ee2346]/60 focus:ring-2 focus:ring-[#ee2346]/10 transition-colors"
+                  aria-invalid={editEmail.length > 0 && !esCorreoValido(editEmail)}
+                  className={
+                    "w-full rounded-xl border bg-[var(--ss-input)] px-3 py-2.5 text-sm " +
+                    "text-[var(--ss-text)] focus:outline-none focus:ring-2 " +
+                    "focus:ring-[#ee2346]/10 transition-colors " +
+                    (editEmail.length > 0 && !esCorreoValido(editEmail)
+                      ? "border-[#ee2346] focus:border-[#ee2346]"
+                      : "border-[var(--ss-border)] focus:border-[#ee2346]/60")
+                  }
                 />
+
+                {editEmail.length > 0 && !esCorreoValido(editEmail) && (
+                  <p className="mt-1.5 text-xs text-[#ee2346]">
+                    Ingresá un correo válido, por ejemplo: nombre@dominio.com
+                  </p>
+                )}
               </div>
             </div>
 

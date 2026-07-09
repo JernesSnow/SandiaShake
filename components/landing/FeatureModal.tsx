@@ -24,8 +24,8 @@ export function FeatureModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
       <div className="w-full max-w-2xl rounded-2xl bg-white shadow-xl overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b">
-          <div className="font-semibold">{titles[feature]}</div>
-          <button className="text-sm px-3 py-1 rounded-lg border" onClick={onClose}>
+          <div className="font-semibold  text-black">{titles[feature]}</div>
+          <button className="text-sm px-3 py-1 rounded-lg border bg-black text-white" onClick={onClose}>
             Cerrar
           </button>
         </div>
@@ -39,7 +39,7 @@ export function FeatureModal({
             <button className="px-4 py-2 rounded-xl bg-black text-white">
               Ver demo completa
             </button>
-            <button className="px-4 py-2 rounded-xl border">
+            <button className="px-4 py-2 rounded-xl bg-black text-white">
               Comenzar
             </button>
           </div>
