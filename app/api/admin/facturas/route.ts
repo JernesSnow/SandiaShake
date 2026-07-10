@@ -250,6 +250,15 @@ export async function POST(req: Request) {
       .single();
 
     if (insertErr) {
+      if (
+        insertErr.code === "23505" ||
+        insertErr.message?.includes("uq_facturas_organizacion_periodo")
+      ) {
+        return NextResponse.json(
+          { error: "Ya existe una factura para esta organización en ese periodo." },
+          { status: 409 }
+        );
+      }
       return NextResponse.json({ error: insertErr.message }, { status: 500 });
     }
 
