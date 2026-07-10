@@ -165,6 +165,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     }
 
     updateData.updated_at = new Date().toISOString();
+    updateData.updated_by = Number(perfilId);
 
     let q = admin.from("tareas").update(updateData).eq("id_tarea", idTarea);
     if (!isAdmin) q = q.eq("id_colaborador", perfilId);
@@ -210,6 +211,13 @@ export async function DELETE(_req: Request, ctx: Ctx) {
     if (!idTarea) return NextResponse.json({ error: "ID de tarea inválido" }, { status: 400 });
 
     const admin = createSupabaseAdmin();
+
+    // Registrar el actor antes de borrar para que la bitácora atribuya la eliminación correctamente
+    await admin
+      .from("tareas")
+      .update({ updated_by: perfil!.id_usuario })
+      .eq("id_tarea", idTarea);
+
     const { error: delErr } = await admin.from("tareas").delete().eq("id_tarea", idTarea);
 
     if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
