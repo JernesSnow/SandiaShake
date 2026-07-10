@@ -88,11 +88,11 @@ export const kanbanStyles = {
     rounded-xl px-3 py-2 text-xs shadow-sm cursor-pointer
     bg-[var(--ss-surface)] text-[var(--ss-text)]
     border border-[var(--ss-border)]
-    transition-all duration-150 hover:shadow-md hover:-translate-y-0.5
+    transition-shadow duration-150 hover:shadow-md
   `,
 
   cardDragging: `
-    ring-2 ring-[#ee2346]/40 scale-[1.02]
+    ring-2 ring-[#ee2346]/40
   `,
 
   cardBorderIdle: "border-[var(--ss-border)]",

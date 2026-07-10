@@ -170,8 +170,15 @@ export async function PATCH(req: Request, ctx: Ctx) {
     let q = admin.from("tareas").update(updateData).eq("id_tarea", idTarea);
     if (!isAdmin) q = q.eq("id_colaborador", perfilId);
 
-    const { error: updErr } = await q;
+    const { data: updatedRows, error: updErr } = await q.select("id_tarea");
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return NextResponse.json(
+        { error: "La tarea ya no está asignada a este colaborador o fue eliminada." },
+        { status: 409 }
+      );
+    }
 
     const { data: row, error: rowErr } = await admin
       .from("tareas")

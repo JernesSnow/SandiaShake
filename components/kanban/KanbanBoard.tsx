@@ -292,6 +292,25 @@ function apiRowToTask(r: any): Task | null {
   };
 }
 
+// Translates a drop index from the (possibly filtered) visible list back
+// into a position within the full, unfiltered taskIds array.
+function mapVisibleIndexToFullIndex(
+  fullIdsAfterRemoval: string[],
+  visibleIdsAfterRemoval: string[],
+  visibleIndex: number
+): number {
+  if (visibleIndex >= visibleIdsAfterRemoval.length) {
+    const lastVisibleId = visibleIdsAfterRemoval[visibleIdsAfterRemoval.length - 1];
+    if (lastVisibleId == null) return fullIdsAfterRemoval.length;
+    const idx = fullIdsAfterRemoval.indexOf(lastVisibleId);
+    return idx === -1 ? fullIdsAfterRemoval.length : idx + 1;
+  }
+
+  const anchorId = visibleIdsAfterRemoval[visibleIndex];
+  const idx = fullIdsAfterRemoval.indexOf(anchorId);
+  return idx === -1 ? fullIdsAfterRemoval.length : idx;
+}
+
 function buildStateFromApi(rows: any[]): KanbanState {
   const next: KanbanState = {
     tasks: {},
@@ -325,6 +344,8 @@ export function KanbanBoard() {
     useState<PriorityFilter>("Todas");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [savingModal, setSavingModal] = useState(false);
+  const [modalErrMsg, setModalErrMsg] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState("");
@@ -508,10 +529,24 @@ export function KanbanBoard() {
     const start = state.columns[source.droppableId as StatusId];
     const finish = state.columns[destination.droppableId as StatusId];
 
+    // `source.index`/`destination.index` come from @hello-pangea/dnd and are
+    // positions within the currently *visible* (search/priority-filtered)
+    // list, not within the full unfiltered taskIds array below — so we always
+    // remove the dragged id by value (never by index) to avoid splicing out
+    // the wrong task and leaving a duplicate behind, then translate the drop
+    // position back into full-array space just for visual ordering.
     if (start.id === finish.id) {
-      const newTaskIds = Array.from(start.taskIds);
-      newTaskIds.splice(source.index, 1);
-      newTaskIds.splice(destination.index, 0, draggableId);
+      const visibleIds = getVisibleTaskIds(start.id as StatusId);
+      const taskIdsAfterRemoval = start.taskIds.filter((id) => id !== draggableId);
+      const visibleIdsAfterRemoval = visibleIds.filter((id) => id !== draggableId);
+      const insertAt = mapVisibleIndexToFullIndex(
+        taskIdsAfterRemoval,
+        visibleIdsAfterRemoval,
+        destination.index
+      );
+
+      const newTaskIds = Array.from(taskIdsAfterRemoval);
+      newTaskIds.splice(insertAt, 0, draggableId);
       const newColumn = { ...start, taskIds: newTaskIds };
       setState({
         ...state,
@@ -522,12 +557,19 @@ export function KanbanBoard() {
 
     const prevState = state;
 
-    const startTaskIds = Array.from(start.taskIds);
-    startTaskIds.splice(source.index, 1);
-    const newStart = { ...start, taskIds: startTaskIds };
+    const newStart = {
+      ...start,
+      taskIds: start.taskIds.filter((id) => id !== draggableId),
+    };
 
+    const visibleFinishIds = getVisibleTaskIds(finish.id as StatusId);
+    const insertAt = mapVisibleIndexToFullIndex(
+      finish.taskIds,
+      visibleFinishIds,
+      destination.index
+    );
     const finishTaskIds = Array.from(finish.taskIds);
-    finishTaskIds.splice(destination.index, 0, draggableId);
+    finishTaskIds.splice(insertAt, 0, draggableId);
     const newFinish = { ...finish, taskIds: finishTaskIds };
 
     setState({
@@ -592,6 +634,8 @@ export function KanbanBoard() {
     const me = colabs.find((c) => String(c.id_usuario) === String(perfilId));
     const defaultColab = me ?? colabs[0];
 
+    setModalErrMsg("");
+    setSavingModal(false);
     setIsNew(true);
     setEditingTask({
       id: "",
@@ -611,6 +655,8 @@ export function KanbanBoard() {
   }
 
   function openTaskDetails(task: Task) {
+    setModalErrMsg("");
+    setSavingModal(false);
     setIsNew(false);
     setEditingTask(task);
   }
@@ -664,17 +710,17 @@ export function KanbanBoard() {
         !taskInput.idOrganizacion ||
         !Number.isFinite(taskInput.idOrganizacion)
       ) {
-        alert("Debes seleccionar una organización.");
+        setModalErrMsg("Debes seleccionar una organización.");
         return;
       }
 
       if (isAdmin && colabs.length > 0 && !taskInput.idColaborador) {
-        alert("Debes seleccionar un colaborador.");
+        setModalErrMsg("Debes seleccionar un colaborador.");
         return;
       }
 
-      setSaveOkMsg("");
-      setSaveErrMsg("");
+      setModalErrMsg("");
+      setSavingModal(true);
 
       createTaskInDb(taskInput, isAdmin)
         .then((row) => {
@@ -697,21 +743,22 @@ export function KanbanBoard() {
 
           setSaveOkMsg("Tarea creada correctamente");
           window.setTimeout(() => setSaveOkMsg(""), 1500);
+          setEditingTask(null);
+          setIsNew(false);
         })
         .catch((err) => {
           console.error(err);
-          setSaveErrMsg(err?.message ?? "No se pudo crear la tarea");
-        });
+          setModalErrMsg(err?.message ?? "No se pudo crear la tarea");
+        })
+        .finally(() => setSavingModal(false));
 
-      setEditingTask(null);
-      setIsNew(false);
       return;
     }
 
     try {
       assertNumericId("handleSaveTask", taskInput.id);
     } catch (e: any) {
-      setSaveErrMsg(e?.message ?? "ID de tarea inválido");
+      setModalErrMsg(e?.message ?? "ID de tarea inválido");
       return;
     }
 
@@ -740,8 +787,8 @@ export function KanbanBoard() {
       columns: newColumns,
     });
 
-    setSaveOkMsg("");
-    setSaveErrMsg("");
+    setModalErrMsg("");
+    setSavingModal(true);
 
     persistTaskEdits(taskInput, canReassign)
       .then((row) => {
@@ -752,15 +799,15 @@ export function KanbanBoard() {
         }));
         setSaveOkMsg("Cambios guardados");
         window.setTimeout(() => setSaveOkMsg(""), 1500);
+        setEditingTask(null);
+        setIsNew(false);
       })
       .catch((err) => {
         console.error(err);
-        setSaveErrMsg(err?.message ?? "No se pudieron guardar los cambios");
+        setModalErrMsg(err?.message ?? "No se pudieron guardar los cambios");
         setState(prevState);
-      });
-
-    setEditingTask(null);
-    setIsNew(false);
+      })
+      .finally(() => setSavingModal(false));
   }
 
   return (
@@ -1055,7 +1102,10 @@ export function KanbanBoard() {
           colabs={colabs}
           role={role}
           perfilId={perfilId}
+          saving={savingModal}
+          errorMsg={modalErrMsg}
           onClose={() => {
+            if (savingModal) return;
             setEditingTask(null);
             setIsNew(false);
           }}
@@ -1150,6 +1200,8 @@ type TaskModalProps = {
   colabs: ColabOption[];
   role: Role;
   perfilId: string;
+  saving: boolean;
+  errorMsg: string;
   onClose: () => void;
   onSave: (task: Task) => void;
   onDelete: (taskId: string) => void;
@@ -1168,6 +1220,8 @@ function TaskModal({
   colabs,
   role,
   perfilId,
+  saving,
+  errorMsg,
   onClose,
   onSave,
   onDelete,
@@ -1177,11 +1231,13 @@ function TaskModal({
   const [form, setForm] = useState<Task>(task);
   const [decisionComment, setDecisionComment] = useState("");
   const [deciding, setDeciding] = useState<"" | "APROBAR" | "RECHAZAR">("");
+  const [localErr, setLocalErr] = useState("");
 
   useEffect(() => {
     setForm(task);
     setDecisionComment("");
     setDeciding("");
+    setLocalErr("");
   }, [task]);
 
   const isAdmin = role === "ADMIN";
@@ -1202,12 +1258,21 @@ function TaskModal({
     e.preventDefault();
     if (readOnly) return;
 
-    if (!form.titulo.trim()) return alert("Título es obligatorio.");
+    setLocalErr("");
+
+    if (!form.titulo.trim()) {
+      setLocalErr("Título es obligatorio.");
+      return;
+    }
 
     if (isNew) {
-      if (!form.idOrganizacion) return alert("Selecciona una organización.");
+      if (!form.idOrganizacion) {
+        setLocalErr("Selecciona una organización.");
+        return;
+      }
       if (isAdmin && !form.idColaborador) {
-        return alert("Selecciona un colaborador.");
+        setLocalErr("Selecciona un colaborador.");
+        return;
       }
     }
 
@@ -1412,7 +1477,7 @@ function TaskModal({
 
               <textarea
                 rows={5}
-                className="w-full resize-none rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] p-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#6cbe45]/40"
+                className="w-full resize-none rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] p-3 text-sm text-[var(--ss-text)] focus:outline-none focus:ring-2 focus:ring-[#6cbe45]/40"
                 value={form.descripcion ?? ""}
                 disabled={readOnly}
                 onChange={(e) => updateField("descripcion", e.target.value)}
@@ -1457,35 +1522,46 @@ function TaskModal({
         </form>
 
         {/* FOOTER */}
-        <div className="flex justify-between border-t border-[var(--ss-border)] p-4">
-          {!isNew && isAdmin && (
-            <button
-              type="button"
-              onClick={() => onDelete(form.id)}
-              className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300"
-            >
-              <Trash2 size={14} />
-              Eliminar
-            </button>
+        <div className="flex flex-col gap-3 border-t border-[var(--ss-border)] p-4">
+          {(localErr || errorMsg) && (
+            <div className="rounded-xl bg-[#ee2346]/10 border border-[#ee2346]/20 px-3 py-2">
+              <p className="text-xs text-[#ee2346]">{localErr || errorMsg}</p>
+            </div>
           )}
 
-          <div className="ml-auto flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-4 py-2"
-            >
-              Cancelar
-            </button>
-
-            {(isAdmin || isColab) && (
+          <div className="flex justify-between">
+            {!isNew && isAdmin && (
               <button
-                type="submit"
-                className="rounded-xl bg-[#6cbe45] px-4 py-2 font-medium text-white hover:bg-[#5aa63d]"
+                type="button"
+                onClick={() => onDelete(form.id)}
+                disabled={saving}
+                className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 disabled:opacity-60"
               >
-                Guardar
+                <Trash2 size={14} />
+                Eliminar
               </button>
             )}
+
+            <div className="ml-auto flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={saving}
+                className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-4 py-2 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+
+              {(isAdmin || isColab) && (
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="rounded-xl bg-[#6cbe45] px-4 py-2 font-medium text-white hover:bg-[#5aa63d] disabled:opacity-60"
+                >
+                  {saving ? "Guardando..." : "Guardar"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
