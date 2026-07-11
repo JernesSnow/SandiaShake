@@ -151,6 +151,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
         if (!colId) errors.push("id_colaborador inválido");
         else updateData.id_colaborador = Number(colId);
       }
+
+      // Only restoring a soft-deleted task is allowed here; soft-deleting
+      // itself goes through DELETE below, not this generic PATCH.
+      if (body?.estado !== undefined) {
+        const nextEstado = String(body.estado ?? "").toUpperCase();
+        if (nextEstado !== "ACTIVO") {
+          errors.push("Transición de estado no permitida");
+        } else {
+          updateData.estado = "ACTIVO";
+        }
+      }
     } else {
       if (body?.id_organizacion !== undefined || body?.id_colaborador !== undefined) {
         return NextResponse.json({ error: "Sin permisos para reasignar tarea" }, { status: 403 });
@@ -219,15 +230,29 @@ export async function DELETE(_req: Request, ctx: Ctx) {
 
     const admin = createSupabaseAdmin();
 
-    // Registrar el actor antes de borrar para que la bitácora atribuya la eliminación correctamente
-    await admin
+    // Soft delete: the task is kept for accountability (e.g. tasks generated
+    // from a factura) and moves to the "Eliminadas" column, restorable by an
+    // admin, instead of being permanently removed.
+    const { data: updatedRows, error: delErr } = await admin
       .from("tareas")
-      .update({ updated_by: perfil!.id_usuario })
-      .eq("id_tarea", idTarea);
-
-    const { error: delErr } = await admin.from("tareas").delete().eq("id_tarea", idTarea);
+      .update({
+        estado: "ELIMINADO",
+        updated_at: new Date().toISOString(),
+        updated_by: perfil!.id_usuario,
+      })
+      .eq("id_tarea", idTarea)
+      .neq("estado", "ELIMINADO")
+      .select("id_tarea");
 
     if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return NextResponse.json(
+        { error: "La tarea no existe o ya estaba eliminada." },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Error interno" }, { status: 500 });

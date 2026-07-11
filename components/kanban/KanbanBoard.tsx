@@ -33,12 +33,17 @@ export type StatusId =
   | "aprobada"
   | "archivada";
 
+// "eliminada" is a synthetic bucket for soft-deleted tasks — it is never a
+// real `status_kanban` value, only a column shown to admins.
+export type ColumnId = StatusId | "eliminada";
+
 export type Task = {
   id: string;
   titulo: string;
   cliente: string;
   asignadoA: string;
   statusId: StatusId;
+  estadoTarea?: "ACTIVO" | "ELIMINADO";
 
   fechaEntrega?: string;
   mes?: string;
@@ -52,15 +57,15 @@ export type Task = {
 };
 
 export type Column = {
-  id: StatusId;
+  id: ColumnId;
   titulo: string;
   taskIds: string[];
 };
 
 export type KanbanState = {
   tasks: Record<string, Task>;
-  columns: Record<StatusId, Column>;
-  columnOrder: StatusId[];
+  columns: Record<ColumnId, Column>;
+  columnOrder: ColumnId[];
 };
 
 const emptyState: KanbanState = {
@@ -71,6 +76,7 @@ const emptyState: KanbanState = {
     en_revision: { id: "en_revision", titulo: "En revisión", taskIds: [] },
     aprobada: { id: "aprobada", titulo: "Aprobada", taskIds: [] },
     archivada: { id: "archivada", titulo: "Archivada", taskIds: [] },
+    eliminada: { id: "eliminada", titulo: "Eliminadas", taskIds: [] },
   },
   columnOrder: [
     "pendiente",
@@ -78,6 +84,7 @@ const emptyState: KanbanState = {
     "en_revision",
     "aprobada",
     "archivada",
+    "eliminada",
   ],
 };
 
@@ -192,6 +199,20 @@ async function deleteTaskInDb(taskId: string) {
   return true;
 }
 
+async function restoreTaskInDb(taskId: string) {
+  assertNumericId("restoreTaskInDb", taskId);
+
+  const res = await fetch(`/api/admin/tareas/${taskId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ estado: "ACTIVO" }),
+  });
+
+  const json = await safeJson(res);
+  if (!res.ok) throw new Error(json?.error ?? "No se pudo restaurar la tarea");
+  return json?.data;
+}
+
 async function createTaskInDb(task: Task, isAdmin: boolean) {
   const payload: any = {
     id_organizacion: task.idOrganizacion,
@@ -278,6 +299,7 @@ function apiRowToTask(r: any): Task | null {
     cliente: String(r.organizaciones?.nombre ?? ""),
     asignadoA: String(r.colaborador?.nombre ?? ""),
     statusId: normalizeStatus(r.status_kanban),
+    estadoTarea: String(r.estado ?? "").toUpperCase() === "ELIMINADO" ? "ELIMINADO" : "ACTIVO",
 
     fechaEntrega: r.fecha_entrega ?? undefined,
     mes: r.mes ?? undefined,
@@ -320,6 +342,7 @@ function buildStateFromApi(rows: any[]): KanbanState {
       en_revision: { ...emptyState.columns.en_revision, taskIds: [] },
       aprobada: { ...emptyState.columns.aprobada, taskIds: [] },
       archivada: { ...emptyState.columns.archivada, taskIds: [] },
+      eliminada: { ...emptyState.columns.eliminada, taskIds: [] },
     },
     columnOrder: emptyState.columnOrder,
   };
@@ -328,7 +351,8 @@ function buildStateFromApi(rows: any[]): KanbanState {
     const t = apiRowToTask(r);
     if (!t) continue;
     next.tasks[t.id] = t;
-    next.columns[t.statusId].taskIds.push(t.id);
+    const bucket: ColumnId = t.estadoTarea === "ELIMINADO" ? "eliminada" : t.statusId;
+    next.columns[bucket].taskIds.push(t.id);
   }
 
   return next;
@@ -514,7 +538,7 @@ export function KanbanBoard() {
       if (!isAdmin) return;
       const newColumnOrder = Array.from(state.columnOrder);
       newColumnOrder.splice(source.index, 1);
-      newColumnOrder.splice(destination.index, 0, draggableId as StatusId);
+      newColumnOrder.splice(destination.index, 0, draggableId as ColumnId);
       setState({ ...state, columnOrder: newColumnOrder });
       return;
     }
@@ -526,8 +550,14 @@ export function KanbanBoard() {
       return;
     }
 
-    const start = state.columns[source.droppableId as StatusId];
-    const finish = state.columns[destination.droppableId as StatusId];
+    // "Eliminadas" is a read-only trash bucket — restoring/deleting only
+    // happens through explicit actions in the task modal, never by dragging.
+    if (source.droppableId === "eliminada" || destination.droppableId === "eliminada") {
+      return;
+    }
+
+    const start = state.columns[source.droppableId as ColumnId];
+    const finish = state.columns[destination.droppableId as ColumnId];
 
     // `source.index`/`destination.index` come from @hello-pangea/dnd and are
     // positions within the currently *visible* (search/priority-filtered)
@@ -536,7 +566,7 @@ export function KanbanBoard() {
     // the wrong task and leaving a duplicate behind, then translate the drop
     // position back into full-array space just for visual ordering.
     if (start.id === finish.id) {
-      const visibleIds = getVisibleTaskIds(start.id as StatusId);
+      const visibleIds = getVisibleTaskIds(start.id);
       const taskIdsAfterRemoval = start.taskIds.filter((id) => id !== draggableId);
       const visibleIdsAfterRemoval = visibleIds.filter((id) => id !== draggableId);
       const insertAt = mapVisibleIndexToFullIndex(
@@ -562,7 +592,7 @@ export function KanbanBoard() {
       taskIds: start.taskIds.filter((id) => id !== draggableId),
     };
 
-    const visibleFinishIds = getVisibleTaskIds(finish.id as StatusId);
+    const visibleFinishIds = getVisibleTaskIds(finish.id);
     const insertAt = mapVisibleIndexToFullIndex(
       finish.taskIds,
       visibleFinishIds,
@@ -571,6 +601,7 @@ export function KanbanBoard() {
     const finishTaskIds = Array.from(finish.taskIds);
     finishTaskIds.splice(insertAt, 0, draggableId);
     const newFinish = { ...finish, taskIds: finishTaskIds };
+    const finishStatusId = finish.id as StatusId;
 
     setState({
       ...state,
@@ -583,7 +614,7 @@ export function KanbanBoard() {
         ...state.tasks,
         [draggableId]: {
           ...state.tasks[draggableId],
-          statusId: finish.id,
+          statusId: finishStatusId,
         },
       },
     });
@@ -591,7 +622,7 @@ export function KanbanBoard() {
     setSaveOkMsg("");
     setSaveErrMsg("");
 
-    persistKanbanStatus(draggableId, finish.id)
+    persistKanbanStatus(draggableId, finishStatusId)
       .then(() => {
         setSaveOkMsg("Estado actualizado correctamente");
         window.setTimeout(() => setSaveOkMsg(""), 1500);
@@ -621,7 +652,7 @@ export function KanbanBoard() {
     return result;
   }, [state.tasks, searchClient, priorityFilter]);
 
-  function getVisibleTaskIds(columnId: StatusId) {
+  function getVisibleTaskIds(columnId: ColumnId) {
     return state.columns[columnId].taskIds.filter(
       (taskId) => filteredTasks[taskId]
     );
@@ -665,19 +696,24 @@ export function KanbanBoard() {
     if (!canDelete) return;
 
     const task = state.tasks[taskId];
-    if (!task) return;
+    if (!task || task.estadoTarea === "ELIMINADO") return;
 
     const prevState = state;
     const col = state.columns[task.statusId];
+    const trashCol = state.columns.eliminada;
 
+    // Soft delete: the task moves to the "Eliminadas" column instead of
+    // disappearing, so an admin can restore it later.
     setState({
       ...state,
-      tasks: Object.fromEntries(
-        Object.entries(state.tasks).filter(([k]) => k !== taskId)
-      ),
+      tasks: {
+        ...state.tasks,
+        [taskId]: { ...task, estadoTarea: "ELIMINADO" },
+      },
       columns: {
         ...state.columns,
         [col.id]: { ...col, taskIds: col.taskIds.filter((id) => id !== taskId) },
+        [trashCol.id]: { ...trashCol, taskIds: [...trashCol.taskIds, taskId] },
       },
     });
 
@@ -686,7 +722,7 @@ export function KanbanBoard() {
 
     deleteTaskInDb(taskId)
       .then(() => {
-        setSaveOkMsg("Tarea eliminada");
+        setSaveOkMsg("Tarea movida a Eliminadas");
         window.setTimeout(() => setSaveOkMsg(""), 1500);
       })
       .catch((err) => {
@@ -696,6 +732,50 @@ export function KanbanBoard() {
       });
 
     setEditingTask(null);
+  }
+
+  function handleRestoreTask(taskId: string) {
+    if (!isAdmin) return;
+
+    const task = state.tasks[taskId];
+    if (!task || task.estadoTarea !== "ELIMINADO") return;
+
+    const prevState = state;
+    const trashCol = state.columns.eliminada;
+    const targetCol = state.columns[task.statusId];
+
+    setState({
+      ...state,
+      tasks: {
+        ...state.tasks,
+        [taskId]: { ...task, estadoTarea: "ACTIVO" },
+      },
+      columns: {
+        ...state.columns,
+        [trashCol.id]: {
+          ...trashCol,
+          taskIds: trashCol.taskIds.filter((id) => id !== taskId),
+        },
+        [targetCol.id]: { ...targetCol, taskIds: [...targetCol.taskIds, taskId] },
+      },
+    });
+
+    setModalErrMsg("");
+    setSavingModal(true);
+
+    restoreTaskInDb(taskId)
+      .then(() => {
+        setSaveOkMsg("Tarea restaurada");
+        window.setTimeout(() => setSaveOkMsg(""), 1500);
+        setEditingTask(null);
+        setIsNew(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setModalErrMsg(err?.message ?? "No se pudo restaurar la tarea");
+        setState(prevState);
+      })
+      .finally(() => setSavingModal(false));
   }
 
   function handleSaveTask(taskInput: Task) {
@@ -810,6 +890,11 @@ export function KanbanBoard() {
       .finally(() => setSavingModal(false));
   }
 
+  // "Eliminadas" (soft-deleted tasks) is only visible to admins.
+  const visibleColumnOrder = isAdmin
+    ? state.columnOrder
+    : state.columnOrder.filter((id) => id !== "eliminada");
+
   return (
     <div className={kanbanStyles.root}>
       {/* Header + filtros */}
@@ -903,8 +988,9 @@ export function KanbanBoard() {
                   ref={provided.innerRef}
                   {...provided.droppableProps}
                 >
-                  {state.columnOrder.map((columnId, index) => {
+                  {visibleColumnOrder.map((columnId, index) => {
                     const column = state.columns[columnId];
+                    const isTrashColumn = columnId === "eliminada";
                     const visibleTaskIds = getVisibleTaskIds(columnId);
                     const tasks = visibleTaskIds.map(
                       (taskId) => filteredTasks[taskId]
@@ -929,7 +1015,9 @@ export function KanbanBoard() {
                           >
                             <div className={kanbanStyles.columnHeader}>
                               <h2
-                                className={kanbanStyles.columnTitle}
+                                className={`${kanbanStyles.columnTitle} ${
+                                  isTrashColumn ? "text-[#ee2346]" : ""
+                                }`}
                                 {...colProvided.dragHandleProps}
                                 title={
                                   !isAdmin
@@ -944,7 +1032,11 @@ export function KanbanBoard() {
                               </span>
                             </div>
 
-                            <Droppable droppableId={column.id} type="task">
+                            <Droppable
+                              droppableId={column.id}
+                              type="task"
+                              isDropDisabled={isTrashColumn}
+                            >
                               {(taskProvided, snapshot) => (
                                 <div
                                   ref={taskProvided.innerRef}
@@ -959,13 +1051,14 @@ export function KanbanBoard() {
                                     const unread =
                                       unreadByTaskId[task.id] ?? 0;
                                     const idOk = isNumericId(task.id);
+                                    const isEliminada = task.estadoTarea === "ELIMINADO";
 
                                     return (
                                       <Draggable
                                         draggableId={task.id}
                                         index={taskIndex}
                                         key={task.id}
-                                        isDragDisabled={!canEdit || !idOk}
+                                        isDragDisabled={!canEdit || !idOk || isEliminada}
                                       >
                                         {(dragProvided, dragSnapshot) => (
                                           <div
@@ -977,7 +1070,7 @@ export function KanbanBoard() {
                                                 ? kanbanStyles.cardDragging
                                                 : kanbanStyles.cardBorderIdle
                                             } ${
-                                              !canEdit || !idOk
+                                              !canEdit || !idOk || isEliminada
                                                 ? "opacity-75"
                                                 : ""
                                             }`}
@@ -1111,6 +1204,7 @@ export function KanbanBoard() {
           }}
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
+          onRestore={handleRestoreTask}
           onOpenChat={(t) => {
             setConversationTask(t);
             setUnreadByTaskId((prev) => ({ ...prev, [t.id]: 0 }));
@@ -1205,6 +1299,7 @@ type TaskModalProps = {
   onClose: () => void;
   onSave: (task: Task) => void;
   onDelete: (taskId: string) => void;
+  onRestore: (taskId: string) => void;
   onOpenChat: (task: Task) => void;
   onClientDecision: (
     task: Task,
@@ -1225,6 +1320,7 @@ function TaskModal({
   onClose,
   onSave,
   onDelete,
+  onRestore,
   onOpenChat,
   onClientDecision,
 }: TaskModalProps) {
@@ -1232,19 +1328,22 @@ function TaskModal({
   const [decisionComment, setDecisionComment] = useState("");
   const [deciding, setDeciding] = useState<"" | "APROBAR" | "RECHAZAR">("");
   const [localErr, setLocalErr] = useState("");
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
     setForm(task);
     setDecisionComment("");
     setDeciding("");
     setLocalErr("");
+    setConfirmDeleteOpen(false);
   }, [task]);
 
   const isAdmin = role === "ADMIN";
   const isColab = role === "COLABORADOR";
   const isCliente = role === "CLIENTE";
 
-  const canEdit = isAdmin || isColab;
+  const isEliminada = form.estadoTarea === "ELIMINADO";
+  const canEdit = (isAdmin || isColab) && !isEliminada;
   const readOnly = !canEdit;
 
   function updateField<K extends keyof Task>(key: K, value: Task[K]) {
@@ -1351,9 +1450,18 @@ function TaskModal({
         </div>
 
         {/* BODY */}
-        <form onSubmit={handleSubmit} className="flex flex-1 overflow-hidden">
+        <form id="task-form" onSubmit={handleSubmit} className="flex flex-1 overflow-hidden">
           {/* LEFT SIDE */}
           <div className="w-[55%] space-y-6 overflow-y-auto border-r border-[var(--ss-border)] p-6">
+            {isEliminada && (
+              <div className="rounded-xl border border-[#ee2346]/30 bg-[#ee2346]/10 px-3 py-2">
+                <p className="text-xs text-[#ee2346]">
+                  Esta tarea fue eliminada y se encuentra en la columna
+                  "Eliminadas". Solo un administrador puede restaurarla.
+                </p>
+              </div>
+            )}
+
             <div>
               <h3 className="mb-3 text-sm font-semibold text-[var(--ss-text2)]">
                 Información
@@ -1530,15 +1638,26 @@ function TaskModal({
           )}
 
           <div className="flex justify-between">
-            {!isNew && isAdmin && (
+            {!isNew && isAdmin && !isEliminada && (
               <button
                 type="button"
-                onClick={() => onDelete(form.id)}
+                onClick={() => setConfirmDeleteOpen(true)}
                 disabled={saving}
                 className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 disabled:opacity-60"
               >
                 <Trash2 size={14} />
                 Eliminar
+              </button>
+            )}
+
+            {!isNew && isAdmin && isEliminada && (
+              <button
+                type="button"
+                onClick={() => onRestore(form.id)}
+                disabled={saving}
+                className="flex items-center gap-2 text-sm text-[#6cbe45] hover:text-[#5aa63d] disabled:opacity-60"
+              >
+                {saving ? "Restaurando..." : "Restaurar tarea"}
               </button>
             )}
 
@@ -1552,9 +1671,10 @@ function TaskModal({
                 Cancelar
               </button>
 
-              {(isAdmin || isColab) && (
+              {(isAdmin || isColab) && !isEliminada && (
                 <button
                   type="submit"
+                  form="task-form"
                   disabled={saving}
                   className="rounded-xl bg-[#6cbe45] px-4 py-2 font-medium text-white hover:bg-[#5aa63d] disabled:opacity-60"
                 >
@@ -1565,6 +1685,57 @@ function TaskModal({
           </div>
         </div>
       </div>
+
+      {confirmDeleteOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-[var(--ss-text)]">
+              Eliminar tarea
+            </h3>
+            <p className="mt-3 text-sm text-[var(--ss-text2)]">
+              Esta tarea pudo haberse generado automáticamente al crear una
+              factura, como parte del registro de servicios facturados a la
+              organización.
+            </p>
+            <p className="mt-2 text-sm text-[var(--ss-text2)]">
+              Esta es una <strong>eliminación suave (soft delete)</strong>: la
+              tarea no se borra de forma permanente, sino que se mueve a la
+              columna <strong>"Eliminadas"</strong>, visible solo para
+              administradores, y deja de aparecer en el tablero normal. La
+              factura y sus montos no se modifican. Un administrador podrá
+              restaurarla más adelante desde ahí.
+            </p>
+            <p className="mt-2 text-sm text-[var(--ss-text2)]">
+              Aun así, procede con cuidado: mientras esté eliminada, la tarea
+              deja de ser visible para colaboradores y clientes, y cualquier
+              flujo o notificación asociado a ella se detiene.
+            </p>
+            <p className="mt-3 text-sm font-medium text-[var(--ss-text)]">
+              ¿Deseas continuar?
+            </p>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteOpen(false)}
+                className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-4 py-2 text-sm text-[var(--ss-text)]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmDeleteOpen(false);
+                  onDelete(form.id);
+                }}
+                className="rounded-xl bg-[#ee2346] px-4 py-2 text-sm font-medium text-white hover:bg-[#d8203f]"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
