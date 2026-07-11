@@ -16,6 +16,7 @@ const baseUrl = `${proto}://${host}`;
     pathname.startsWith("/forgot-password") ||
     pathname.startsWith("/verify-email-mfa") ||
     pathname.startsWith("/morosidad") ||
+    pathname.startsWith("/force-password-change") ||
     pathname.startsWith("/_next") ||
     pathname.startsWith("/assets") ||
     pathname === "/favicon.ico" ||
@@ -48,6 +49,11 @@ const cookie = _req.headers.get("cookie") ?? "";
   }
 
   const estadoJson = await estadoRes.json().catch(() => null);
+
+  // El cambio de contraseña obligatorio tiene prioridad sobre el bloqueo por morosidad
+  if (estadoJson?.force_password_change) {
+    return NextResponse.redirect(new URL("/force-password-change", _req.url));
+  }
 
   if (estadoJson?.blocked) {
     return NextResponse.redirect(new URL("/morosidad", _req.url));

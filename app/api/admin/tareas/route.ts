@@ -207,81 +207,13 @@ export async function GET(req: Request) {
   }
 }
 
-/* ---------- CREATE TAREA ---------- */
+/* ---------- CREATE TAREA ----------
+   Las tareas ya no se crean manualmente: se generan automáticamente
+   al emitir una factura (ver app/api/admin/facturas/route.ts). */
 
-export async function POST(req: Request) {
-  try {
-    const { perfil, error } = await getPerfil();
-    if (error) return error;
-
-    const rol = String(perfil!.rol ?? "").toUpperCase();
-    const userId = Number(perfil!.id_usuario);
-
-    if (rol === "CLIENTE") {
-      return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
-    }
-
-    const body = await req.json().catch(() => ({}));
-
-    const idOrganizacion = Number(body?.id_organizacion);
-    const titulo = String(body?.titulo ?? "").trim();
-
-    if (!idOrganizacion || !titulo) {
-      return NextResponse.json(
-        { error: "Datos inválidos" },
-        { status: 400 }
-      );
-    }
-
-    const admin = createSupabaseAdmin();
-
-    // When an ADMIN creates a task they can assign it to a specific colaborador
-    const idColaboradorBody = body?.id_colaborador ? Number(body.id_colaborador) : null;
-    const idColaboradorToSave =
-      rol === "ADMIN" && idColaboradorBody && Number.isFinite(idColaboradorBody)
-        ? idColaboradorBody
-        : userId;
-
-    const { data: inserted, error: insErr } = await admin
-      .from("tareas")
-      .insert({
-        id_organizacion: idOrganizacion,
-        id_colaborador: idColaboradorToSave,
-        titulo,
-        descripcion: body?.descripcion ?? "",
-        status_kanban: body?.status_kanban ?? "pendiente",
-        prioridad: body?.prioridad ?? "Media",
-        tipo_entregable: body?.tipo_entregable ?? "Otro",
-        fecha_entrega: body?.fecha_entrega ?? null,
-        mes: body?.mes ?? null,
-        estado: "ACTIVO",
-        created_by: userId,
-        updated_by: userId,
-      })
-      .select("id_tarea")
-      .maybeSingle();
-
-    if (insErr || !inserted) {
-      return NextResponse.json(
-        { error: insErr?.message ?? "No se pudo crear la tarea" },
-        { status: 500 }
-      );
-    }
-
-    const { data: row } = await admin
-      .from("tareas")
-      .select(selectWithJoins)
-      .eq("id_tarea", inserted.id_tarea)
-      .maybeSingle();
-
-    const final = attachDriveFolder([row])[0];
-
-    return NextResponse.json({ ok: true, data: final });
-
-  } catch (e: any) {
-    return NextResponse.json(
-      { error: e?.message ?? "Error interno" },
-      { status: 500 }
-    );
-  }
+export async function POST() {
+  return NextResponse.json(
+    { error: "Las tareas se generan automáticamente al emitir una factura" },
+    { status: 405 }
+  );
 }

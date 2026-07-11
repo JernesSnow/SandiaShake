@@ -12,7 +12,6 @@ import {
   Calendar,
   Edit2,
   Link as LinkIcon,
-  Plus,
   Search,
   Trash2,
   User,
@@ -213,31 +212,6 @@ async function restoreTaskInDb(taskId: string) {
   return json?.data;
 }
 
-async function createTaskInDb(task: Task, isAdmin: boolean) {
-  const payload: any = {
-    id_organizacion: task.idOrganizacion,
-    titulo: task.titulo,
-    descripcion: task.descripcion ?? "",
-    status_kanban: task.statusId,
-    prioridad: task.prioridad ?? "Media",
-    tipo_entregable: task.tipoEntregable ?? null,
-    fecha_entrega: task.fechaEntrega ?? null,
-    mes: task.mes ?? null,
-  };
-
-  if (isAdmin) payload.id_colaborador = task.idColaborador ?? null;
-
-  const res = await fetch("/api/admin/tareas", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
-
-  const json = await safeJson(res);
-  if (!res.ok) throw new Error(json?.error ?? "No se pudo crear la tarea");
-  return json?.data;
-}
-
 async function decideTaskInDb(
   taskId: string,
   accion: "APROBAR" | "RECHAZAR",
@@ -395,7 +369,6 @@ export function KanbanBoard() {
   const isColab = role === "COLABORADOR";
   const isCliente = role === "CLIENTE";
 
-  const canCreate = isAdmin || isColab;
   const canEdit = isAdmin || isColab;
   const canReassign = isAdmin;
   const canDelete = isAdmin;
@@ -658,33 +631,6 @@ export function KanbanBoard() {
     );
   }
 
-  function openNewTask() {
-    if (!canCreate) return;
-
-    const firstOrg = orgs[0];
-    const me = colabs.find((c) => String(c.id_usuario) === String(perfilId));
-    const defaultColab = me ?? colabs[0];
-
-    setModalErrMsg("");
-    setSavingModal(false);
-    setIsNew(true);
-    setEditingTask({
-      id: "",
-      titulo: "",
-      cliente: firstOrg?.nombre ?? "",
-      asignadoA: defaultColab?.nombre ?? "",
-      statusId: "pendiente",
-      fechaEntrega: "",
-      mes: "",
-      tipoEntregable: "Arte",
-      prioridad: "Media",
-      googleDriveUrl: "",
-      descripcion: "",
-      idOrganizacion: firstOrg?.id_organizacion,
-      idColaborador: defaultColab?.id_usuario,
-    });
-  }
-
   function openTaskDetails(task: Task) {
     setModalErrMsg("");
     setSavingModal(false);
@@ -782,56 +728,6 @@ export function KanbanBoard() {
     if (!canEdit) {
       setEditingTask(null);
       setIsNew(false);
-      return;
-    }
-
-    if (isNew) {
-      if (
-        !taskInput.idOrganizacion ||
-        !Number.isFinite(taskInput.idOrganizacion)
-      ) {
-        setModalErrMsg("Debes seleccionar una organización.");
-        return;
-      }
-
-      if (isAdmin && colabs.length > 0 && !taskInput.idColaborador) {
-        setModalErrMsg("Debes seleccionar un colaborador.");
-        return;
-      }
-
-      setModalErrMsg("");
-      setSavingModal(true);
-
-      createTaskInDb(taskInput, isAdmin)
-        .then((row) => {
-          const created = apiRowToTask(row);
-          if (!created) {
-            throw new Error("Formato inválido de API (id_tarea)");
-          }
-
-          setState((prev) => {
-            const col = prev.columns[created.statusId];
-            return {
-              ...prev,
-              tasks: { ...prev.tasks, [created.id]: created },
-              columns: {
-                ...prev.columns,
-                [col.id]: { ...col, taskIds: [...col.taskIds, created.id] },
-              },
-            };
-          });
-
-          setSaveOkMsg("Tarea creada correctamente");
-          window.setTimeout(() => setSaveOkMsg(""), 1500);
-          setEditingTask(null);
-          setIsNew(false);
-        })
-        .catch((err) => {
-          console.error(err);
-          setModalErrMsg(err?.message ?? "No se pudo crear la tarea");
-        })
-        .finally(() => setSavingModal(false));
-
       return;
     }
 
@@ -936,18 +832,6 @@ export function KanbanBoard() {
 ) : (
   <ReporteDropdown />
 )}
-
-  {/* BOTÓN NUEVA TAREA */}
-  {(isAdmin || isColab) && (
-    <button
-      type="button"
-      onClick={openNewTask}
-      className={`${kanbanStyles.primaryButton} flex items-center gap-2`}
-    >
-      <Plus size={16} />
-      Nueva tarea
-    </button>
-  )}
 
 </div>
 
@@ -1353,14 +1237,29 @@ function TaskModal({
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (readOnly) return;
+function handleSubmit(e: React.FormEvent) {
+  e.preventDefault();
+  if (readOnly) return;
 
     setLocalErr("");
 
     if (!form.titulo.trim()) {
-      setLocalErr("Título es obligatorio.");
+      setLocalErr("El título es obligatorio.");
+      return;
+    }
+
+    if (!form.fechaEntrega) {
+      setLocalErr("La fecha de entrega es obligatoria.");
+      return;
+    }
+
+    if (!form.descripcion?.trim()) {
+      setLocalErr("La descripción es obligatoria.");
+      return;
+    }
+
+    if (!form.tipoEntregable) {
+      setLocalErr("Debes seleccionar un tipo de entregable.");
       return;
     }
 
@@ -1533,7 +1432,7 @@ function TaskModal({
 
                 {/* DELIVERY DATE */}
                 <div>
-                  <label className={kanbanStyles.label}>Fecha entrega</label>
+                  <label className={kanbanStyles.label}>Fecha entrega *</label>
 
                   {readOnly ? (
                     <div className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-3 py-2 text-sm">
@@ -1551,7 +1450,7 @@ function TaskModal({
 
                 {/* DELIVERABLE TYPE */}
                 <div>
-                  <label className={kanbanStyles.label}>Tipo entregable</label>
+                  <label className={kanbanStyles.label}>Tipo entregable *</label>
 
                   {readOnly ? (
                     <div className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-3 py-2 text-sm">
@@ -1580,7 +1479,7 @@ function TaskModal({
             {/* DESCRIPTION */}
             <div>
               <h3 className="mb-2 text-sm font-semibold text-[var(--ss-text2)]">
-                Descripción
+                Descripción *
               </h3>
 
               <textarea

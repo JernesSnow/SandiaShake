@@ -73,11 +73,19 @@ export async function POST(req: Request) {
     const admin = createSupabaseAdmin();
     const body = await req.json();
 
-    const { nombre, descripcion, precio, servicios } = body;
+    const { nombre, descripcion, servicios } = body;
+    const precio = Number(body.precio);
 
     if (!nombre) {
       return NextResponse.json(
         { error: "Nombre requerido" },
+        { status: 400 }
+      );
+    }
+
+    if (Number.isNaN(precio) || precio <= 0) {
+      return NextResponse.json(
+        { error: "precio debe ser mayor a 0" },
         { status: 400 }
       );
     }
@@ -124,11 +132,19 @@ export async function PATCH(req: Request) {
     const admin = createSupabaseAdmin();
     const body = await req.json();
 
-    const { id_plan, nombre, descripcion, precio, servicios } = body;
+    const { id_plan, nombre, descripcion, servicios } = body;
+    const precio = Number(body.precio);
 
     if (!id_plan) {
       return NextResponse.json(
         { error: "id_plan requerido" },
+        { status: 400 }
+      );
+    }
+
+    if (Number.isNaN(precio) || precio <= 0) {
+      return NextResponse.json(
+        { error: "precio debe ser mayor a 0" },
         { status: 400 }
       );
     }
