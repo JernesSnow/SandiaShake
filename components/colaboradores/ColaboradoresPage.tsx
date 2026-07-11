@@ -48,6 +48,7 @@ const mentalConfig: Record<MentalState, { strip: string; badge: string; glow: st
 
 export function ColaboradoresPage() {
   const [colaboradores, setColaboradores] = useState<Colaborador[]>([]);
+  const [loading, setLoading] = useState(true);
   const [editando, setEditando] = useState<Colaborador | null>(null);
   const [editNombre, setEditNombre] = useState("");
   const [editEmail, setEditEmail] = useState("");
@@ -62,24 +63,28 @@ function esCorreoValido(correo: string) {
 }
 
   async function cargar() {
-    const res = await fetch("/api/admin/colaboradores");
-    if (!res.ok) return;
-    const json = await res.json();
-    if (!Array.isArray(json.colaboradores)) return;
-    setColaboradores(
-      json.colaboradores.map((u: any) => ({
-        id: String(u.id_usuario),
-        nombre: u.nombre,
-        email: u.correo,
-        rol: u.rol === "ADMIN" ? "Admin" : "Ejecutivo de cuenta",
-        estadoCuenta: u.estado === "ACTIVO" ? "Activo" : "Suspendido",
-        mentalState: "Estable",
-        totalTareas: u.totalTareas ?? 0,
-        tareasPendientes: u.tareasPendientes ?? 0,
-        tareasAprobadas: u.tareasAprobadas ?? 0,
-        chilliPoints: u.chilliPoints ?? 0,
-      }))
-    );
+    try {
+      const res = await fetch("/api/admin/colaboradores");
+      if (!res.ok) return;
+      const json = await res.json();
+      if (!Array.isArray(json.colaboradores)) return;
+      setColaboradores(
+        json.colaboradores.map((u: any) => ({
+          id: String(u.id_usuario),
+          nombre: u.nombre,
+          email: u.correo,
+          rol: u.rol === "ADMIN" ? "Admin" : "Ejecutivo de cuenta",
+          estadoCuenta: u.estado === "ACTIVO" ? "Activo" : "Suspendido",
+          mentalState: "Estable",
+          totalTareas: u.totalTareas ?? 0,
+          tareasPendientes: u.tareasPendientes ?? 0,
+          tareasAprobadas: u.tareasAprobadas ?? 0,
+          chilliPoints: u.chilliPoints ?? 0,
+        }))
+      );
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { cargar(); }, []);
@@ -145,9 +150,20 @@ function esCorreoValido(correo: string) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-[var(--ss-text)]">Equipo</h1>
-        <p className="text-xs text-[var(--ss-text3)]">{colaboradores.length} colaboradores</p>
+        <p className="text-xs text-[var(--ss-text3)]">
+          {loading ? "Cargando…" : `${colaboradores.length} colaboradores`}
+        </p>
       </div>
 
+      {loading ? (
+        <div className="py-10 text-center text-sm text-[var(--ss-text3)]">
+          Cargando colaboradores…
+        </div>
+      ) : colaboradores.length === 0 ? (
+        <div className="py-10 text-center text-sm text-[var(--ss-text3)]">
+          No hay colaboradores registrados.
+        </div>
+      ) : (
       <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {colaboradores.map((c) => {
           const mental = mentalConfig[c.mentalState];
@@ -246,6 +262,7 @@ function esCorreoValido(correo: string) {
           );
         })}
       </div>
+      )}
 
       {/* EDIT MODAL */}
       {editando && (

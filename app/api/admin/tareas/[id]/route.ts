@@ -151,6 +151,17 @@ export async function PATCH(req: Request, ctx: Ctx) {
         if (!colId) errors.push("id_colaborador inválido");
         else updateData.id_colaborador = Number(colId);
       }
+
+      // Only restoring a soft-deleted task is allowed here; soft-deleting
+      // itself goes through DELETE below, not this generic PATCH.
+      if (body?.estado !== undefined) {
+        const nextEstado = String(body.estado ?? "").toUpperCase();
+        if (nextEstado !== "ACTIVO") {
+          errors.push("Transición de estado no permitida");
+        } else {
+          updateData.estado = "ACTIVO";
+        }
+      }
     } else {
       if (body?.id_organizacion !== undefined || body?.id_colaborador !== undefined) {
         return NextResponse.json({ error: "Sin permisos para reasignar tarea" }, { status: 403 });
@@ -165,12 +176,20 @@ export async function PATCH(req: Request, ctx: Ctx) {
     }
 
     updateData.updated_at = new Date().toISOString();
+    updateData.updated_by = Number(perfilId);
 
     let q = admin.from("tareas").update(updateData).eq("id_tarea", idTarea);
     if (!isAdmin) q = q.eq("id_colaborador", perfilId);
 
-    const { error: updErr } = await q;
+    const { data: updatedRows, error: updErr } = await q.select("id_tarea");
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return NextResponse.json(
+        { error: "La tarea ya no está asignada a este colaborador o fue eliminada." },
+        { status: 409 }
+      );
+    }
 
     const { data: row, error: rowErr } = await admin
       .from("tareas")
@@ -210,9 +229,30 @@ export async function DELETE(_req: Request, ctx: Ctx) {
     if (!idTarea) return NextResponse.json({ error: "ID de tarea inválido" }, { status: 400 });
 
     const admin = createSupabaseAdmin();
-    const { error: delErr } = await admin.from("tareas").delete().eq("id_tarea", idTarea);
+
+    // Soft delete: the task is kept for accountability (e.g. tasks generated
+    // from a factura) and moves to the "Eliminadas" column, restorable by an
+    // admin, instead of being permanently removed.
+    const { data: updatedRows, error: delErr } = await admin
+      .from("tareas")
+      .update({
+        estado: "ELIMINADO",
+        updated_at: new Date().toISOString(),
+        updated_by: perfil!.id_usuario,
+      })
+      .eq("id_tarea", idTarea)
+      .neq("estado", "ELIMINADO")
+      .select("id_tarea");
 
     if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+
+    if (!updatedRows || updatedRows.length === 0) {
+      return NextResponse.json(
+        { error: "La tarea no existe o ya estaba eliminada." },
+        { status: 404 }
+      );
+    }
+
     return NextResponse.json({ ok: true }, { status: 200 });
   } catch (e: any) {
     return NextResponse.json({ error: e?.message ?? "Error interno" }, { status: 500 });

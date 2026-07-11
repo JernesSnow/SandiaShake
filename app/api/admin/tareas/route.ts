@@ -142,11 +142,14 @@ export async function GET(req: Request) {
 
     let q = admin
       .from("tareas")
-      .select(selectWithJoins)
-      .neq("estado", "ELIMINADO");
+      .select(selectWithJoins);
 
     if (rol === "ADMIN") {
+      // Admins also get ELIMINADO tasks so the Kanban can render the
+      // "Eliminadas" trash column; every other role only ever sees ACTIVO tasks.
       if (idOrg && Number.isFinite(idOrg)) q = q.eq("id_organizacion", idOrg);
+    } else {
+      q = q.neq("estado", "ELIMINADO");
     }
 
     if (rol === "CLIENTE") {

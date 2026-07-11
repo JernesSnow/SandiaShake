@@ -26,7 +26,7 @@ export async function POST(req: Request) {
     const admin = createSupabaseAdmin();
 
     const { data: userData, error: userError } =
-      await admin.auth.admin.listUsers();
+      await admin.auth.admin.listUsers({ perPage: 1000 });
 
     if (userError) {
       return NextResponse.json(
@@ -35,7 +35,9 @@ export async function POST(req: Request) {
       );
     }
 
-    const user = userData.users.find((u) => u.email === email);
+    const user = userData.users.find(
+      (u) => u.email?.toLowerCase() === email.toLowerCase()
+    );
 
     if (!user) {
       return NextResponse.json(

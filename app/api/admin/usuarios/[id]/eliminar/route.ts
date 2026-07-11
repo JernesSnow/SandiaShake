@@ -46,6 +46,12 @@ export async function DELETE(_: Request, ctx: { params: Promise<{ id: string }> 
       return NextResponse.json({ error: "No se puede eliminar el Admin PRIMARIO." }, { status: 403 });
     }
 
+    // Registrar el actor antes de borrar para que la bitácora atribuya la eliminación correctamente
+    await admin
+      .from("usuarios")
+      .update({ updated_by: perfil.id_usuario })
+      .eq("id_usuario", idStr);
+
     const { error: delPerfilErr } = await admin.from("usuarios").delete().eq("id_usuario", idStr);
     if (delPerfilErr) return NextResponse.json({ error: delPerfilErr.message }, { status: 500 });
 

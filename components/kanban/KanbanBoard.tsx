@@ -32,12 +32,17 @@ export type StatusId =
   | "aprobada"
   | "archivada";
 
+// "eliminada" is a synthetic bucket for soft-deleted tasks — it is never a
+// real `status_kanban` value, only a column shown to admins.
+export type ColumnId = StatusId | "eliminada";
+
 export type Task = {
   id: string;
   titulo: string;
   cliente: string;
   asignadoA: string;
   statusId: StatusId;
+  estadoTarea?: "ACTIVO" | "ELIMINADO";
 
   fechaEntrega?: string;
   mes?: string;
@@ -51,15 +56,15 @@ export type Task = {
 };
 
 export type Column = {
-  id: StatusId;
+  id: ColumnId;
   titulo: string;
   taskIds: string[];
 };
 
 export type KanbanState = {
   tasks: Record<string, Task>;
-  columns: Record<StatusId, Column>;
-  columnOrder: StatusId[];
+  columns: Record<ColumnId, Column>;
+  columnOrder: ColumnId[];
 };
 
 const emptyState: KanbanState = {
@@ -70,6 +75,7 @@ const emptyState: KanbanState = {
     en_revision: { id: "en_revision", titulo: "En revisión", taskIds: [] },
     aprobada: { id: "aprobada", titulo: "Aprobada", taskIds: [] },
     archivada: { id: "archivada", titulo: "Archivada", taskIds: [] },
+    eliminada: { id: "eliminada", titulo: "Eliminadas", taskIds: [] },
   },
   columnOrder: [
     "pendiente",
@@ -77,6 +83,7 @@ const emptyState: KanbanState = {
     "en_revision",
     "aprobada",
     "archivada",
+    "eliminada",
   ],
 };
 
@@ -191,6 +198,20 @@ async function deleteTaskInDb(taskId: string) {
   return true;
 }
 
+async function restoreTaskInDb(taskId: string) {
+  assertNumericId("restoreTaskInDb", taskId);
+
+  const res = await fetch(`/api/admin/tareas/${taskId}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ estado: "ACTIVO" }),
+  });
+
+  const json = await safeJson(res);
+  if (!res.ok) throw new Error(json?.error ?? "No se pudo restaurar la tarea");
+  return json?.data;
+}
+
 async function decideTaskInDb(
   taskId: string,
   accion: "APROBAR" | "RECHAZAR",
@@ -252,6 +273,7 @@ function apiRowToTask(r: any): Task | null {
     cliente: String(r.organizaciones?.nombre ?? ""),
     asignadoA: String(r.colaborador?.nombre ?? ""),
     statusId: normalizeStatus(r.status_kanban),
+    estadoTarea: String(r.estado ?? "").toUpperCase() === "ELIMINADO" ? "ELIMINADO" : "ACTIVO",
 
     fechaEntrega: r.fecha_entrega ?? undefined,
     mes: r.mes ?? undefined,
@@ -266,6 +288,25 @@ function apiRowToTask(r: any): Task | null {
   };
 }
 
+// Translates a drop index from the (possibly filtered) visible list back
+// into a position within the full, unfiltered taskIds array.
+function mapVisibleIndexToFullIndex(
+  fullIdsAfterRemoval: string[],
+  visibleIdsAfterRemoval: string[],
+  visibleIndex: number
+): number {
+  if (visibleIndex >= visibleIdsAfterRemoval.length) {
+    const lastVisibleId = visibleIdsAfterRemoval[visibleIdsAfterRemoval.length - 1];
+    if (lastVisibleId == null) return fullIdsAfterRemoval.length;
+    const idx = fullIdsAfterRemoval.indexOf(lastVisibleId);
+    return idx === -1 ? fullIdsAfterRemoval.length : idx + 1;
+  }
+
+  const anchorId = visibleIdsAfterRemoval[visibleIndex];
+  const idx = fullIdsAfterRemoval.indexOf(anchorId);
+  return idx === -1 ? fullIdsAfterRemoval.length : idx;
+}
+
 function buildStateFromApi(rows: any[]): KanbanState {
   const next: KanbanState = {
     tasks: {},
@@ -275,6 +316,7 @@ function buildStateFromApi(rows: any[]): KanbanState {
       en_revision: { ...emptyState.columns.en_revision, taskIds: [] },
       aprobada: { ...emptyState.columns.aprobada, taskIds: [] },
       archivada: { ...emptyState.columns.archivada, taskIds: [] },
+      eliminada: { ...emptyState.columns.eliminada, taskIds: [] },
     },
     columnOrder: emptyState.columnOrder,
   };
@@ -283,7 +325,8 @@ function buildStateFromApi(rows: any[]): KanbanState {
     const t = apiRowToTask(r);
     if (!t) continue;
     next.tasks[t.id] = t;
-    next.columns[t.statusId].taskIds.push(t.id);
+    const bucket: ColumnId = t.estadoTarea === "ELIMINADO" ? "eliminada" : t.statusId;
+    next.columns[bucket].taskIds.push(t.id);
   }
 
   return next;
@@ -299,6 +342,8 @@ export function KanbanBoard() {
     useState<PriorityFilter>("Todas");
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isNew, setIsNew] = useState(false);
+  const [savingModal, setSavingModal] = useState(false);
+  const [modalErrMsg, setModalErrMsg] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [loadErr, setLoadErr] = useState("");
@@ -466,7 +511,7 @@ export function KanbanBoard() {
       if (!isAdmin) return;
       const newColumnOrder = Array.from(state.columnOrder);
       newColumnOrder.splice(source.index, 1);
-      newColumnOrder.splice(destination.index, 0, draggableId as StatusId);
+      newColumnOrder.splice(destination.index, 0, draggableId as ColumnId);
       setState({ ...state, columnOrder: newColumnOrder });
       return;
     }
@@ -478,13 +523,33 @@ export function KanbanBoard() {
       return;
     }
 
-    const start = state.columns[source.droppableId as StatusId];
-    const finish = state.columns[destination.droppableId as StatusId];
+    // "Eliminadas" is a read-only trash bucket — restoring/deleting only
+    // happens through explicit actions in the task modal, never by dragging.
+    if (source.droppableId === "eliminada" || destination.droppableId === "eliminada") {
+      return;
+    }
 
+    const start = state.columns[source.droppableId as ColumnId];
+    const finish = state.columns[destination.droppableId as ColumnId];
+
+    // `source.index`/`destination.index` come from @hello-pangea/dnd and are
+    // positions within the currently *visible* (search/priority-filtered)
+    // list, not within the full unfiltered taskIds array below — so we always
+    // remove the dragged id by value (never by index) to avoid splicing out
+    // the wrong task and leaving a duplicate behind, then translate the drop
+    // position back into full-array space just for visual ordering.
     if (start.id === finish.id) {
-      const newTaskIds = Array.from(start.taskIds);
-      newTaskIds.splice(source.index, 1);
-      newTaskIds.splice(destination.index, 0, draggableId);
+      const visibleIds = getVisibleTaskIds(start.id);
+      const taskIdsAfterRemoval = start.taskIds.filter((id) => id !== draggableId);
+      const visibleIdsAfterRemoval = visibleIds.filter((id) => id !== draggableId);
+      const insertAt = mapVisibleIndexToFullIndex(
+        taskIdsAfterRemoval,
+        visibleIdsAfterRemoval,
+        destination.index
+      );
+
+      const newTaskIds = Array.from(taskIdsAfterRemoval);
+      newTaskIds.splice(insertAt, 0, draggableId);
       const newColumn = { ...start, taskIds: newTaskIds };
       setState({
         ...state,
@@ -495,13 +560,21 @@ export function KanbanBoard() {
 
     const prevState = state;
 
-    const startTaskIds = Array.from(start.taskIds);
-    startTaskIds.splice(source.index, 1);
-    const newStart = { ...start, taskIds: startTaskIds };
+    const newStart = {
+      ...start,
+      taskIds: start.taskIds.filter((id) => id !== draggableId),
+    };
 
+    const visibleFinishIds = getVisibleTaskIds(finish.id);
+    const insertAt = mapVisibleIndexToFullIndex(
+      finish.taskIds,
+      visibleFinishIds,
+      destination.index
+    );
     const finishTaskIds = Array.from(finish.taskIds);
-    finishTaskIds.splice(destination.index, 0, draggableId);
+    finishTaskIds.splice(insertAt, 0, draggableId);
     const newFinish = { ...finish, taskIds: finishTaskIds };
+    const finishStatusId = finish.id as StatusId;
 
     setState({
       ...state,
@@ -514,7 +587,7 @@ export function KanbanBoard() {
         ...state.tasks,
         [draggableId]: {
           ...state.tasks[draggableId],
-          statusId: finish.id,
+          statusId: finishStatusId,
         },
       },
     });
@@ -522,7 +595,7 @@ export function KanbanBoard() {
     setSaveOkMsg("");
     setSaveErrMsg("");
 
-    persistKanbanStatus(draggableId, finish.id)
+    persistKanbanStatus(draggableId, finishStatusId)
       .then(() => {
         setSaveOkMsg("Estado actualizado correctamente");
         window.setTimeout(() => setSaveOkMsg(""), 1500);
@@ -552,13 +625,15 @@ export function KanbanBoard() {
     return result;
   }, [state.tasks, searchClient, priorityFilter]);
 
-  function getVisibleTaskIds(columnId: StatusId) {
+  function getVisibleTaskIds(columnId: ColumnId) {
     return state.columns[columnId].taskIds.filter(
       (taskId) => filteredTasks[taskId]
     );
   }
 
   function openTaskDetails(task: Task) {
+    setModalErrMsg("");
+    setSavingModal(false);
     setIsNew(false);
     setEditingTask(task);
   }
@@ -567,19 +642,24 @@ export function KanbanBoard() {
     if (!canDelete) return;
 
     const task = state.tasks[taskId];
-    if (!task) return;
+    if (!task || task.estadoTarea === "ELIMINADO") return;
 
     const prevState = state;
     const col = state.columns[task.statusId];
+    const trashCol = state.columns.eliminada;
 
+    // Soft delete: the task moves to the "Eliminadas" column instead of
+    // disappearing, so an admin can restore it later.
     setState({
       ...state,
-      tasks: Object.fromEntries(
-        Object.entries(state.tasks).filter(([k]) => k !== taskId)
-      ),
+      tasks: {
+        ...state.tasks,
+        [taskId]: { ...task, estadoTarea: "ELIMINADO" },
+      },
       columns: {
         ...state.columns,
         [col.id]: { ...col, taskIds: col.taskIds.filter((id) => id !== taskId) },
+        [trashCol.id]: { ...trashCol, taskIds: [...trashCol.taskIds, taskId] },
       },
     });
 
@@ -588,7 +668,7 @@ export function KanbanBoard() {
 
     deleteTaskInDb(taskId)
       .then(() => {
-        setSaveOkMsg("Tarea eliminada");
+        setSaveOkMsg("Tarea movida a Eliminadas");
         window.setTimeout(() => setSaveOkMsg(""), 1500);
       })
       .catch((err) => {
@@ -598,6 +678,50 @@ export function KanbanBoard() {
       });
 
     setEditingTask(null);
+  }
+
+  function handleRestoreTask(taskId: string) {
+    if (!isAdmin) return;
+
+    const task = state.tasks[taskId];
+    if (!task || task.estadoTarea !== "ELIMINADO") return;
+
+    const prevState = state;
+    const trashCol = state.columns.eliminada;
+    const targetCol = state.columns[task.statusId];
+
+    setState({
+      ...state,
+      tasks: {
+        ...state.tasks,
+        [taskId]: { ...task, estadoTarea: "ACTIVO" },
+      },
+      columns: {
+        ...state.columns,
+        [trashCol.id]: {
+          ...trashCol,
+          taskIds: trashCol.taskIds.filter((id) => id !== taskId),
+        },
+        [targetCol.id]: { ...targetCol, taskIds: [...targetCol.taskIds, taskId] },
+      },
+    });
+
+    setModalErrMsg("");
+    setSavingModal(true);
+
+    restoreTaskInDb(taskId)
+      .then(() => {
+        setSaveOkMsg("Tarea restaurada");
+        window.setTimeout(() => setSaveOkMsg(""), 1500);
+        setEditingTask(null);
+        setIsNew(false);
+      })
+      .catch((err) => {
+        console.error(err);
+        setModalErrMsg(err?.message ?? "No se pudo restaurar la tarea");
+        setState(prevState);
+      })
+      .finally(() => setSavingModal(false));
   }
 
   function handleSaveTask(taskInput: Task) {
@@ -610,7 +734,7 @@ export function KanbanBoard() {
     try {
       assertNumericId("handleSaveTask", taskInput.id);
     } catch (e: any) {
-      setSaveErrMsg(e?.message ?? "ID de tarea inválido");
+      setModalErrMsg(e?.message ?? "ID de tarea inválido");
       return;
     }
 
@@ -639,8 +763,8 @@ export function KanbanBoard() {
       columns: newColumns,
     });
 
-    setSaveOkMsg("");
-    setSaveErrMsg("");
+    setModalErrMsg("");
+    setSavingModal(true);
 
     persistTaskEdits(taskInput, canReassign)
       .then((row) => {
@@ -651,16 +775,21 @@ export function KanbanBoard() {
         }));
         setSaveOkMsg("Cambios guardados");
         window.setTimeout(() => setSaveOkMsg(""), 1500);
+        setEditingTask(null);
+        setIsNew(false);
       })
       .catch((err) => {
         console.error(err);
-        setSaveErrMsg(err?.message ?? "No se pudieron guardar los cambios");
+        setModalErrMsg(err?.message ?? "No se pudieron guardar los cambios");
         setState(prevState);
-      });
-
-    setEditingTask(null);
-    setIsNew(false);
+      })
+      .finally(() => setSavingModal(false));
   }
+
+  // "Eliminadas" (soft-deleted tasks) is only visible to admins.
+  const visibleColumnOrder = isAdmin
+    ? state.columnOrder
+    : state.columnOrder.filter((id) => id !== "eliminada");
 
   return (
     <div className={kanbanStyles.root}>
@@ -743,8 +872,9 @@ export function KanbanBoard() {
                   ref={provided.innerRef}
                   {...provided.droppableProps}
                 >
-                  {state.columnOrder.map((columnId, index) => {
+                  {visibleColumnOrder.map((columnId, index) => {
                     const column = state.columns[columnId];
+                    const isTrashColumn = columnId === "eliminada";
                     const visibleTaskIds = getVisibleTaskIds(columnId);
                     const tasks = visibleTaskIds.map(
                       (taskId) => filteredTasks[taskId]
@@ -769,7 +899,9 @@ export function KanbanBoard() {
                           >
                             <div className={kanbanStyles.columnHeader}>
                               <h2
-                                className={kanbanStyles.columnTitle}
+                                className={`${kanbanStyles.columnTitle} ${
+                                  isTrashColumn ? "text-[#ee2346]" : ""
+                                }`}
                                 {...colProvided.dragHandleProps}
                                 title={
                                   !isAdmin
@@ -784,7 +916,11 @@ export function KanbanBoard() {
                               </span>
                             </div>
 
-                            <Droppable droppableId={column.id} type="task">
+                            <Droppable
+                              droppableId={column.id}
+                              type="task"
+                              isDropDisabled={isTrashColumn}
+                            >
                               {(taskProvided, snapshot) => (
                                 <div
                                   ref={taskProvided.innerRef}
@@ -799,13 +935,14 @@ export function KanbanBoard() {
                                     const unread =
                                       unreadByTaskId[task.id] ?? 0;
                                     const idOk = isNumericId(task.id);
+                                    const isEliminada = task.estadoTarea === "ELIMINADO";
 
                                     return (
                                       <Draggable
                                         draggableId={task.id}
                                         index={taskIndex}
                                         key={task.id}
-                                        isDragDisabled={!canEdit || !idOk}
+                                        isDragDisabled={!canEdit || !idOk || isEliminada}
                                       >
                                         {(dragProvided, dragSnapshot) => (
                                           <div
@@ -817,7 +954,7 @@ export function KanbanBoard() {
                                                 ? kanbanStyles.cardDragging
                                                 : kanbanStyles.cardBorderIdle
                                             } ${
-                                              !canEdit || !idOk
+                                              !canEdit || !idOk || isEliminada
                                                 ? "opacity-75"
                                                 : ""
                                             }`}
@@ -942,12 +1079,16 @@ export function KanbanBoard() {
           colabs={colabs}
           role={role}
           perfilId={perfilId}
+          saving={savingModal}
+          errorMsg={modalErrMsg}
           onClose={() => {
+            if (savingModal) return;
             setEditingTask(null);
             setIsNew(false);
           }}
           onSave={handleSaveTask}
           onDelete={handleDeleteTask}
+          onRestore={handleRestoreTask}
           onOpenChat={(t) => {
             setConversationTask(t);
             setUnreadByTaskId((prev) => ({ ...prev, [t.id]: 0 }));
@@ -1037,9 +1178,12 @@ type TaskModalProps = {
   colabs: ColabOption[];
   role: Role;
   perfilId: string;
+  saving: boolean;
+  errorMsg: string;
   onClose: () => void;
   onSave: (task: Task) => void;
   onDelete: (taskId: string) => void;
+  onRestore: (taskId: string) => void;
   onOpenChat: (task: Task) => void;
   onClientDecision: (
     task: Task,
@@ -1055,27 +1199,35 @@ function TaskModal({
   colabs,
   role,
   perfilId,
+  saving,
+  errorMsg,
   onClose,
   onSave,
   onDelete,
+  onRestore,
   onOpenChat,
   onClientDecision,
 }: TaskModalProps) {
   const [form, setForm] = useState<Task>(task);
   const [decisionComment, setDecisionComment] = useState("");
   const [deciding, setDeciding] = useState<"" | "APROBAR" | "RECHAZAR">("");
+  const [localErr, setLocalErr] = useState("");
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
 
   useEffect(() => {
     setForm(task);
     setDecisionComment("");
     setDeciding("");
+    setLocalErr("");
+    setConfirmDeleteOpen(false);
   }, [task]);
 
   const isAdmin = role === "ADMIN";
   const isColab = role === "COLABORADOR";
   const isCliente = role === "CLIENTE";
 
-  const canEdit = isAdmin || isColab;
+  const isEliminada = form.estadoTarea === "ELIMINADO";
+  const canEdit = (isAdmin || isColab) && !isEliminada;
   const readOnly = !canEdit;
 
   function updateField<K extends keyof Task>(key: K, value: Task[K]) {
@@ -1089,34 +1241,41 @@ function handleSubmit(e: React.FormEvent) {
   e.preventDefault();
   if (readOnly) return;
 
-  if (!form.titulo.trim()) {
-    return alert("El título es obligatorio.");
-  }
+    setLocalErr("");
 
-  if (!form.fechaEntrega) {
-    return alert("La fecha de entrega es obligatoria.");
-  }
-
-  if (!form.descripcion?.trim()) {
-    return alert("La descripción es obligatoria.");
-  }
-
-  if (!form.tipoEntregable) {
-    return alert("Debes seleccionar un tipo de entregable.");
-  }
-
-  if (isNew) {
-    if (!form.idOrganizacion) {
-      return alert("Selecciona una organización.");
+    if (!form.titulo.trim()) {
+      setLocalErr("El título es obligatorio.");
+      return;
     }
 
-    if (isAdmin && !form.idColaborador) {
-      return alert("Selecciona un colaborador.");
+    if (!form.fechaEntrega) {
+      setLocalErr("La fecha de entrega es obligatoria.");
+      return;
     }
-  }
 
-  onSave(form);
-}
+    if (!form.descripcion?.trim()) {
+      setLocalErr("La descripción es obligatoria.");
+      return;
+    }
+
+    if (!form.tipoEntregable) {
+      setLocalErr("Debes seleccionar un tipo de entregable.");
+      return;
+    }
+
+    if (isNew) {
+      if (!form.idOrganizacion) {
+        setLocalErr("Selecciona una organización.");
+        return;
+      }
+      if (isAdmin && !form.idColaborador) {
+        setLocalErr("Selecciona un colaborador.");
+        return;
+      }
+    }
+
+    onSave(form);
+  }
 
   const canClientDecide =
     isCliente &&
@@ -1190,9 +1349,18 @@ function handleSubmit(e: React.FormEvent) {
         </div>
 
         {/* BODY */}
-        <form onSubmit={handleSubmit} className="flex flex-1 overflow-hidden">
+        <form id="task-form" onSubmit={handleSubmit} className="flex flex-1 overflow-hidden">
           {/* LEFT SIDE */}
           <div className="w-[55%] space-y-6 overflow-y-auto border-r border-[var(--ss-border)] p-6">
+            {isEliminada && (
+              <div className="rounded-xl border border-[#ee2346]/30 bg-[#ee2346]/10 px-3 py-2">
+                <p className="text-xs text-[#ee2346]">
+                  Esta tarea fue eliminada y se encuentra en la columna
+                  "Eliminadas". Solo un administrador puede restaurarla.
+                </p>
+              </div>
+            )}
+
             <div>
               <h3 className="mb-3 text-sm font-semibold text-[var(--ss-text2)]">
                 Información
@@ -1316,7 +1484,7 @@ function handleSubmit(e: React.FormEvent) {
 
               <textarea
                 rows={5}
-                className="w-full resize-none rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] p-3 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#6cbe45]/40"
+                className="w-full resize-none rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] p-3 text-sm text-[var(--ss-text)] focus:outline-none focus:ring-2 focus:ring-[#6cbe45]/40"
                 value={form.descripcion ?? ""}
                 disabled={readOnly}
                 onChange={(e) => updateField("descripcion", e.target.value)}
@@ -1361,38 +1529,112 @@ function handleSubmit(e: React.FormEvent) {
         </form>
 
         {/* FOOTER */}
-        <div className="flex justify-between border-t border-[var(--ss-border)] p-4">
-          {!isNew && isAdmin && (
-            <button
-              type="button"
-              onClick={() => onDelete(form.id)}
-              className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300"
-            >
-              <Trash2 size={14} />
-              Eliminar
-            </button>
+        <div className="flex flex-col gap-3 border-t border-[var(--ss-border)] p-4">
+          {(localErr || errorMsg) && (
+            <div className="rounded-xl bg-[#ee2346]/10 border border-[#ee2346]/20 px-3 py-2">
+              <p className="text-xs text-[#ee2346]">{localErr || errorMsg}</p>
+            </div>
           )}
 
-          <div className="ml-auto flex gap-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-4 py-2"
-            >
-              Cancelar
-            </button>
-
-            {(isAdmin || isColab) && (
+          <div className="flex justify-between">
+            {!isNew && isAdmin && !isEliminada && (
               <button
-                type="submit"
-                className="rounded-xl bg-[#6cbe45] px-4 py-2 font-medium text-white hover:bg-[#5aa63d]"
+                type="button"
+                onClick={() => setConfirmDeleteOpen(true)}
+                disabled={saving}
+                className="flex items-center gap-2 text-sm text-red-400 hover:text-red-300 disabled:opacity-60"
               >
-                Guardar
+                <Trash2 size={14} />
+                Eliminar
               </button>
             )}
+
+            {!isNew && isAdmin && isEliminada && (
+              <button
+                type="button"
+                onClick={() => onRestore(form.id)}
+                disabled={saving}
+                className="flex items-center gap-2 text-sm text-[#6cbe45] hover:text-[#5aa63d] disabled:opacity-60"
+              >
+                {saving ? "Restaurando..." : "Restaurar tarea"}
+              </button>
+            )}
+
+            <div className="ml-auto flex gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={saving}
+                className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-4 py-2 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+
+              {(isAdmin || isColab) && !isEliminada && (
+                <button
+                  type="submit"
+                  form="task-form"
+                  disabled={saving}
+                  className="rounded-xl bg-[#6cbe45] px-4 py-2 font-medium text-white hover:bg-[#5aa63d] disabled:opacity-60"
+                >
+                  {saving ? "Guardando..." : "Guardar"}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
+
+      {confirmDeleteOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-[var(--ss-text)]">
+              Eliminar tarea
+            </h3>
+            <p className="mt-3 text-sm text-[var(--ss-text2)]">
+              Esta tarea pudo haberse generado automáticamente al crear una
+              factura, como parte del registro de servicios facturados a la
+              organización.
+            </p>
+            <p className="mt-2 text-sm text-[var(--ss-text2)]">
+              Esta es una <strong>eliminación suave (soft delete)</strong>: la
+              tarea no se borra de forma permanente, sino que se mueve a la
+              columna <strong>"Eliminadas"</strong>, visible solo para
+              administradores, y deja de aparecer en el tablero normal. La
+              factura y sus montos no se modifican. Un administrador podrá
+              restaurarla más adelante desde ahí.
+            </p>
+            <p className="mt-2 text-sm text-[var(--ss-text2)]">
+              Aun así, procede con cuidado: mientras esté eliminada, la tarea
+              deja de ser visible para colaboradores y clientes, y cualquier
+              flujo o notificación asociado a ella se detiene.
+            </p>
+            <p className="mt-3 text-sm font-medium text-[var(--ss-text)]">
+              ¿Deseas continuar?
+            </p>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteOpen(false)}
+                className="rounded-xl border border-[var(--ss-border)] bg-[var(--ss-raised)] px-4 py-2 text-sm text-[var(--ss-text)]"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setConfirmDeleteOpen(false);
+                  onDelete(form.id);
+                }}
+                className="rounded-xl bg-[#ee2346] px-4 py-2 text-sm font-medium text-white hover:bg-[#d8203f]"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

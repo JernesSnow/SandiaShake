@@ -23,12 +23,28 @@ const ACCION_COLORS: Record<string, { bg: string; text: string; border: string; 
 };
 
 const TABLA_LABELS: Record<string, string> = {
-  usuarios:       "Usuarios",
-  tareas:         "Tareas",
-  entregables:    "Entregables",
-  organizaciones: "Organizaciones",
-  premios:        "Premios",
-  facturas:       "Facturas",
+  usuarios:                   "Usuarios",
+  tareas:                     "Tareas",
+  entregables:                "Entregables",
+  organizaciones:             "Organizaciones",
+  premios:                    "Premios",
+  facturas:                   "Facturas",
+  asignacion_organizacion:    "Asignaciones",
+  pagos:                      "Pagos",
+  cursos:                     "Cursos",
+  chilli_movimientos:         "Puntos Chilli",
+  canje_premio:               "Canjes de premios",
+  organizacion_plan_contenido:"Plan de contenido (organización)",
+  organizacion_notas:         "Notas internas",
+  planes_contenido:           "Planes de contenido",
+  organizacion_usuario:       "Usuarios de organización",
+  plan_servicio:              "Servicios del plan",
+  tarea_comentarios:          "Comentarios de tareas",
+  tarea_comentario_lecturas:  "Lecturas de comentarios",
+  estado_pago_organizacion:   "Estado de cuenta",
+  factura_detalles:           "Detalles de factura",
+  google_drive_org_folders:   "Carpetas Drive (organización)",
+  google_drive_task_folders:  "Carpetas Drive (tarea)",
 };
 
 const selectCls =

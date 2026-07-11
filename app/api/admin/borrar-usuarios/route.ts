@@ -16,7 +16,7 @@ export async function POST(req: Request) {
     //Validar que sea ADMIN (y activo)
     const { data: perfil } = await supabase
       .from("usuarios")
-      .select("rol, admin_nivel, estado")
+      .select("rol, admin_nivel, estado, id_usuario")
       .eq("auth_user_id", user.id)
       .maybeSingle();
 
@@ -44,6 +44,12 @@ export async function POST(req: Request) {
     if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 });
 
     const encontrados = rows ?? [];
+
+    // Registrar el actor antes de borrar para que la bitácora atribuya la eliminación correctamente
+    await admin
+      .from("usuarios")
+      .update({ updated_by: perfil.id_usuario })
+      .in("correo", correos);
 
     //Borrar perfiles en la DB
     const { error: delPerfilErr } = await admin

@@ -221,6 +221,30 @@ export function FacturacionPage() {
   const [loadingTareas, setLoadingTareas] = useState(false);
 
 const [sendingEmail, setSendingEmail] = useState(false);
+const [emailMsg, setEmailMsg] = useState<{ ok: boolean; text: string } | null>(null);
+const [payError, setPayError] = useState<string | null>(null);
+const [createError, setCreateError] = useState<string | null>(null);
+const [editError, setEditError] = useState<string | null>(null);
+const [deleteError, setDeleteError] = useState<string | null>(null);
+const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
+const [toastVisible, setToastVisible] = useState(false);
+
+function showToast(ok: boolean, text: string) {
+  setToast({ ok, text });
+}
+
+useEffect(() => {
+  if (!toast) return;
+  setToastVisible(false);
+  const enter = requestAnimationFrame(() => setToastVisible(true));
+  const hideTimer = setTimeout(() => setToastVisible(false), 4000);
+  const removeTimer = setTimeout(() => setToast(null), 4300);
+  return () => {
+    cancelAnimationFrame(enter);
+    clearTimeout(hideTimer);
+    clearTimeout(removeTimer);
+  };
+}, [toast]);
 
 async function fetchPlanes() {
   try {
@@ -252,10 +276,12 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
     const json = await res.json();
     if (!res.ok) throw new Error(json?.error || "No se pudo enviar el correo");
 
-    alert(`Correo enviado a: ${json?.to || "cliente"}`);
+    setEmailMsg({ ok: true, text: `Correo enviado a: ${json?.to || "cliente"}` });
+    setTimeout(() => setEmailMsg(null), 5000);
   } catch (e: any) {
     console.error(e);
-    alert(e?.message ?? "Error enviando correo");
+    setEmailMsg({ ok: false, text: e?.message ?? "Error enviando correo" });
+    setTimeout(() => setEmailMsg(null), 5000);
   } finally {
     setSendingEmail(false);
   }
@@ -368,6 +394,7 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
   }, [selectedId]);
 
   function openCreateModal() {
+    setCreateError(null);
     setCreateOrgId("");
     setCreatePeriodo("");
     setCreateVencimiento("");
@@ -384,31 +411,33 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
   }
 
   async function submitCreate() {
+    setCreateError(null);
+
     if (!createOrgId) {
-      alert("Selecciona una organización.");
+      setCreateError("Selecciona una organización.");
       return;
     }
     if (!createPeriodo.trim()) {
-      alert("Ingresa el periodo.");
+      setCreateError("Ingresa el periodo.");
       return;
     }
     if (createItems.length === 0) {
-      alert("Agrega al menos un item.");
+      setCreateError("Agrega al menos un item.");
       return;
     }
     for (const item of createItems) {
       if (!item.concepto.trim()) {
-        alert("Cada item debe tener un servicio.");
+        setCreateError("Cada item debe tener un servicio.");
         return;
       }
       if (item.cantidad <= 0) {
-        alert("La cantidad de cada item debe ser mayor a 0.");
+        setCreateError("La cantidad de cada item debe ser mayor a 0.");
         return;
       }
       if (item.precio < 0) {
-    alert("El precio no puede ser negativo.");
-    return;
-  }
+        setCreateError("El precio no puede ser negativo.");
+        return;
+      }
     }
 
     setSavingCreate(true);
@@ -455,20 +484,19 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
 
       setCreateOpen(false);
       await fetchFacturas();
+      showToast(true, "Factura creada correctamente.");
     } catch (e: any) {
       console.error(e);
-      alert(e?.message ?? "Error creando factura");
+      setCreateError(e?.message ?? "Error creando factura");
     } finally {
       setSavingCreate(false);
     }
   }
 
   function openEditModal() {
-    if (!selectedInvoice) {
-      alert("Selecciona una factura primero.");
-      return;
-    }
+    if (!selectedInvoice) return;
 
+    setEditError(null);
     setEditPeriodo(selectedInvoice.periodo ?? "");
     setEditTotal(String(selectedInvoice.total ?? ""));
     setEditVencimiento(selectedInvoice.fecha_vencimiento ?? "");
@@ -477,22 +505,23 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
 
   async function submitEdit() {
     if (!selectedInvoice) return;
+    setEditError(null);
 
     const total = Number(editTotal);
 
     if (!Number.isFinite(total) || total <= 0) {
-      alert("El total debe ser un número positivo.");
+      setEditError("El total debe ser un número positivo.");
       return;
     }
 
     const paid = selectedInvoice.total - selectedInvoice.saldo;
 
     if (total < paid) {
-      alert("El total no puede ser menor a lo ya pagado.");
+      setEditError("El total no puede ser menor a lo ya pagado.");
       return;
     }
     if (!editPeriodo.trim()) {
-      alert("Ingresa el periodo.");
+      setEditError("Ingresa el periodo.");
       return;
     }
 
@@ -516,9 +545,10 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
 
       setEditOpen(false);
       await fetchFacturas();
+      showToast(true, "Factura actualizada correctamente.");
     } catch (e: any) {
       console.error(e);
-      alert(e?.message ?? "Error editando factura");
+      setEditError(e?.message ?? "Error editando factura");
     } finally {
       setSavingEdit(false);
     }
@@ -526,6 +556,7 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
 
   async function submitDelete() {
     if (!selectedInvoice) return;
+    setDeleteError(null);
 
     setSavingDelete(true);
     try {
@@ -541,9 +572,10 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
       setDeleteOpen(false);
       setSelectedId(null);
       await fetchFacturas();
+      showToast(true, "Factura eliminada correctamente.");
     } catch (e: any) {
       console.error(e);
-      alert(e?.message ?? "Error eliminando factura");
+      setDeleteError(e?.message ?? "Error eliminando factura");
     } finally {
       setSavingDelete(false);
     }
@@ -582,15 +614,16 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
 
   async function submitPago() {
     if (!payFacturaId) {
-      alert("Selecciona una factura.");
+      setPayError("Selecciona una factura.");
       return;
     }
     const monto = Number(payMonto);
     if (!Number.isFinite(monto) || monto <= 0) {
-      alert("Monto inválido.");
+      setPayError("Monto inválido.");
       return;
     }
 
+    setPayError(null);
     setSavingPay(true);
     try {
       const res = await fetch("/api/admin/pagos", {
@@ -609,12 +642,10 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
 
       setPayOpen(false);
       await fetchFacturas();
-      //prueba
-await enviarNotificacion("pago");
-      //fin prueba
+      showToast(true, "Pago registrado correctamente.");
     } catch (e: any) {
       console.error(e);
-      alert(e?.message ?? "Error registrando pago");
+      setPayError(e?.message ?? "Error registrando pago");
     } finally {
       setSavingPay(false);
     }
@@ -861,13 +892,15 @@ await enviarNotificacion("pago");
 >
   {sendingEmail ? "Enviando..." : "Enviar recordatorio"}
 </button>
-
-
-
+{emailMsg && (
+  <span className={`text-[11px] ${emailMsg.ok ? "text-[#6cbe45]" : "text-[#ee2346]"}`}>
+    {emailMsg.text}
+  </span>
+)}
                     {/*fin prueba boton */}
                     <button
                       type="button"
-                      onClick={() => setDeleteOpen(true)}
+                      onClick={() => { setDeleteError(null); setDeleteOpen(true); }}
                       className="
                         inline-flex items-center gap-2 rounded-xl
                         border border-[#ee2346]/60 text-[#ee2346] px-3 py-2
@@ -980,12 +1013,12 @@ await enviarNotificacion("pago");
         <Modal
           title="Registrar pago"
           subtitle="Ingresa monto y método. Se guardará en la BD y actualizará el saldo."
-          onClose={() => setPayOpen(false)}
+          onClose={() => { setPayOpen(false); setPayError(null); }}
           footer={
             <>
               <button
                 type="button"
-                onClick={() => setPayOpen(false)}
+                onClick={() => { setPayOpen(false); setPayError(null); }}
                 className="rounded-xl border border-[var(--ss-border)] px-3 py-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-raised)] transition"
               >
                 Cancelar
@@ -1059,6 +1092,12 @@ await enviarNotificacion("pago");
                 placeholder="Comprobante / número referencia"
               />
             </div>
+
+            {payError && (
+              <div className="rounded-xl bg-[#ee2346]/10 border border-[#ee2346]/20 px-3 py-2">
+                <p className="text-xs text-[#ee2346]">{payError}</p>
+              </div>
+            )}
           </div>
         </Modal>
       )}
@@ -1068,12 +1107,12 @@ await enviarNotificacion("pago");
         <Modal
           title="Nueva factura"
           subtitle="Crea una factura para una organización."
-          onClose={() => setCreateOpen(false)}
+          onClose={() => { setCreateOpen(false); setCreateError(null); }}
           footer={
             <>
               <button
                 type="button"
-                onClick={() => setCreateOpen(false)}
+                onClick={() => { setCreateOpen(false); setCreateError(null); }}
                 className="rounded-xl border border-[var(--ss-border)] px-3 py-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-raised)] transition"
               >
                 Cancelar
@@ -1387,6 +1426,12 @@ await enviarNotificacion("pago");
               </div>
             </div>
 
+            {createError && (
+              <div className="rounded-xl bg-[#ee2346]/10 border border-[#ee2346]/20 px-3 py-2">
+                <p className="text-xs text-[#ee2346]">{createError}</p>
+              </div>
+            )}
+
           </div>
         </Modal>
       )}
@@ -1396,12 +1441,12 @@ await enviarNotificacion("pago");
         <Modal
           title="Editar factura"
           subtitle={`Factura #${selectedInvoice.id_factura} · ${selectedInvoice.organizacion_nombre}`}
-          onClose={() => setEditOpen(false)}
+          onClose={() => { setEditOpen(false); setEditError(null); }}
           footer={
             <>
               <button
                 type="button"
-                onClick={() => setEditOpen(false)}
+                onClick={() => { setEditOpen(false); setEditError(null); }}
                 className="rounded-xl border border-[var(--ss-border)] px-3 py-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-raised)] transition"
               >
                 Cancelar
@@ -1461,6 +1506,12 @@ await enviarNotificacion("pago");
                 onChange={(e) => setEditVencimiento(e.target.value)}
               />
             </div>
+
+            {editError && (
+              <div className="rounded-xl bg-[#ee2346]/10 border border-[#ee2346]/20 px-3 py-2">
+                <p className="text-xs text-[#ee2346]">{editError}</p>
+              </div>
+            )}
           </div>
         </Modal>
       )}
@@ -1470,12 +1521,12 @@ await enviarNotificacion("pago");
         <Modal
           title="Eliminar factura"
           subtitle={`Factura #${selectedInvoice.id_factura} · ${selectedInvoice.organizacion_nombre}`}
-          onClose={() => setDeleteOpen(false)}
+          onClose={() => { setDeleteOpen(false); setDeleteError(null); }}
           footer={
             <>
               <button
                 type="button"
-                onClick={() => setDeleteOpen(false)}
+                onClick={() => { setDeleteOpen(false); setDeleteError(null); }}
                 className="rounded-xl border border-[var(--ss-border)] px-3 py-2 text-sm text-[var(--ss-text2)] hover:text-[var(--ss-text)] hover:bg-[var(--ss-raised)] transition"
               >
                 Cancelar
@@ -1499,7 +1550,30 @@ await enviarNotificacion("pago");
             <p>Total: {formatCRC(selectedInvoice.total)}</p>
             <p>Saldo: {formatCRC(selectedInvoice.saldo)}</p>
           </div>
+
+          {deleteError && (
+            <div className="mt-3 rounded-xl bg-[#ee2346]/10 border border-[#ee2346]/20 px-3 py-2">
+              <p className="text-xs text-[#ee2346]">{deleteError}</p>
+            </div>
+          )}
         </Modal>
+      )}
+
+      {/* Toast global de confirmación */}
+      {toast && (
+        <div
+          className={cx(
+            "fixed top-6 left-1/2 -translate-x-1/2 z-[60] rounded-xl px-4 py-3",
+            "text-xs font-medium shadow-lg border max-w-sm text-center",
+            "transition-all duration-300 ease-out",
+            toastVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-6 pointer-events-none",
+            toast.ok
+              ? "bg-[var(--ss-surface)] text-[#6cbe45] border-[#6cbe45]/40"
+              : "bg-[var(--ss-surface)] text-[#ee2346] border-[#ee2346]/40"
+          )}
+        >
+          {toast.text}
+        </div>
       )}
     </div>
   );
