@@ -1,12 +1,9 @@
 "use client";
 
-import { CheckCircle, Clock, AlertTriangle, FileText, ChevronRight } from "react-feather";
+import { CheckCircle, Clock, AlertTriangle, Circle, TrendingUp, ThumbsUp, ThumbsDown, MessageCircle, Calendar, MapPin, Phone, Mail } from "react-feather";
+import KPI from "./KPI";
 
 /* ─── helpers ─── */
-
-function formatCRC(n: number) {
-  return "₡ " + n.toLocaleString("es-CR");
-}
 
 function formatDate(iso?: string | null) {
   if (!iso) return null;
@@ -15,50 +12,19 @@ function formatDate(iso?: string | null) {
   return new Intl.DateTimeFormat("es-CR", { day: "numeric", month: "long" }).format(d);
 }
 
-function daysUntil(iso?: string | null): number | null {
-  if (!iso) return null;
-  return Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000);
-}
+const AVATAR_COLORS = [
+  { bg: "#ee2346", text: "#fff" },
+  { bg: "#6cbe45", text: "#fff" },
+  { bg: "#3b82f6", text: "#fff" },
+  { bg: "#8b5cf6", text: "#fff" },
+  { bg: "#f97316", text: "#fff" },
+  { bg: "#14b8a6", text: "#fff" },
+];
 
-const KANBAN_DOT: Record<string, string> = {
-  pendiente:   "bg-[var(--ss-border)]",
-  en_progreso: "bg-sky-400",
-  en_revision: "bg-amber-400",
-  aprobada:    "bg-[#6cbe45]",
-};
-
-const KANBAN_LABEL: Record<string, string> = {
-  pendiente:   "Pendiente",
-  en_progreso: "En producción",
-  en_revision: "En revisión",
-  aprobada:    "Aprobada",
-};
-
-const FACTURA_COLOR: Record<string, string> = {
-  PAGADA:    "text-[#6cbe45]",
-  PENDIENTE: "text-[var(--ss-text2)]",
-  PARCIAL:   "text-amber-500",
-  VENCIDA:   "text-[#ee2346]",
-};
-
-/* ─── Progress ring ─── */
-function ProgressRing({ pct, size = 96 }: { pct: number; size?: number }) {
-  const r = (size - 12) / 2;
-  const circ = 2 * Math.PI * r;
-  const filled = circ * (pct / 100);
-
-  return (
-    <svg width={size} height={size} className="-rotate-90">
-      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--ss-overlay)" strokeWidth={8} />
-      <circle
-        cx={size / 2} cy={size / 2} r={r} fill="none"
-        stroke="#6cbe45" strokeWidth={8}
-        strokeDasharray={`${filled} ${circ}`}
-        strokeLinecap="round"
-        style={{ transition: "stroke-dasharray 0.6s ease" }}
-      />
-    </svg>
-  );
+function avatarColor(nombre: string) {
+  let hash = 0;
+  for (let i = 0; i < nombre.length; i++) hash = nombre.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
 /* ─── main ─── */
@@ -81,18 +47,21 @@ export default function ClienteDashboard({ data }: { data: any }) {
     );
   }
 
-  const { org, tareas: t, facturacion: f } = data;
+  const { org, tareas: t, aprobaciones: ap } = data;
 
-  const total      = t?.total ?? 0;
   const aprobadas  = t?.aprobadas ?? 0;
   const revision   = t?.enRevision ?? 0;
   const progreso   = t?.enProgreso ?? 0;
-  const pct        = total > 0 ? Math.round((aprobadas / total) * 100) : 0;
+  const pendientes = t?.pendientes ?? 0;
+  const proximaEntrega = t?.proximaEntrega ?? null;
 
-  const saldo      = f?.saldoTotal ?? 0;
-  const vencidas   = f?.facturasVencidas ?? 0;
-  const proxima    = f?.proximaFactura ?? null;
-  const diasVence  = daysUntil(proxima?.fecha_vencimiento);
+  const tareasAprobadas  = ap?.aprobadas ?? 0;
+  const tareasRechazadas = ap?.rechazadas ?? 0;
+  const totalRevisiones  = tareasAprobadas + tareasRechazadas;
+  const pctAprobacion    = totalRevisiones > 0 ? Math.round((tareasAprobadas / totalRevisiones) * 100) : null;
+
+  const mensajesSinLeer      = t?.mensajesSinLeer ?? [];
+  const totalMensajesSinLeer = mensajesSinLeer.reduce((s: number, x: any) => s + (x.unread_count ?? 0), 0);
 
   const hour = new Date().getHours();
   const greeting = hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
@@ -100,189 +69,250 @@ export default function ClienteDashboard({ data }: { data: any }) {
   return (
     <div className="flex flex-col gap-6 text-[var(--ss-text)]">
 
-      {/* ── HERO ── */}
-      <div
-        className="rounded-2xl p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6 relative overflow-hidden"
-        style={{ background: "linear-gradient(135deg, #1a1a2e 0%, #16213e 60%, #0f3460 100%)" }}
-      >
-        {/* Decorative glow */}
-        <div className="absolute -right-10 -top-10 w-52 h-52 rounded-full opacity-10 pointer-events-none"
-          style={{ background: "radial-gradient(circle, #6cbe45, transparent)" }} />
-        <div className="absolute right-20 -bottom-8 w-36 h-36 rounded-full opacity-10 pointer-events-none"
-          style={{ background: "radial-gradient(circle, #7dd3fc, transparent)" }} />
+      {/* ── HERO + PRÓXIMA ENTREGA ── */}
+      <div className="flex flex-col lg:flex-row gap-6 items-stretch">
 
-        <div className="relative z-10">
-          <p className="text-white/50 text-sm mb-1">{greeting}</p>
-          <h1 className="text-2xl font-bold text-white">{org?.nombre ?? "Tu organización"}</h1>
-          {org?.descripcion && (
-            <p className="text-white/40 text-sm mt-1 max-w-sm leading-snug">{org.descripcion}</p>
-          )}
-          {(org?.diasMora ?? 0) > 0 && (
-            <div className="mt-3 inline-flex items-center gap-2 bg-red-500/20 border border-red-400/30 text-red-300 text-xs font-semibold px-3 py-1.5 rounded-full">
-              <AlertTriangle size={12} />
-              {org.diasMora} días de mora en pagos
+        {/* HERO */}
+        <div className="flex-1 rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] px-7 py-8">
+          <div className="flex items-start gap-4">
+            <div
+              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl text-xl font-bold select-none"
+              style={{ backgroundColor: avatarColor(org?.nombre ?? "O").bg, color: avatarColor(org?.nombre ?? "O").text }}
+            >
+              {(org?.nombre ?? "O").charAt(0).toUpperCase()}
             </div>
-          )}
-        </div>
 
-        {/* Progress ring */}
-        <div className="relative z-10 flex flex-col items-center gap-1 shrink-0">
-          <div className="relative">
-            <ProgressRing pct={pct} size={100} />
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
-              <span className="text-xl font-bold text-white">{pct}%</span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[var(--ss-text3)] text-sm mb-1">{greeting}</p>
+              <h1 className="text-2xl font-bold text-[var(--ss-text)]">{org?.nombre ?? "Tu organización"}</h1>
+              {org?.descripcion && (
+                <p className="text-[var(--ss-text3)] text-sm mt-1 max-w-md leading-snug">{org.descripcion}</p>
+              )}
+
+              <div className="flex flex-wrap items-center gap-4 mt-3">
+                {(org?.ciudad || org?.pais) && (
+                  <span className="flex items-center gap-1.5 text-xs text-[var(--ss-text3)]">
+                    <MapPin size={12} />
+                    {[org.ciudad, org.pais].filter(Boolean).join(", ")}
+                  </span>
+                )}
+                {org?.telefono && (
+                  <span className="flex items-center gap-1.5 text-xs text-[var(--ss-text3)]">
+                    <Phone size={12} />
+                    {org.telefono}
+                  </span>
+                )}
+                {org?.correo && (
+                  <span className="flex items-center gap-1.5 text-xs text-[var(--ss-text3)]">
+                    <Mail size={12} />
+                    {org.correo}
+                  </span>
+                )}
+              </div>
+
+              {(org?.diasMora ?? 0) > 0 && (
+                <div className="mt-3 inline-flex items-center gap-2 bg-[#ee2346]/10 border border-[#ee2346]/30 text-[#ee2346] text-xs font-semibold px-3 py-1.5 rounded-full">
+                  <AlertTriangle size={12} />
+                  {org.diasMora} días de mora en pagos
+                </div>
+              )}
             </div>
           </div>
-          <p className="text-white/40 text-xs">completado</p>
+        </div>
+
+        {/* Próxima entrega — separada de la tarjeta de la organización */}
+        <div className="lg:w-72 shrink-0">
+          <KPI
+            icon={<Calendar size={24} />}
+            label="Próxima entrega"
+            value={proximaEntrega ? formatDate(proximaEntrega.fecha_entrega)! : "—"}
+            accent="#7dd3fc"
+            size="lg"
+            fullHeight
+            description={proximaEntrega ? proximaEntrega.titulo : "No tienes entregas próximas por ahora."}
+          />
         </div>
       </div>
 
-      {/* ── NEEDS YOUR ACTION (tasks in revision) ── */}
-      {revision > 0 && (
-        <div className="rounded-2xl border border-amber-400/30 bg-[var(--ss-surface)] overflow-hidden">
-          <div className="px-5 py-4 bg-amber-400/10 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/20 text-amber-500">
-                <Clock size={15} />
-              </span>
-              <div>
-                <p className="font-semibold text-sm text-amber-600 dark:text-amber-300">
-                  {revision === 1 ? "1 tarea espera tu revisión" : `${revision} tareas esperan tu revisión`}
-                </p>
-                <p className="text-xs text-[var(--ss-text3)]">Tu respuesta mantiene al equipo en movimiento</p>
+      {/* ── NEEDS YOUR ACTION (tasks in revision) + UNREAD MESSAGES ── */}
+      <div className="grid md:grid-cols-2 gap-6">
+          {revision > 0 && (
+            <div className="rounded-2xl border border-amber-400/30 bg-[var(--ss-surface)] overflow-hidden">
+              <div className="px-5 py-4 bg-amber-400/10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/20 text-amber-500">
+                    <Clock size={15} />
+                  </span>
+                  <div>
+                    <p className="font-semibold text-sm text-amber-600 dark:text-amber-300">
+                      {revision === 1 ? "1 tarea espera tu revisión" : `${revision} tareas esperan tu revisión`}
+                    </p>
+                    <p className="text-xs text-[var(--ss-text3)]">Tu respuesta mantiene al equipo en movimiento</p>
+                  </div>
+                </div>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-400 text-white text-xs font-bold">
+                  {revision}
+                </span>
+              </div>
+              <div className="divide-y divide-[var(--ss-border)] max-h-[280px] overflow-y-auto">
+                {(t?.paraTuAprobacion ?? []).map((tarea: any) => (
+                  <div key={tarea.id_tarea} className="px-5 py-3 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{tarea.titulo}</p>
+                      {tarea.tipo && <p className="text-xs text-[var(--ss-text3)]">{tarea.tipo}</p>}
+                    </div>
+                    {tarea.fecha_entrega && (
+                      <span className="shrink-0 text-xs text-[var(--ss-text3)]">{formatDate(tarea.fecha_entrega)}</span>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-400 text-white text-xs font-bold">
-              {revision}
-            </span>
-          </div>
-          <div className="divide-y divide-[var(--ss-border)]">
-            {(t?.paraTuAprobacion ?? []).map((tarea: any) => (
-              <div key={tarea.id_tarea} className="px-5 py-3 flex items-center justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{tarea.titulo}</p>
-                  {tarea.tipo && <p className="text-xs text-[var(--ss-text3)]">{tarea.tipo}</p>}
+          )}
+
+          <div className={"rounded-2xl border bg-[var(--ss-surface)] overflow-hidden " + (totalMensajesSinLeer > 0 ? "border-sky-400/30" : "border-[var(--ss-border)]")}>
+            <div className={"px-5 py-4 flex items-center justify-between " + (totalMensajesSinLeer > 0 ? "bg-sky-400/10" : "")}>
+              <div className="flex items-center gap-3">
+                <span className={"flex h-8 w-8 items-center justify-center rounded-full " + (totalMensajesSinLeer > 0 ? "bg-sky-400/20 text-sky-500" : "bg-[#6cbe45]/15 text-[#6cbe45]")}>
+                  {totalMensajesSinLeer > 0 ? <MessageCircle size={15} /> : <CheckCircle size={15} />}
+                </span>
+                <div>
+                  <p className={"font-semibold text-sm " + (totalMensajesSinLeer > 0 ? "text-sky-600 dark:text-sky-300" : "text-[var(--ss-text)]")}>
+                    {totalMensajesSinLeer === 0
+                      ? "Sin mensajes sin leer"
+                      : totalMensajesSinLeer === 1
+                      ? "1 mensaje sin leer"
+                      : `${totalMensajesSinLeer} mensajes sin leer`}
+                  </p>
+                  <p className="text-xs text-[var(--ss-text3)]">Actualizaciones del equipo en tus tareas</p>
                 </div>
-                {tarea.fecha_entrega && (
-                  <span className="shrink-0 text-xs text-[var(--ss-text3)]">{formatDate(tarea.fecha_entrega)}</span>
-                )}
               </div>
-            ))}
+              {totalMensajesSinLeer > 0 && (
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-500 text-white text-xs font-bold">
+                  {totalMensajesSinLeer}
+                </span>
+              )}
+            </div>
+            {mensajesSinLeer.length === 0 ? (
+              <p className="px-5 py-8 text-center text-xs text-[var(--ss-text3)]">Estás al día — no tienes mensajes sin leer.</p>
+            ) : (
+              <div className="divide-y divide-[var(--ss-border)] max-h-[280px] overflow-y-auto">
+                {mensajesSinLeer.map((tarea: any) => (
+                  <div key={tarea.id_tarea} className="px-5 py-3 flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{tarea.titulo}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        {tarea.tipo && <p className="text-xs text-[var(--ss-text3)]">{tarea.tipo}</p>}
+                        {tarea.tipo && tarea.fecha_entrega && <span className="text-[var(--ss-text3)]">·</span>}
+                        {tarea.fecha_entrega && (
+                          <p className="text-xs text-[var(--ss-text3)]">{formatDate(tarea.fecha_entrega)}</p>
+                        )}
+                      </div>
+                    </div>
+                    <span className="shrink-0 flex h-6 min-w-[24px] px-1.5 items-center justify-center rounded-full bg-sky-500 text-white text-xs font-bold">
+                      {tarea.unread_count}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      )}
+      </div>
 
       {/* ── TWO COLUMN ── */}
       <div className="grid lg:grid-cols-5 gap-6">
 
         {/* LEFT — task feed (3 cols) */}
         <div className="lg:col-span-3 flex flex-col gap-4">
-          <h2 className="text-sm font-semibold text-[var(--ss-text2)]">Estado de tus entregas</h2>
+          <h2 className="text-sm font-semibold text-[var(--ss-text2)]">Estado de tus entregables</h2>
 
-          {/* Summary pills */}
-          <div className="flex flex-wrap gap-2">
-            {[
-              { label: "En producción", count: progreso, color: "bg-sky-500/15 text-sky-600 dark:text-sky-300" },
-              { label: "En revisión",   count: revision, color: "bg-amber-500/15 text-amber-600 dark:text-amber-300" },
-              { label: "Aprobadas",     count: aprobadas, color: "bg-[#6cbe45]/15 text-[#6cbe45]" },
-              { label: "Total",         count: total,    color: "bg-[var(--ss-overlay)] text-[var(--ss-text2)]" },
-            ].map(p => (
-              <span key={p.label} className={"text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-1.5 " + p.color}>
-                {p.count} {p.label}
-              </span>
-            ))}
-          </div>
-
-          {/* Task list as feed */}
-          <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] divide-y divide-[var(--ss-border)]">
-            {(t?.recientes ?? []).length === 0 && (
-              <p className="px-5 py-8 text-center text-xs text-[var(--ss-text3)]">No hay tareas aún.</p>
-            )}
-            {(t?.recientes ?? []).map((tarea: any) => (
-              <div key={tarea.id_tarea} className="px-5 py-3.5 flex items-center gap-4">
-                <span className={"shrink-0 h-2.5 w-2.5 rounded-full " + (KANBAN_DOT[tarea.status_kanban] ?? "bg-[var(--ss-border)]")} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">{tarea.titulo}</p>
-                  {tarea.fecha_entrega && (
-                    <p className="text-xs text-[var(--ss-text3)] mt-0.5">Entrega: {formatDate(tarea.fecha_entrega)}</p>
-                  )}
-                </div>
-                <span className="shrink-0 text-xs text-[var(--ss-text3)]">
-                  {KANBAN_LABEL[tarea.status_kanban] ?? tarea.status_kanban}
-                </span>
-              </div>
-            ))}
+          {/* KPIs por estado */}
+          <div className="grid grid-cols-2 gap-4">
+            <KPI
+              icon={<Circle size={24} />}
+              label="Pendiente"
+              value={pendientes}
+              accent="#94a3b8"
+              size="lg"
+              description="Aún no se ha comenzado a trabajar en ellas."
+            />
+            <KPI
+              icon={<TrendingUp size={24} />}
+              label="En producción"
+              value={progreso}
+              accent="#0ea5e9"
+              size="lg"
+              description="El equipo está trabajando en ellas."
+            />
+            <KPI
+              icon={<Clock size={24} />}
+              label="En revisión"
+              value={revision}
+              accent="#f59e0b"
+              size="lg"
+              description="Esperan tu aprobación."
+            />
+            <KPI
+              icon={<CheckCircle size={24} />}
+              label="Aprobadas"
+              value={aprobadas}
+              accent="#6cbe45"
+              size="lg"
+              description="Ya fueron aprobadas por ti."
+            />
           </div>
         </div>
 
         {/* RIGHT — billing (2 cols) */}
         <div className="lg:col-span-2 flex flex-col gap-4">
-          <h2 className="text-sm font-semibold text-[var(--ss-text2)]">Tu cuenta</h2>
+          <h2 className="text-sm font-semibold text-[var(--ss-text2)]">Tus revisiones</h2>
 
-          {/* Balance card */}
-          <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-5">
-            <p className="text-xs text-[var(--ss-text3)] mb-1">Saldo pendiente</p>
-            <p className={"text-3xl font-bold " + (saldo > 0 ? "text-[#ee2346]" : "text-[#6cbe45]")}>
-              {formatCRC(saldo)}
-            </p>
-            {saldo === 0 && (
-              <div className="flex items-center gap-1.5 mt-2 text-xs text-[#6cbe45]">
-                <CheckCircle size={12} /> Al día — sin pagos pendientes
-              </div>
-            )}
-            {vencidas > 0 && (
-              <div className="flex items-center gap-1.5 mt-2 text-xs text-[#ee2346]">
-                <AlertTriangle size={12} /> {vencidas} factura{vencidas > 1 ? "s" : ""} vencida{vencidas > 1 ? "s" : ""}
-              </div>
-            )}
-
-            {/* Next due */}
-            {proxima && (
-              <div className={"mt-4 pt-4 border-t border-[var(--ss-border)]"}>
-                <p className="text-xs text-[var(--ss-text3)] mb-2">Próximo vencimiento</p>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-semibold">Factura #{proxima.id_factura}</p>
-                    <p className="text-xs text-[var(--ss-text3)]">{proxima.periodo}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold">{formatCRC(proxima.saldo)}</p>
-                    <p className={"text-xs font-semibold " + (diasVence !== null && diasVence <= 3 ? "text-[#ee2346]" : diasVence !== null && diasVence <= 7 ? "text-amber-500" : "text-[var(--ss-text3)]")}>
-                      {diasVence === null ? "" : diasVence <= 0 ? "Vencida" : diasVence === 1 ? "Vence mañana" : "Vence en " + diasVence + "d"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
+          {/* Tareas: aprobación vs rechazo */}
+          <div className="grid grid-cols-2 gap-4">
+            <KPI
+              icon={<ThumbsUp size={24} />}
+              label="Aprobadas"
+              value={tareasAprobadas}
+              accent="#6cbe45"
+              size="lg"
+              description="Tareas que aceptaste."
+            />
+            <KPI
+              icon={<ThumbsDown size={24} />}
+              label="Rechazadas"
+              value={tareasRechazadas}
+              accent="#ee2346"
+              size="lg"
+              description="Tareas que pediste corregir."
+            />
           </div>
 
-          {/* Invoice history */}
-          <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] overflow-hidden">
-            <div className="px-5 py-3.5 border-b border-[var(--ss-border)] flex items-center gap-2">
-              <FileText size={13} className="text-[var(--ss-text3)]" />
-              <p className="text-xs font-semibold text-[var(--ss-text2)]">Historial de facturas</p>
-            </div>
-            <div className="divide-y divide-[var(--ss-border)]">
-              {(f?.historial ?? []).length === 0 && (
-                <p className="px-5 py-6 text-xs text-center text-[var(--ss-text3)]">Sin facturas aún.</p>
-              )}
-              {(f?.historial ?? []).map((factura: any) => (
-                <div key={factura.id_factura} className="px-5 py-3 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-xs font-semibold">#{factura.id_factura} · {factura.periodo}</p>
-                    {factura.fecha_vencimiento && (
-                      <p className="text-[10px] text-[var(--ss-text3)]">{formatDate(factura.fecha_vencimiento)}</p>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xs font-semibold">{formatCRC(factura.total ?? 0)}</p>
-                    <p className={"text-[10px] font-semibold " + (FACTURA_COLOR[factura.estado_factura] ?? "")}>
-                      {factura.estado_factura}
-                    </p>
-                  </div>
+          {/* Tasa de aprobación + feedback */}
+          <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-5 h-[150px] overflow-hidden flex flex-col">
+            <p className="text-xs text-[var(--ss-text3)] mb-2 shrink-0">Tasa de aprobación</p>
+            {totalRevisiones === 0 ? (
+              <p className="text-sm text-[var(--ss-text3)]">Aún no tienes revisiones registradas.</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-1.5 shrink-0">
+                  <span className="text-2xl font-bold text-[var(--ss-text)]">{pctAprobacion}%</span>
+                  <span className="text-xs text-[var(--ss-text3)]">{tareasAprobadas} de {totalRevisiones} revisadas</span>
                 </div>
-              ))}
-            </div>
+                <div className="h-2 rounded-full bg-[var(--ss-overlay)] overflow-hidden shrink-0">
+                  <div
+                    className="h-full rounded-full bg-[#6cbe45] transition-all"
+                    style={{ width: pctAprobacion + "%" }}
+                  />
+                </div>
+                <p className="text-xs text-[var(--ss-text3)] mt-3 leading-snug line-clamp-2">
+                  {pctAprobacion! >= 80
+                    ? "Excelente — la mayoría de tus revisiones se aprueban sin correcciones."
+                    : pctAprobacion! >= 50
+                    ? "Buen ritmo. Comentarios claros al rechazar ayudan a agilizar las correcciones."
+                    : "Da el mayor detalle posible en tus comentarios de rechazo para acelerar las correcciones."}
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -4,7 +4,7 @@ export const kanbanStyles = {
   // Layout
   root: "w-full flex flex-col gap-4 text-[var(--ss-text)]",
   boardWrapper: "w-full overflow-x-auto pb-6",
-  columnsRow: "flex gap-4 min-w-max",
+  columnsRow: "flex gap-4 min-w-max lg:w-full",
 
   // ----------------------------------------------------
   // FILTERS + ACTION BAR
@@ -50,14 +50,16 @@ export const kanbanStyles = {
   // COLUMN WRAPPERS
   // ----------------------------------------------------
   columnWrapperBase: `
-    w-72 flex-shrink-0 min-h-[70vh] p-3 rounded-2xl shadow-sm space-y-2
+    w-72 flex-shrink-0 lg:w-auto lg:flex-1 lg:min-w-[260px]
+    h-[78vh] pt-3 px-3 pb-1 rounded-2xl shadow-sm space-y-2
     border border-[var(--ss-border)]
+    flex flex-col overflow-hidden
   `,
 
   columnBgEven: "bg-[var(--ss-surface)]",
   columnBgOdd: "bg-[var(--ss-raised)]",
 
-  columnHeader: "flex items-center justify-between mb-1",
+  columnHeader: "flex items-center justify-between mb-1 shrink-0",
 
   columnTitle: `
     text-xs font-semibold uppercase tracking-wide
@@ -71,6 +73,7 @@ export const kanbanStyles = {
 
   columnDropAreaBase: `
     space-y-2 rounded-xl p-1 min-h-[60px]
+    flex-1 overflow-y-auto
   `,
 
   columnDropAreaDragging: `

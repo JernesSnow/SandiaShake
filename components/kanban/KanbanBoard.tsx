@@ -612,18 +612,21 @@ export function KanbanBoard() {
     const result: Record<string, Task> = {};
 
     for (const [id, task] of Object.entries(state.tasks)) {
-      const matchesClient =
-        !search || task.cliente.toLowerCase().includes(search);
+      const matchesSearch =
+        !search ||
+        (isCliente
+          ? task.titulo.toLowerCase().includes(search)
+          : task.cliente.toLowerCase().includes(search));
       const matchesPriority =
         priorityFilter === "Todas" || task.prioridad === priorityFilter;
 
-      if (matchesClient && matchesPriority) {
+      if (matchesSearch && matchesPriority) {
         result[id] = task;
       }
     }
 
     return result;
-  }, [state.tasks, searchClient, priorityFilter]);
+  }, [state.tasks, searchClient, priorityFilter, isCliente]);
 
   function getVisibleTaskIds(columnId: ColumnId) {
     return state.columns[columnId].taskIds.filter(
@@ -787,9 +790,12 @@ export function KanbanBoard() {
   }
 
   // "Eliminadas" (soft-deleted tasks) is only visible to admins.
-  const visibleColumnOrder = isAdmin
-    ? state.columnOrder
-    : state.columnOrder.filter((id) => id !== "eliminada");
+  // "Archivada" is hidden from clientes — they shouldn't see archived tareas.
+  const visibleColumnOrder = state.columnOrder.filter((id) => {
+    if (id === "eliminada") return isAdmin;
+    if (id === "archivada") return !isCliente;
+    return true;
+  });
 
   return (
     <div className={kanbanStyles.root}>
@@ -797,7 +803,9 @@ export function KanbanBoard() {
       <div className="mb-4 rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-4 shadow-sm">
         <div className="flex flex-col gap-3 md:flex-row md:items-end">
           <div className="flex-1">
-            <label className={kanbanStyles.label}>Buscar por cliente</label>
+            <label className={kanbanStyles.label}>
+              {isCliente ? "Buscar por tarea" : "Buscar por cliente"}
+            </label>
             <div className={kanbanStyles.searchWrapper}>
               <span className={kanbanStyles.searchIcon}>
                 <Search size={14} />
@@ -805,7 +813,7 @@ export function KanbanBoard() {
               <input
                 type="text"
                 className={kanbanStyles.searchInput}
-                placeholder="Ej: Café La Plaza"
+                placeholder={isCliente ? "Nombre de la tarea" : "Ej: Café La Plaza"}
                 value={searchClient}
                 onChange={(e) => setSearchClient(e.target.value)}
               />

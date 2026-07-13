@@ -22,6 +22,7 @@ type Tarea = {
   titulo: string;
   status_kanban: string;
   tipo_tarea?: string | null;
+  fecha_entrega?: string | null;
 };
 
 type TaskFolder = {
@@ -62,6 +63,22 @@ function avatarColor(nombre: string) {
 
 function formatCRC(n: number) {
   return "₡ " + n.toLocaleString("es-CR");
+}
+
+// Parses a fetch response defensively — never throws, and logs which
+// endpoint failed instead of silently aborting the rest of cargarTodo().
+async function safeJson(res: Response, label: string): Promise<any> {
+  const text = await res.text().catch(() => "");
+  if (!res.ok) {
+    console.error(`[ClienteDetailClient] ${label} failed: ${res.status} ${text.slice(0, 300)}`);
+    return null;
+  }
+  try {
+    return text ? JSON.parse(text) : null;
+  } catch (e) {
+    console.error(`[ClienteDetailClient] ${label} returned invalid JSON:`, text.slice(0, 300));
+    return null;
+  }
 }
 
 function formatDate(iso?: string) {
@@ -185,6 +202,7 @@ export default function ClienteDetailClient({ id }: { id: string }) {
   const [nuevoColaboradorId, setNuevoColaboradorId] = useState<number | null>(null);
   const [nuevaNota, setNuevaNota]         = useState("");
   const [loading, setLoading]             = useState(true);
+  const [tareasRechazadas, setTareasRechazadas] = useState(0);
 
   /* ── RESOLVE ROLE + ORG ── */
   useEffect(() => {
@@ -221,19 +239,27 @@ export default function ClienteDetailClient({ id }: { id: string }) {
         fetch(`/api/admin/asignaciones?id_organizacion=${orgId}`),
       ]);
 
-      setCliente(rOrg.ok ? (await rOrg.json())?.organizacion ?? null : null);
-      setFacturas((await rF.json())?.facturas ?? []);
-      setTareas((await rT.json())?.data ?? []);
-      setTaskFolders((await rTF.json())?.data ?? []);
-      setNotas(rN.ok ? (await rN.json())?.data ?? [] : []);
-      setColaboradores((await rC.json())?.data ?? []);
+      const [orgJson, facturasJson, tareasJson, foldersJson, notasJson, colabJson] = await Promise.all([
+        safeJson(rOrg, "organizacion"),
+        safeJson(rF, "facturas"),
+        safeJson(rT, "tareas"),
+        safeJson(rTF, "google-drive-task-folders"),
+        safeJson(rN, "organizacion-notas"),
+        safeJson(rC, "asignaciones"),
+      ]);
+
+      setCliente(orgJson?.organizacion ?? null);
+      setFacturas(facturasJson?.facturas ?? []);
+      setTareas(tareasJson?.data ?? []);
+      setTareasRechazadas(tareasJson?.tareasRechazadas ?? 0);
+      setTaskFolders(foldersJson?.data ?? []);
+      setNotas(notasJson?.data ?? []);
+      setColaboradores(colabJson?.data ?? []);
 
       if (role === "ADMIN") {
         const rU = await fetch("/api/admin/usuarios");
-        if (rU.ok) {
-          const jU = await rU.json();
-          setTodosColaboradores((jU?.usuarios ?? []).filter((u: any) => u.rol === "COLABORADOR" && u.estado === "ACTIVO"));
-        }
+        const uJson = await safeJson(rU, "usuarios");
+        setTodosColaboradores((uJson?.usuarios ?? []).filter((u: any) => u.rol === "COLABORADOR" && u.estado === "ACTIVO"));
       }
     } catch (e) {
       console.error("Error cargando cliente:", e);
@@ -294,6 +320,23 @@ export default function ClienteDetailClient({ id }: { id: string }) {
     }
     return Object.entries(map).map(([mes, v]) => ({ mes, ...v }));
   }, [facturas]);
+
+  // Tareas chart (client view) — group by fecha_entrega (deliverable date)
+  const tareasPorMes = useMemo(() => {
+    const map: Record<string, { label: string; cantidad: number }> = {};
+    for (const t of tareas) {
+      if (!t.fecha_entrega) continue;
+      const d = new Date(t.fecha_entrega);
+      if (isNaN(d.getTime())) continue;
+      const key = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+      const label = d.toLocaleDateString("es-CR", { month: "short", year: "2-digit" });
+      if (!map[key]) map[key] = { label, cantidad: 0 };
+      map[key].cantidad += 1;
+    }
+    return Object.entries(map)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([, v]) => ({ mes: v.label, cantidad: v.cantidad }));
+  }, [tareas]);
 
   const diasMora     = cliente?.estado_pago_organizacion?.[0]?.dias_mora    ?? 0;
   const estadoCuenta = cliente?.estado_pago_organizacion?.[0]?.estado_cuenta ?? null;
@@ -466,7 +509,7 @@ export default function ClienteDetailClient({ id }: { id: string }) {
         <StatCard title="Tareas totales"  value={totalTareas}              sub="asignadas a este cliente" />
         <StatCard title="Aprobadas"       value={tareasAprobadas}          sub={"de " + totalTareas + " tareas"} accent="green" />
         <StatCard title="Por aprobar"     value={tareasEnRevision}         sub="esperando respuesta del cliente" accent={tareasEnRevision > 0 ? "yellow" : undefined} />
-        <StatCard title="Total facturado" value={formatCRC(totalFacturado)} sub={facturas.length + " facturas emitidas"} accent={saldoPendiente > 0 ? "red" : "green"} />
+        <StatCard title="Tareas rechazadas" value={tareasRechazadas} sub="rechazadas por el cliente al menos una vez" accent={tareasRechazadas > 0 ? "red" : undefined} />
       </div>
 
       {/* ── RESPONSIVIDAD ── */}
@@ -541,30 +584,50 @@ export default function ClienteDetailClient({ id }: { id: string }) {
         />
       </div>
 
-      {/* Billing chart */}
-      {facturasPorMes.length > 1 && (
-        <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-6">
-          <h3 className="mb-4 font-semibold text-sm text-[var(--ss-text2)]">Facturación por período</h3>
-          <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={facturasPorMes} barGap={4}>
-              <XAxis dataKey="mes" tick={{ fill: "var(--ss-text3)", fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "var(--ss-text3)", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false}
-                tickFormatter={(v) => "₡" + (v >= 1000 ? (v / 1000).toFixed(0) + "k" : v)} />
-              <Tooltip
-                contentStyle={{ backgroundColor: "var(--ss-raised)", border: "1px solid var(--ss-border)", borderRadius: 12, color: "var(--ss-text)", fontSize: 12 }}
-                cursor={{ fill: "var(--ss-overlay)" }}
-                formatter={(v: any) => ["₡ " + Number(v).toLocaleString("es-CR")]}
-              />
-              <Legend wrapperStyle={{ fontSize: 12, color: "var(--ss-text2)" }} />
-              <Bar dataKey="facturado" name="Facturado" fill="#7dd3fc" radius={[4, 4, 0, 0]} />
-              <Bar dataKey="pagado"    name="Pagado"    fill="#6cbe45" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
+      {/* Billing chart (admin/colaborador) — Tareas por período (cliente) */}
+      {role === "CLIENTE" && <SectionDivider label="tareas" />}
+      {role === "CLIENTE" ? (
+        tareasPorMes.length > 1 && (
+          <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-6">
+            <h3 className="mb-4 font-semibold text-sm text-[var(--ss-text2)]">Tareas por período</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={tareasPorMes} barGap={4}>
+                <XAxis dataKey="mes" tick={{ fill: "var(--ss-text3)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "var(--ss-text3)", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "var(--ss-raised)", border: "1px solid var(--ss-border)", borderRadius: 12, color: "var(--ss-text)", fontSize: 12 }}
+                  cursor={{ fill: "var(--ss-overlay)" }}
+                />
+                <Bar dataKey="cantidad" name="Tareas" fill="#7dd3fc" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )
+      ) : (
+        facturasPorMes.length > 1 && (
+          <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-6">
+            <h3 className="mb-4 font-semibold text-sm text-[var(--ss-text2)]">Facturación por período</h3>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={facturasPorMes} barGap={4}>
+                <XAxis dataKey="mes" tick={{ fill: "var(--ss-text3)", fontSize: 11 }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fill: "var(--ss-text3)", fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false}
+                  tickFormatter={(v) => "₡" + (v >= 1000 ? (v / 1000).toFixed(0) + "k" : v)} />
+                <Tooltip
+                  contentStyle={{ backgroundColor: "var(--ss-raised)", border: "1px solid var(--ss-border)", borderRadius: 12, color: "var(--ss-text)", fontSize: 12 }}
+                  cursor={{ fill: "var(--ss-overlay)" }}
+                  formatter={(v: any) => ["₡ " + Number(v).toLocaleString("es-CR")]}
+                />
+                <Legend wrapperStyle={{ fontSize: 12, color: "var(--ss-text2)" }} />
+                <Bar dataKey="facturado" name="Facturado" fill="#7dd3fc" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="pagado"    name="Pagado"    fill="#6cbe45" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        )
       )}
 
       {/* Factura list */}
-      {facturas.length > 0 && (
+      {role !== "CLIENTE" && facturas.length > 0 && (
         <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-6">
           <h3 className="mb-4 font-semibold text-sm text-[var(--ss-text2)] flex items-center gap-2">
             <FileText size={14} className="text-[#7dd3fc]" /> Historial de facturas
@@ -592,32 +655,34 @@ export default function ClienteDetailClient({ id }: { id: string }) {
       )}
 
       {/* ── PRODUCCIÓN ── */}
-      <SectionDivider label="producción" />
+      {role !== "CLIENTE" && <SectionDivider label="producción" />}
 
       {/* ── MAIN GRID ── */}
       <div className="grid lg:grid-cols-3 gap-8">
 
         {/* LEFT — task list + drive */}
         <div className="lg:col-span-2 space-y-8">
-          <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-6">
-            <h2 className="font-semibold mb-4 text-sm flex items-center gap-2">
-              <CheckSquare size={14} className="text-[#6cbe45]" /> Tareas
-            </h2>
-            {tareas.length === 0 && <p className="text-xs text-[var(--ss-text3)]">No hay tareas registradas.</p>}
-            <div className="space-y-2 max-h-[360px] overflow-y-auto">
-              {tareas.map(t => (
-                <div key={t.id_tarea} className="bg-[var(--ss-raised)] px-4 py-3 rounded-xl border border-[var(--ss-border)] flex justify-between items-center gap-3">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-sm truncate">{t.titulo}</p>
-                    {t.tipo_tarea && <p className="text-xs text-[var(--ss-text3)]">{t.tipo_tarea}</p>}
+          {role !== "CLIENTE" && (
+            <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-6">
+              <h2 className="font-semibold mb-4 text-sm flex items-center gap-2">
+                <CheckSquare size={14} className="text-[#6cbe45]" /> Tareas
+              </h2>
+              {tareas.length === 0 && <p className="text-xs text-[var(--ss-text3)]">No hay tareas registradas.</p>}
+              <div className="space-y-2 max-h-[360px] overflow-y-auto">
+                {tareas.map(t => (
+                  <div key={t.id_tarea} className="bg-[var(--ss-raised)] px-4 py-3 rounded-xl border border-[var(--ss-border)] flex justify-between items-center gap-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-sm truncate">{t.titulo}</p>
+                      {t.tipo_tarea && <p className="text-xs text-[var(--ss-text3)]">{t.tipo_tarea}</p>}
+                    </div>
+                    <span className={"shrink-0 text-xs px-2.5 py-1 rounded-full font-medium " + (KANBAN_STYLE[t.status_kanban] ?? "")}>
+                      {KANBAN_LABEL[t.status_kanban] ?? t.status_kanban}
+                    </span>
                   </div>
-                  <span className={"shrink-0 text-xs px-2.5 py-1 rounded-full font-medium " + (KANBAN_STYLE[t.status_kanban] ?? "")}>
-                    {KANBAN_LABEL[t.status_kanban] ?? t.status_kanban}
-                  </span>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {taskFolders.length > 0 && (
             <div className="rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-6">

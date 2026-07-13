@@ -197,7 +197,25 @@ export async function GET(req: Request) {
     const withNames = await attachColaboradores(admin, data ?? []);
     const withDrive = attachDriveFolder(withNames);
 
-    return NextResponse.json({ ok: true, data: withDrive });
+    // Tareas rechazadas al menos una vez por el cliente (mismo criterio que
+    // /api/cliente/dashboard: no hay status_kanban persistente para
+    // "rechazada", así que se cuenta por el comentario de rechazo del cliente).
+    const taskIds = (data ?? []).map((t: any) => t.id_tarea);
+    let tareasRechazadas = 0;
+
+    if (taskIds.length > 0) {
+      const { data: rechazos } = await admin
+        .from("tarea_comentarios")
+        .select("id_tarea")
+        .in("id_tarea", taskIds)
+        .eq("tipo_comentario", "RECHAZO")
+        .eq("tipo_autor", "CLIENTE")
+        .eq("estado", "ACTIVO");
+
+      tareasRechazadas = new Set((rechazos ?? []).map((r: any) => r.id_tarea)).size;
+    }
+
+    return NextResponse.json({ ok: true, data: withDrive, tareasRechazadas });
 
   } catch (e: any) {
     return NextResponse.json(
