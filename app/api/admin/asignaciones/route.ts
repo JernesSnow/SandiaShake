@@ -38,7 +38,8 @@ export async function GET(req: Request) {
           id_colaborador,
           usuarios!fk_asignacion_clientes_colaborador (
             nombre,
-            correo
+            correo,
+            estado
           )
         `)
         .eq("id_organizacion", orgId)
@@ -46,11 +47,15 @@ export async function GET(req: Request) {
 
       if (error) throw error;
 
-      const formatted = (data ?? []).map((a: any) => ({
-        id_colaborador: a.id_colaborador,
-        nombre: a.usuarios?.nombre,
-        correo: a.usuarios?.correo,
-      }));
+      // Stale assignment rows can outlive a colaborador being deactivated —
+      // only surface ones whose usuario is still active.
+      const formatted = (data ?? [])
+        .filter((a: any) => a.usuarios?.estado === "ACTIVO")
+        .map((a: any) => ({
+          id_colaborador: a.id_colaborador,
+          nombre: a.usuarios?.nombre,
+          correo: a.usuarios?.correo,
+        }));
 
       return NextResponse.json({ data: formatted });
     }

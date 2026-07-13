@@ -12,6 +12,7 @@ import Rendimiento from "./Rendimiento";
 import ChilliPoints from "./ChilliPoints";
 import SaludMentalModal from "@/components/SaludMentalModal";
 import ClienteDashboard from "./ClienteDashboard";
+import ColaboradorDashboard from "./ColaboradorDashboard";
 
 import { CheckSquare, FileText, Users, User } from "react-feather";
 import { requestNotificationPermissionAndToken } from "@/lib/firebase/messaging";
@@ -38,6 +39,7 @@ export default function DashboardPage() {
   const [rol, setRol]                 = useState<string | null>(null);
   const [data, setData]               = useState<DashboardData | null>(null);
   const [clienteData, setClienteData] = useState<any>(null);
+  const [colaboradorData, setColaboradorData] = useState<any>(null);
   const [showBienestar, setShowBienestar] = useState(false);
 
   useEffect(() => {
@@ -71,6 +73,9 @@ export default function DashboardPage() {
         const res = await fetch("/api/bienestar/hoy");
         const hoy = await res.json();
         if (hoy.aplica && !hoy.registrado && !cancelled) setShowBienestar(true);
+
+        const dashRes = await fetch("/api/colaborador/dashboard", { cache: "no-store" });
+        if (dashRes.ok && !cancelled) setColaboradorData(await dashRes.json());
       }
 
       if (perfil.rol === "CLIENTE") {
@@ -96,7 +101,17 @@ export default function DashboardPage() {
     return <ClienteDashboard data={clienteData} />;
   }
 
-  /* ── ADMIN / COLABORADOR DASHBOARD ── */
+  /* ── COLABORADOR DASHBOARD ── */
+  if (rol === "COLABORADOR") {
+    return (
+      <>
+        {showBienestar && <SaludMentalModal onClose={() => setShowBienestar(false)} />}
+        <ColaboradorDashboard data={colaboradorData} />
+      </>
+    );
+  }
+
+  /* ── ADMIN DASHBOARD ── */
   const kpis = data?.kpis;
   const tc   = data?.tareasChart;
   const ec   = data?.entregablesChart;
@@ -105,8 +120,6 @@ export default function DashboardPage() {
 
   return (
     <>
-      {showBienestar && <SaludMentalModal onClose={() => setShowBienestar(false)} />}
-
       <h1 className="text-xl font-semibold mb-6 text-[var(--ss-text)]">Dashboard</h1>
 
       {/* KPIs */}

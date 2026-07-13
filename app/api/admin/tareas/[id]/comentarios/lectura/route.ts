@@ -50,9 +50,16 @@ async function canAccessTask(admin: any, perfil: Perfil, idTarea: number) {
   if (rol === "ADMIN") return { ok: true };
 
   if (rol === "COLABORADOR") {
-    if (Number(t.id_colaborador) !== userId) {
-      return { ok: false, status: 403, message: "Sin permisos" };
-    }
+    const { data: asign, error: aErr } = await admin
+      .from("asignacion_organizacion")
+      .select("id_asignacion")
+      .eq("id_organizacion", Number(t.id_organizacion))
+      .eq("id_colaborador", userId)
+      .eq("estado", "ACTIVO")
+      .maybeSingle();
+
+    if (aErr) throw new Error(aErr.message);
+    if (!asign) return { ok: false, status: 403, message: "Sin permisos" };
     return { ok: true };
   }
 

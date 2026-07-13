@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
 import { createSupabaseServer } from "@/lib/supabase/server";
+import { unassignColaboradorFromOrganizaciones } from "@/lib/colaboradorDeactivation";
 
 async function getActorId(admin: ReturnType<typeof createSupabaseAdmin>): Promise<number | null> {
   try {
@@ -33,7 +34,7 @@ export async function POST(
 
   const { data: target } = await admin
     .from("usuarios")
-    .select("estado")
+    .select("estado, auth_user_id")
     .eq("id_usuario", Number(id))
     .maybeSingle();
 
@@ -49,6 +50,17 @@ export async function POST(
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  // Revoke the Auth account too — otherwise the email stays locked in
+  // auth.users and can never be used to register a new user, even though
+  // the usuarios row is deactivated.
+  if (target?.auth_user_id) {
+    await admin.auth.admin.deleteUser(target.auth_user_id);
+  }
+
+  // They must also stop being tied to any organización and stop owning
+  // in-flight tareas there (no-ops for roles that were never assigned).
+  await unassignColaboradorFromOrganizaciones(admin, Number(id), actorId ?? Number(id));
 
   return NextResponse.json({ ok: true });
 }

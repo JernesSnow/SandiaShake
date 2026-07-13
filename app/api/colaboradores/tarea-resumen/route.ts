@@ -56,6 +56,28 @@ export async function GET() {
       return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
     }
 
+    const { data: asignaciones, error: asignErr } = await supabase
+      .from("asignacion_organizacion")
+      .select("id_organizacion")
+      .eq("id_colaborador", perfil.id_usuario)
+      .eq("estado", "ACTIVO");
+
+    if (asignErr) {
+      return NextResponse.json({ error: asignErr.message }, { status: 500 });
+    }
+
+    const orgIds = (asignaciones ?? []).map((a: any) => Number(a.id_organizacion));
+
+    if (orgIds.length === 0) {
+      const response = {
+        usuario: { id_usuario: perfil.id_usuario, nombre: perfil.nombre },
+        vence_hoy: [], vence_1: [], vence_2: [], vence_5: [], pendientes: [], en_progreso: [],
+      };
+      return NextResponse.json({ ok: true, data: response });
+    }
+
+    // Any colaborador assigned to the org sees all of that org's tareas,
+    // not just the ones where id_colaborador matches them.
     const { data, error } = await supabase
       .from("tareas")
       .select(`
@@ -70,7 +92,7 @@ export async function GET() {
           nombre
         )
       `)
-      .eq("id_colaborador", perfil.id_usuario)
+      .in("id_organizacion", orgIds)
       .eq("estado", "ACTIVO")
       .in("status_kanban", ["pendiente", "en_progreso"])
       .order("fecha_entrega", { ascending: true, nullsFirst: false });

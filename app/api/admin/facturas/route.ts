@@ -292,24 +292,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: detallesErr.message }, { status: 500 });
     }
 
-    // Resolve assigned collaborador for this org (fall back to admin if none)
-    const { data: asignacion } = await admin
+    // Resolve assigned collaboradores for this org (fall back to admin if none).
+    // An org can have more than one colaborador assigned — distribute the
+    // resulting tareas round-robin across all of them instead of dumping
+    // everything on a single one, since a colaborador only ever sees tareas
+    // where id_colaborador matches their own id.
+    const { data: asignaciones } = await admin
       .from("asignacion_organizacion")
       .select("id_colaborador")
       .eq("id_organizacion", id_organizacion)
-      .neq("estado", "ELIMINADO")
-      .limit(1)
-      .maybeSingle();
+      .neq("estado", "ELIMINADO");
 
-    const idColaboradorTareas = asignacion?.id_colaborador ?? perfil!.id_usuario;
+    const idsColaboradorTareas = Array.from(
+      new Set((asignaciones ?? []).map((a) => Number(a.id_colaborador)))
+    );
+    if (idsColaboradorTareas.length === 0) {
+      idsColaboradorTareas.push(perfil!.id_usuario);
+    }
 
     // Create tareas for each line item (cantidad tareas per item), skip PLAN items
     const tareasRows: Record<string, unknown>[] = [];
+    let tareaIndex = 0;
     for (const item of items) {
       if (item.tipo === "PLAN") continue;
       const cantidad = Number(item.cantidad);
       const titulo = String(item.concepto).trim();
       for (let i = 0; i < cantidad; i++) {
+        const idColaboradorTareas = idsColaboradorTareas[tareaIndex % idsColaboradorTareas.length];
+        tareaIndex++;
         tareasRows.push({
           id_organizacion,
           id_colaborador: idColaboradorTareas,

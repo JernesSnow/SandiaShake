@@ -241,17 +241,22 @@ export async function POST(req: Request, ctx: Ctx) {
 
     if (accion === "APROBAR") {
       try {
-        const { count } = await admin
+        const { data: entregablesActivos, count } = await admin
           .from("entregables")
-          .select("id_entregable", { count: "exact", head: true })
+          .select("creado_por", { count: "exact" })
           .eq("id_tarea", idTarea)
           .neq("estado", "ELIMINADO");
 
-        if (count === 1 && updatedTask.id_colaborador) {
+        // Credit whoever actually uploaded the entregable, not tarea's
+        // primary id_colaborador — any colaborador assigned to the org
+        // can work a tarea, not just its original owner.
+        const creadoPor = entregablesActivos?.[0]?.creado_por;
+
+        if (count === 1 && creadoPor) {
           const motivo = `PRIMERA_APROBACION_UNICA:TAREA:${idTarea}`;
 
           await grantChilliPointsIfNotExists(admin, {
-            id_colaborador: updatedTask.id_colaborador,
+            id_colaborador: creadoPor,
             puntos: 4,
             motivo,
             id_tarea: idTarea,

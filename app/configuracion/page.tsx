@@ -96,6 +96,7 @@ function ConfiguracionPage() {
   const [loadingUsers, setLoadingUsers]   = useState(false);
   const [usersErr, setUsersErr]           = useState<string | null>(null);
   const [noAuth, setNoAuth]               = useState(false);
+  const [userModalError, setUserModalError] = useState<string | null>(null);
 
   /* drive */
   const [driveConnected, setDriveConnected] = useState(false);
@@ -151,30 +152,33 @@ function ConfiguracionPage() {
   /* ── user CRUD ── */
   function openNewUser() {
     setIsNewUser(true);
+    setUserModalError(null);
     setEditingUser({ id: "", nombre: "", correo: "", rol: "Colaborador", estado: "Activo", adminNivel: "SECUNDARIO" });
   }
 
   async function saveUser(u: UsuarioSistema) {
-    if (!u.nombre.trim() || !u.correo.trim()) { alert("Nombre y correo son obligatorios."); return; }
+    setUserModalError(null);
+    if (!u.nombre.trim() || !u.correo.trim()) { setUserModalError("Nombre y correo son obligatorios."); return; }
     if (isNewUser) {
-      if (u.rol === "Cliente") { alert("Para crear Clientes usá el flujo separado de clientes."); return; }
+      if (u.rol === "Cliente") { setUserModalError("Para crear Clientes usá el flujo separado de clientes."); return; }
       const res  = await fetch("/api/admin/crear-usuario", { method: "POST", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre: u.nombre, correo: u.correo, rol: rolUiToDb(u.rol), admin_nivel: u.rol === "Admin" ? (u.adminNivel ?? "SECUNDARIO") : null }) });
       const json = safeJson(await res.text());
-      if (!res.ok) { alert(json?.error ?? "No se pudo crear el usuario."); return; }
+      if (!res.ok) { setUserModalError(json?.error ?? "No se pudo crear el usuario."); return; }
     } else {
-      if (!u.id || !/^\d+$/.test(u.id)) { alert("ID inválido"); return; }
+      if (!u.id || !/^\d+$/.test(u.id)) { setUserModalError("ID inválido"); return; }
       const res  = await fetch(`/api/admin/usuarios/${u.id}`, { method: "PATCH", credentials: "include", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ nombre: u.nombre, correo: u.correo, rol: rolUiToDb(u.rol), admin_nivel: u.rol === "Admin" ? (u.adminNivel ?? "SECUNDARIO") : null, estado: estadoUiToDb(u.estado) }) });
       const json = safeJson(await res.text());
-      if (!res.ok) { alert(json?.error ?? "No se pudo actualizar el usuario."); return; }
+      if (!res.ok) { setUserModalError(json?.error ?? "No se pudo actualizar el usuario."); return; }
     }
     await cargarUsuarios(); setEditingUser(null); setIsNewUser(false);
   }
 
   async function softDeleteUser(id: string) {
-    if (!id || !/^\d+$/.test(id)) { alert("ID inválido"); return; }
+    if (!id || !/^\d+$/.test(id)) { setUserModalError("ID inválido"); return; }
+    setUserModalError(null);
     const res  = await fetch(`/api/admin/usuarios/${id}/desactivar`, { method: "POST", credentials: "include" });
     const json = safeJson(await res.text());
-    if (!res.ok) { alert(json?.error ?? "No se pudo desactivar."); return; }
+    if (!res.ok) { setUserModalError(json?.error ?? "No se pudo desactivar."); return; }
     await cargarUsuarios(); setEditingUser(null); setIsNewUser(false);
   }
 
@@ -287,7 +291,7 @@ function ConfiguracionPage() {
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <div className="flex justify-end gap-1.5">
-                        <button type="button" onClick={() => { setIsNewUser(false); setEditingUser({ ...u }); }} className="inline-flex items-center gap-1 rounded-lg border border-[var(--ss-border)] px-2.5 py-1.5 text-xs text-[var(--ss-text2)] hover:bg-[var(--ss-overlay)] transition">
+                        <button type="button" onClick={() => { setIsNewUser(false); setUserModalError(null); setEditingUser({ ...u }); }} className="inline-flex items-center gap-1 rounded-lg border border-[var(--ss-border)] px-2.5 py-1.5 text-xs text-[var(--ss-text2)] hover:bg-[var(--ss-overlay)] transition">
                           <Edit2 size={12} /> Editar
                         </button>
                         <button
@@ -442,11 +446,16 @@ function ConfiguracionPage() {
           <div className="w-full max-w-lg rounded-2xl bg-[var(--ss-surface)] border border-[var(--ss-border)] shadow-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-[var(--ss-border)] flex items-center justify-between">
               <h3 className="text-[var(--ss-text)] font-semibold">{isNewUser ? "Nuevo usuario" : "Editar usuario"}</h3>
-              <button type="button" onClick={() => { setEditingUser(null); setIsNewUser(false); }} className="text-[var(--ss-text3)] hover:text-[var(--ss-text)] transition p-1 rounded-lg hover:bg-[var(--ss-overlay)]">
+              <button type="button" onClick={() => { setEditingUser(null); setIsNewUser(false); setUserModalError(null); }} className="text-[var(--ss-text3)] hover:text-[var(--ss-text)] transition p-1 rounded-lg hover:bg-[var(--ss-overlay)]">
                 <X size={18} />
               </button>
             </div>
             <div className="p-5 space-y-4">
+              {userModalError && (
+                <p className="text-sm text-[#ee2346] bg-[#ee2346]/10 border border-[#ee2346]/30 rounded-md px-3 py-2">
+                  {userModalError}
+                </p>
+              )}
               <div className="space-y-1.5">
                 <label className="text-xs font-medium text-[var(--ss-text2)] block">Nombre</label>
                 <input value={editingUser.nombre} onChange={e => setEditingUser(p => p ? { ...p, nombre: e.target.value } : p)} className={inputCls} />

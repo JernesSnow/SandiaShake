@@ -56,6 +56,7 @@ export function ColaboradoresPage() {
   const [editEmail, setEditEmail] = useState("");
   const [saving, setSaving] = useState(false);
   const [desactivando, setDesactivando] = useState<string | null>(null);
+  const [confirmDesactivar, setConfirmDesactivar] = useState<Colaborador | null>(null);
   const router = useRouter();
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -66,7 +67,7 @@ function esCorreoValido(correo: string) {
 
   async function cargar() {
     try {
-      const res = await fetch("/api/admin/colaboradores");
+      const res = await fetch("/api/admin/colaboradores", { cache: "no-store" });
       if (!res.ok) return;
       const json = await res.json();
       if (!Array.isArray(json.colaboradores)) return;
@@ -128,9 +129,12 @@ function esCorreoValido(correo: string) {
     }
   }
 
-  async function desactivar(e: React.MouseEvent, c: Colaborador) {
+  function pedirDesactivar(e: React.MouseEvent, c: Colaborador) {
     e.stopPropagation();
-    if (!confirm("¿Desactivar a " + c.nombre + "? Esta acción se puede revertir.")) return;
+    setConfirmDesactivar(c);
+  }
+
+  async function desactivar(c: Colaborador) {
     setDesactivando(c.id);
     try {
       const res = await fetch("/api/admin/colaboradores", {
@@ -263,7 +267,7 @@ function esCorreoValido(correo: string) {
                   <Edit2 size={13} /> Editar
                 </button>
                 <button
-                  onClick={(e) => desactivar(e, c)}
+                  onClick={(e) => pedirDesactivar(e, c)}
                   disabled={desactivando === c.id || c.estadoCuenta === "Suspendido"}
                   className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-[#ee2346]/30 bg-[#ee2346]/10 px-3 py-2 text-xs font-medium text-[#ee2346] hover:bg-[#ee2346]/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#ee2346]/10"
                 >
@@ -363,6 +367,46 @@ function esCorreoValido(correo: string) {
               >
                 <Save size={14} />
                 {saving ? "Guardando…" : "Guardar"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CONFIRM DESACTIVAR MODAL */}
+      {confirmDesactivar && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4"
+          onClick={() => setConfirmDesactivar(null)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-[var(--ss-border)] bg-[var(--ss-surface)] p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-base font-semibold text-[var(--ss-text)]">
+              ¿Desactivar a {confirmDesactivar.nombre}?
+            </h3>
+            <p className="mt-2 text-sm text-[var(--ss-text2)]">
+              Esta acción se puede revertir.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDesactivar(null)}
+                className="rounded-xl border border-[var(--ss-border)] px-4 py-2 text-sm text-[var(--ss-text2)] hover:bg-[var(--ss-overlay)] transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const c = confirmDesactivar;
+                  setConfirmDesactivar(null);
+                  if (c) await desactivar(c);
+                }}
+                className="rounded-xl bg-[#ee2346] hover:bg-[#d8203f] px-4 py-2 text-sm font-semibold text-white transition"
+              >
+                Sí, desactivar
               </button>
             </div>
           </div>

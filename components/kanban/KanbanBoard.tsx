@@ -271,7 +271,9 @@ function apiRowToTask(r: any): Task | null {
     id: String(rawId),
     titulo: String(r.titulo ?? ""),
     cliente: String(r.organizaciones?.nombre ?? ""),
-    asignadoA: String(r.colaborador?.nombre ?? ""),
+    asignadoA: Array.isArray(r.colaboradores_asignados) && r.colaboradores_asignados.length > 0
+      ? r.colaboradores_asignados.map((c: any) => c.nombre).filter(Boolean).join(", ")
+      : String(r.colaborador?.nombre ?? ""),
     statusId: normalizeStatus(r.status_kanban),
     estadoTarea: String(r.estado ?? "").toUpperCase() === "ELIMINADO" ? "ELIMINADO" : "ACTIVO",
 

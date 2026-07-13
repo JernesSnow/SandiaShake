@@ -193,16 +193,25 @@ export async function POST(req: Request) {
        GENERATE TAREAS
     -------------------------------- */
 
-    // Resolve assigned collaborador for this org (fall back to admin if none)
-    const { data: asignacion } = await admin
+    // Resolve assigned collaboradores for this org (fall back to admin if
+    // none). An org can have more than one colaborador assigned — distribute
+    // the resulting tareas round-robin across all of them instead of
+    // dumping everything on a single one.
+    const { data: asignaciones } = await admin
       .from("asignacion_organizacion")
       .select("id_colaborador")
       .eq("id_organizacion", id_organizacion)
-      .neq("estado", "ELIMINADO")
-      .limit(1)
-      .maybeSingle();
+      .neq("estado", "ELIMINADO");
 
-    const idColaboradorTareas = asignacion?.id_colaborador ?? perfil.id_usuario;
+    const idsColaboradorTareas = Array.from(
+      new Set((asignaciones ?? []).map((a) => Number(a.id_colaborador)))
+    );
+    if (idsColaboradorTareas.length === 0) {
+      idsColaboradorTareas.push(perfil.id_usuario);
+    }
+    let tareaIndex = 0;
+    const nextColaborador = () =>
+      idsColaboradorTareas[tareaIndex++ % idsColaboradorTareas.length];
 
     const tareasInsert: any[] = [];
 
@@ -224,7 +233,7 @@ export async function POST(req: Request) {
         for (let i = 0; i < qty; i++) {
           tareasInsert.push({
             id_organizacion,
-            id_colaborador: idColaboradorTareas,
+            id_colaborador: nextColaborador(),
             titulo: nombreServicio,
             descripcion: `Generado desde factura ${factura.id_factura}`,
             tipo_entregable: "Otro",
@@ -253,7 +262,7 @@ export async function POST(req: Request) {
 
             tareasInsert.push({
               id_organizacion,
-              id_colaborador: idColaboradorTareas,
+              id_colaborador: nextColaborador(),
               titulo: servicio.nombre,
               descripcion: `Servicio incluido en plan (Factura ${factura.id_factura})`,
               tipo_entregable: "Otro",

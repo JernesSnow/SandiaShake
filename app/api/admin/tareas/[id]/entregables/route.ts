@@ -199,11 +199,11 @@ export async function POST(
 
       const { data: tarea } = await admin
         .from("tareas")
-        .select("id_colaborador, fecha_entrega")
+        .select("fecha_entrega")
         .eq("id_tarea", tareaId)
         .maybeSingle();
 
-      if (tarea?.id_colaborador && tarea?.fecha_entrega) {
+      if (tarea?.fecha_entrega) {
 
         const dueDate = new Date(tarea.fecha_entrega);
         const nowDate = new Date();
@@ -216,8 +216,11 @@ export async function POST(
           const motivo =
             `ENTREGA_PUNTUAL:TAREA:${tareaId}:ENTREGABLE:${entregableRow.id_entregable}`;
 
+          // Credit whoever actually uploaded the entregable, not tarea's
+          // primary id_colaborador — any colaborador assigned to the org
+          // can work a tarea, not just its original owner.
           await grantChilliPointsIfNotExists(admin, {
-            id_colaborador: tarea.id_colaborador,
+            id_colaborador: userId,
             puntos: 2,
             motivo,
             id_tarea: tareaId,

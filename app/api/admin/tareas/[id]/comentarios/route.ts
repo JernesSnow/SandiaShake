@@ -90,7 +90,17 @@ async function assertCanAccessTask(admin: any, perfil: Perfil, idTarea: number) 
   if (rol === "ADMIN") return tarea;
 
   if (rol === "COLABORADOR") {
-    if (Number(tarea.id_colaborador) !== Number(perfil.id_usuario)) {
+    const { data: asign, error: aErr } = await admin
+      .from("asignacion_organizacion")
+      .select("id_asignacion")
+      .eq("id_organizacion", Number(tarea.id_organizacion))
+      .eq("id_colaborador", Number(perfil.id_usuario))
+      .eq("estado", "ACTIVO")
+      .maybeSingle();
+
+    if (aErr) throw new Error(aErr.message);
+
+    if (!asign) {
       const err: any = new Error("Sin permisos");
       err.status = 403;
       throw err;

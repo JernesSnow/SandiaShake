@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createSupabaseServer } from "@/lib/supabase/server";
 import { createSupabaseAdmin } from "@/lib/supabase/admin";
+import { translateAuthError } from "@/lib/authErrors";
+import { unassignColaboradorFromOrganizaciones } from "@/lib/colaboradorDeactivation";
 
 /* ===================== HELPERS ===================== */
 
@@ -107,30 +109,67 @@ export async function GET() {
     }
 
     /* ---------- TASK STATS ---------- */
+    /* Any colaborador assigned to an org can see and work all of its
+       tareas, not just the ones where id_colaborador matches them — so a
+       tarea counts for a colaborador if either signal applies: they're
+       assigned to its org, OR they're its direct id_colaborador (e.g. the
+       admin a tarea fell back to when its org has no active colaborador).
+       Dedup per (colaborador, tarea) so a tarea is never double-counted. */
 
     const { data: tareas } = await admin
       .from("tareas")
-      .select("id_colaborador,status_kanban,estado")
+      .select("id_tarea,id_organizacion,id_colaborador,status_kanban,estado")
       .eq("estado", "ACTIVO");
+
+    const tareasByOrg = new Map<number, typeof tareas>();
+    for (const t of tareas ?? []) {
+      const orgId = Number(t.id_organizacion);
+      const list = tareasByOrg.get(orgId) ?? [];
+      list.push(t);
+      tareasByOrg.set(orgId, list);
+    }
+
+    const { data: asignaciones } = await admin
+      .from("asignacion_organizacion")
+      .select("id_colaborador, id_organizacion")
+      .eq("estado", "ACTIVO");
+
+    const tareaIdsPorColaborador = new Map<number, Set<number>>();
+
+    function addTarea(colabId: number, idTarea: number) {
+      const set = tareaIdsPorColaborador.get(colabId) ?? new Set<number>();
+      set.add(idTarea);
+      tareaIdsPorColaborador.set(colabId, set);
+    }
+
+    for (const a of asignaciones ?? []) {
+      const colabId = Number(a.id_colaborador);
+      for (const t of tareasByOrg.get(Number(a.id_organizacion)) ?? []) {
+        addTarea(colabId, t.id_tarea);
+      }
+    }
+
+    for (const t of tareas ?? []) {
+      if (t.id_colaborador) addTarea(Number(t.id_colaborador), t.id_tarea);
+    }
+
+    const tareasById = new Map((tareas ?? []).map((t) => [t.id_tarea, t]));
 
     const tareasMap = new Map<
       number,
       { total: number; aprobadas: number; pendientes: number }
     >();
 
-    for (const t of tareas ?? []) {
-      const id = Number(t.id_colaborador);
-
-      if (!tareasMap.has(id)) {
-        tareasMap.set(id, { total: 0, aprobadas: 0, pendientes: 0 });
+    for (const [colabId, idTareas] of tareaIdsPorColaborador) {
+      const stats = { total: 0, aprobadas: 0, pendientes: 0 };
+      for (const idTarea of idTareas) {
+        const t = tareasById.get(idTarea);
+        if (!t) continue;
+        stats.total++;
+        if (t.status_kanban === "aprobada") stats.aprobadas++;
+        if (t.status_kanban === "pendiente") stats.pendientes++;
       }
-
-      const stats = tareasMap.get(id)!;
-
-      stats.total++;
-
-      if (t.status_kanban === "aprobada") stats.aprobadas++;
-      if (t.status_kanban === "pendiente") stats.pendientes++;
+      tareasMap.set(colabId, stats);
     }
 
     /* ---------- MERGE DATA ---------- */
@@ -197,7 +236,10 @@ export async function POST(req: Request) {
       });
 
     if (authErr) {
-      return NextResponse.json({ error: authErr.message }, { status: 400 });
+      return NextResponse.json(
+        { error: translateAuthError(authErr.message, "Error creando usuario") },
+        { status: 400 }
+      );
     }
 
     const auth_user_id = createdAuth.user?.id;
@@ -300,6 +342,25 @@ export async function PATCH(req: Request) {
       await admin.auth.admin.updateUserById(current.auth_user_id, {
         email: correo,
       });
+    }
+
+    // Deactivating a user must also revoke their Auth account and free up
+    // the correo (same __deleted__<timestamp>__ scheme used by
+    // rpc_desactivar_usuario) — otherwise the email stays locked and can
+    // never be reused to register a new user.
+    if (estado && estado !== "ACTIVO") {
+      const correoActual = correo ?? current.correo ?? "";
+      if (!correoActual.startsWith("__deleted__")) {
+        patch.correo = `__deleted__${Math.floor(Date.now() / 1000)}__${correoActual}`;
+      }
+
+      if (current.auth_user_id) {
+        await admin.auth.admin.deleteUser(current.auth_user_id);
+      }
+
+      // They must also stop being tied to any organización and stop
+      // owning in-flight tareas there.
+      await unassignColaboradorFromOrganizaciones(admin, id_usuario, perfil!.id_usuario);
     }
 
     const { data: updated, error: upErr } = await admin

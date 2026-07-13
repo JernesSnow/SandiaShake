@@ -73,6 +73,36 @@ async function getOrgIdsCliente(admin: any, idUsuario: number) {
   return (data ?? []).map((r: any) => Number(r.id_organizacion));
 }
 
+async function attachOrgColaboradores(admin: any, rows: any[]) {
+  const orgIds = Array.from(
+    new Set((rows ?? []).map((r: any) => Number(r.id_organizacion)).filter(Boolean))
+  );
+
+  if (!orgIds.length) return rows ?? [];
+
+  const { data: asignaciones } = await admin
+    .from("asignacion_organizacion")
+    .select("id_organizacion, usuarios!fk_asignacion_clientes_colaborador(id_usuario, nombre, estado)")
+    .in("id_organizacion", orgIds)
+    .eq("estado", "ACTIVO");
+
+  const byOrg = new Map<number, { id_usuario: number; nombre: string }[]>();
+  for (const a of asignaciones ?? []) {
+    // Stale assignment rows can outlive a colaborador being deactivated —
+    // only surface ones whose usuario is still active.
+    if (!a.usuarios || a.usuarios.estado !== "ACTIVO") continue;
+    const orgId = Number(a.id_organizacion);
+    const list = byOrg.get(orgId) ?? [];
+    list.push({ id_usuario: a.usuarios.id_usuario, nombre: a.usuarios.nombre });
+    byOrg.set(orgId, list);
+  }
+
+  return (rows ?? []).map((r: any) => ({
+    ...r,
+    colaboradores_asignados: byOrg.get(Number(r.id_organizacion)) ?? [],
+  }));
+}
+
 async function attachColaboradores(admin: any, rows: any[]) {
   const ids = Array.from(
     new Set((rows ?? []).map((r: any) => r.id_colaborador).filter(Boolean))
@@ -82,11 +112,14 @@ async function attachColaboradores(admin: any, rows: any[]) {
 
   const { data: users } = await admin
     .from("usuarios")
-    .select("id_usuario,nombre")
+    .select("id_usuario,nombre,estado")
     .in("id_usuario", ids);
 
   const map = new Map<number, any>();
-  for (const u of users ?? []) map.set(Number(u.id_usuario), u);
+  for (const u of users ?? []) {
+    // A stale id_colaborador shouldn't surface a deactivated user's name.
+    if (u.estado === "ACTIVO") map.set(Number(u.id_usuario), u);
+  }
 
   return (rows ?? []).map((r: any) => {
     const u = map.get(Number(r.id_colaborador));
@@ -176,9 +209,9 @@ export async function GET(req: Request) {
         return NextResponse.json({ ok: true, data: [] });
       }
 
-      q = q
-        .in("id_organizacion", orgIds)
-        .eq("id_colaborador", userId);
+      // Any colaborador assigned to the org can see all of that org's
+      // tareas, not just the ones where id_colaborador matches them.
+      q = q.in("id_organizacion", orgIds);
 
       if (idOrg && Number.isFinite(idOrg)) {
         if (!orgIds.includes(idOrg)) {
@@ -195,7 +228,8 @@ export async function GET(req: Request) {
     }
 
     const withNames = await attachColaboradores(admin, data ?? []);
-    const withDrive = attachDriveFolder(withNames);
+    const withOrgColabs = await attachOrgColaboradores(admin, withNames);
+    const withDrive = attachDriveFolder(withOrgColabs);
 
     // Tareas rechazadas al menos una vez por el cliente (mismo criterio que
     // /api/cliente/dashboard: no hay status_kanban persistente para

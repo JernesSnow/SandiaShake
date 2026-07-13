@@ -15,8 +15,23 @@ export async function GET(req: Request) {
       );
     }
 
+    const admin = createSupabaseAdmin();
+
+    const { data: perfil } = await admin
+      .from("usuarios")
+      .select("id_usuario, rol, estado")
+      .eq("auth_user_id", auth.user.id)
+      .maybeSingle();
+
+    if (!perfil || perfil.estado !== "ACTIVO" || (perfil.rol !== "ADMIN" && perfil.rol !== "COLABORADOR")) {
+      return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
+    }
+
     const url = new URL(req.url);
-    const id_colaborador = Number(url.searchParams.get("id_colaborador"));
+    const requested = Number(url.searchParams.get("id_colaborador"));
+
+    // A colaborador can only view their own redemption history.
+    const id_colaborador = perfil.rol === "COLABORADOR" ? perfil.id_usuario : requested;
 
     if (!Number.isFinite(id_colaborador)) {
       return NextResponse.json(
@@ -24,8 +39,6 @@ export async function GET(req: Request) {
         { status: 400 }
       );
     }
-
-    const admin = createSupabaseAdmin();
 
     const { data, error } = await admin
       .from("canje_premio")

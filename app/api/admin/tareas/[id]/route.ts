@@ -80,10 +80,12 @@ export async function PATCH(req: Request, ctx: Ctx) {
 
     const admin = createSupabaseAdmin();
 
+    let tareaOrgId: number | null = null;
+
     if (!isAdmin) {
       const { data: t, error: tErr } = await admin
         .from("tareas")
-        .select("id_tarea,id_colaborador,estado")
+        .select("id_tarea,id_organizacion,id_colaborador,estado")
         .eq("id_tarea", idTarea)
         .maybeSingle();
 
@@ -94,10 +96,22 @@ export async function PATCH(req: Request, ctx: Ctx) {
         return NextResponse.json({ error: "Tarea no disponible" }, { status: 404 });
       }
 
-      const tareaColabId = safeId(t.id_colaborador);
-      if (!tareaColabId || tareaColabId !== perfilId) {
+      // Any colaborador assigned to the tarea's org can edit it, not just
+      // whoever id_colaborador happens to point to.
+      const { data: asign, error: aErr } = await admin
+        .from("asignacion_organizacion")
+        .select("id_asignacion")
+        .eq("id_organizacion", Number(t.id_organizacion))
+        .eq("id_colaborador", Number(perfilId))
+        .eq("estado", "ACTIVO")
+        .maybeSingle();
+
+      if (aErr) return NextResponse.json({ error: aErr.message }, { status: 500 });
+      if (!asign) {
         return NextResponse.json({ error: "Sin permisos" }, { status: 403 });
       }
+
+      tareaOrgId = Number(t.id_organizacion);
     }
 
     const updateData: Record<string, any> = {};
@@ -179,7 +193,7 @@ export async function PATCH(req: Request, ctx: Ctx) {
     updateData.updated_by = Number(perfilId);
 
     let q = admin.from("tareas").update(updateData).eq("id_tarea", idTarea);
-    if (!isAdmin) q = q.eq("id_colaborador", perfilId);
+    if (!isAdmin && tareaOrgId) q = q.eq("id_organizacion", tareaOrgId);
 
     const { data: updatedRows, error: updErr } = await q.select("id_tarea");
     if (updErr) return NextResponse.json({ error: updErr.message }, { status: 500 });

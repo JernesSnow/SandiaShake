@@ -10,7 +10,7 @@ import { createSupabaseClient } from "@/lib/supabase/client";
 import {
   Grid, Users, CheckSquare, BookOpen, CreditCard,
   AlertCircle, BarChart2, FileText, UserCheck, Settings,
-  Folder, Home,
+  Folder, Home, Gift,
   LogOut, Sun, Moon, ChevronDown,
 } from "react-feather";
 
@@ -42,6 +42,7 @@ const NAV_ITEMS: NavItem[] = [
     ],
   },
   { href: "/colaboradores", label: "Colaboradores", icon: <UserCheck size={18} />, roles: ["ADMIN"] },
+  { href: "/premios",       label: "Premios",        icon: <Gift size={18} />,       roles: ["COLABORADOR"] },
   { href: "/configuracion", label: "Configuración", icon: <Settings size={18} />,  roles: ["ADMIN"] },
   { href: "/archivos",      label: "Archivos",       icon: <Folder size={18} />,    roles: ["ADMIN","COLABORADOR"] },
 ];
@@ -58,6 +59,12 @@ export function Sidebar({ mobileOpen, onClose, collapsed, onToggleCollapse }: Si
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const isDark = theme === "dark";
+
+  // theme is undefined on the server (no access to localStorage) but can
+  // resolve immediately on the client's first render — rendering it before
+  // mount causes a hydration mismatch. Gate on mounted per next-themes' docs.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
 
   const [userRole, setUserRole] = useState<Role | null>(null);
   const [clienteOrg, setClienteOrg] = useState<{ id: number; nombre: string } | null>(null);
@@ -114,6 +121,7 @@ export function Sidebar({ mobileOpen, onClose, collapsed, onToggleCollapse }: Si
             alt="SandiaShake"
             width={120}
             height={32}
+            style={{ width: 120, height: 32 }}
             priority
             unoptimized
           />
@@ -245,15 +253,15 @@ export function Sidebar({ mobileOpen, onClose, collapsed, onToggleCollapse }: Si
         <button
           type="button"
           onClick={() => setTheme(isDark ? "light" : "dark")}
-          title={isDark ? "Modo claro" : "Modo oscuro"}
+          title={mounted ? (isDark ? "Modo claro" : "Modo oscuro") : undefined}
           className={clsx(
             "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium w-full transition-all duration-150",
             "text-[var(--ss-text2)] hover:bg-[var(--ss-overlay)] hover:text-[var(--ss-text)]",
             collapsed && "justify-center px-2"
           )}
         >
-          {isDark ? <Sun size={18} /> : <Moon size={18} />}
-          {!collapsed && <span>{isDark ? "Modo claro" : "Modo oscuro"}</span>}
+          {mounted ? (isDark ? <Sun size={18} /> : <Moon size={18} />) : <span className="w-[18px] h-[18px]" />}
+          {!collapsed && <span>{mounted ? (isDark ? "Modo claro" : "Modo oscuro") : " "}</span>}
         </button>
 
         {/* Logout */}

@@ -6,6 +6,7 @@ import {
   getAccessProvisioningEmailHTML,
   getAccessProvisioningEmailText,
 } from "@/lib/emails/accessProvisioningEmail";
+import { translateAuthError } from "@/lib/authErrors";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -65,7 +66,7 @@ export async function POST(req: Request) {
 
     if (createErr || !created?.user) {
       return NextResponse.json(
-        { error: createErr?.message ?? "Error creando usuario" },
+        { error: translateAuthError(createErr?.message, "Error creando usuario") },
         { status: 500 }
       );
     }
