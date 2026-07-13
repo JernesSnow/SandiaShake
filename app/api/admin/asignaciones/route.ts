@@ -147,9 +147,9 @@ export async function POST(req: Request) {
       );
     }
 
-    if (colab.rol !== "COLABORADOR") {
+    if (colab.rol !== "COLABORADOR" && colab.rol !== "ADMIN") {
       return NextResponse.json(
-        { error: "El usuario no es colaborador" },
+        { error: "El usuario no es colaborador ni administrador" },
         { status: 400 }
       );
     }
@@ -233,10 +233,21 @@ export async function DELETE(req: Request) {
     }
 
     const url = new URL(req.url);
-    const idOrganizacion = Number(url.searchParams.get("id_organizacion"));
-    const idColaborador = Number(url.searchParams.get("id_colaborador"));
+    let idOrganizacion = Number(url.searchParams.get("id_organizacion")) || 0;
+    let idColaborador = Number(url.searchParams.get("id_colaborador")) || 0;
+    let idAsignacion = Number(url.searchParams.get("id_asignacion")) || 0;
 
-    if (!idOrganizacion || !idColaborador) {
+    if (!idAsignacion && !(idOrganizacion && idColaborador)) {
+      // Some callers send { id_asignacion } (or org/colaborador ids) in the body instead of the query string.
+      const body = await req.json().catch(() => null);
+      if (body) {
+        idAsignacion = Number(body.id_asignacion) || idAsignacion;
+        idOrganizacion = Number(body.id_organizacion) || idOrganizacion;
+        idColaborador = Number(body.id_colaborador) || idColaborador;
+      }
+    }
+
+    if (!idAsignacion && !(idOrganizacion && idColaborador)) {
       return NextResponse.json(
         { error: "Faltan parámetros" },
         { status: 400 }
@@ -245,15 +256,19 @@ export async function DELETE(req: Request) {
 
     const admin = createSupabaseAdmin();
 
-    const { error: updErr } = await admin
+    let query = admin
       .from("asignacion_organizacion")
       .update({
         estado: "ELIMINADO",
         updated_by: perfil.id_usuario,
         updated_at: new Date().toISOString(),
-      })
-      .eq("id_organizacion", idOrganizacion)
-      .eq("id_colaborador", idColaborador);
+      });
+
+    query = idAsignacion
+      ? query.eq("id_asignacion", idAsignacion)
+      : query.eq("id_organizacion", idOrganizacion).eq("id_colaborador", idColaborador);
+
+    const { error: updErr } = await query;
 
     if (updErr) {
       console.error(updErr);
