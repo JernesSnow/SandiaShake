@@ -203,6 +203,21 @@ export default function ClienteDetailClient({ id }: { id: string }) {
   const [nuevaNota, setNuevaNota]         = useState("");
   const [loading, setLoading]             = useState(true);
   const [tareasRechazadas, setTareasRechazadas] = useState(0);
+  const [toast, setToast]                 = useState<{ ok: boolean; text: string } | null>(null);
+  const [toastVisible, setToastVisible]   = useState(false);
+
+  function showToast(ok: boolean, text: string) {
+    setToast({ ok, text });
+  }
+
+  useEffect(() => {
+    if (!toast) return;
+    setToastVisible(false);
+    const enter = requestAnimationFrame(() => setToastVisible(true));
+    const hideTimer = setTimeout(() => setToastVisible(false), 4000);
+    const removeTimer = setTimeout(() => setToast(null), 4300);
+    return () => { cancelAnimationFrame(enter); clearTimeout(hideTimer); clearTimeout(removeTimer); };
+  }, [toast]);
 
   /* ── RESOLVE ROLE + ORG ── */
   useEffect(() => {
@@ -259,7 +274,7 @@ export default function ClienteDetailClient({ id }: { id: string }) {
       if (role === "ADMIN") {
         const rU = await fetch("/api/admin/usuarios");
         const uJson = await safeJson(rU, "usuarios");
-        setTodosColaboradores((uJson?.usuarios ?? []).filter((u: any) => u.rol === "COLABORADOR" && u.estado === "ACTIVO"));
+        setTodosColaboradores((uJson?.usuarios ?? []).filter((u: any) => (u.rol === "COLABORADOR" || u.rol === "ADMIN") && u.estado === "ACTIVO"));
       }
     } catch (e) {
       console.error("Error cargando cliente:", e);
@@ -344,19 +359,41 @@ export default function ClienteDetailClient({ id }: { id: string }) {
   /* ── ACTIONS ── */
   async function asignarColaborador() {
     if (!nuevoColaboradorId || !resolvedOrgId) return;
-    await fetch("/api/admin/asignaciones", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id_organizacion: Number(resolvedOrgId), id_colaborador: nuevoColaboradorId }),
-    });
-    setNuevoColaboradorId(null);
-    cargarTodo(resolvedOrgId);
+    try {
+      const r = await fetch("/api/admin/asignaciones", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id_organizacion: Number(resolvedOrgId), id_colaborador: nuevoColaboradorId }),
+      });
+      const j = await r.json().catch(() => null);
+      if (!r.ok) {
+        showToast(false, j?.error ?? "No se pudo agregar el colaborador.");
+        return;
+      }
+      setNuevoColaboradorId(null);
+      await cargarTodo(resolvedOrgId);
+      showToast(true, "Colaborador agregado correctamente.");
+    } catch (e) {
+      console.error("Error asignando colaborador:", e);
+      showToast(false, "Ocurrió un error agregando el colaborador.");
+    }
   }
 
   async function removerColaborador(idColaborador: number) {
     if (!resolvedOrgId) return;
-    await fetch(`/api/admin/asignaciones?id_organizacion=${resolvedOrgId}&id_colaborador=${idColaborador}`, { method: "DELETE" });
-    cargarTodo(resolvedOrgId);
+    try {
+      const r = await fetch(`/api/admin/asignaciones?id_organizacion=${resolvedOrgId}&id_colaborador=${idColaborador}`, { method: "DELETE" });
+      const j = await r.json().catch(() => null);
+      if (!r.ok) {
+        showToast(false, j?.error ?? "No se pudo quitar el colaborador.");
+        return;
+      }
+      await cargarTodo(resolvedOrgId);
+      showToast(true, "Colaborador removido correctamente.");
+    } catch (e) {
+      console.error("Error removiendo colaborador:", e);
+      showToast(false, "Ocurrió un error quitando el colaborador.");
+    }
   }
 
   async function crearNota() {
@@ -381,7 +418,7 @@ export default function ClienteDetailClient({ id }: { id: string }) {
     const token = await requestNotificationPermissionAndToken();
 
     if (!token) {
-      alert("No se pudieron activar las notificaciones en este dispositivo.");
+      showToast(false, "No se pudieron activar las notificaciones en este dispositivo.");
       return;
     }
 
@@ -397,14 +434,14 @@ export default function ClienteDetailClient({ id }: { id: string }) {
 
     if (!res.ok) {
       console.error("Error registrando token FCM:", data);
-      alert("Se generó el permiso, pero no se pudo registrar este dispositivo.");
+      showToast(false, "Se generó el permiso, pero no se pudo registrar este dispositivo.");
       return;
     }
 
-    alert("Notificaciones activadas correctamente en este dispositivo.");
+    showToast(true, "Notificaciones activadas correctamente en este dispositivo.");
   } catch (error) {
     console.error("Error activando notificaciones:", error);
-    alert("Ocurrió un error activando las notificaciones.");
+    showToast(false, "Ocurrió un error activando las notificaciones.");
   }
 }
 
@@ -742,7 +779,7 @@ export default function ClienteDetailClient({ id }: { id: string }) {
                       <option key={c.id_usuario} value={c.id_usuario}>{c.nombre}</option>
                     ))}
                   </select>
-                  <button onClick={asignarColaborador} className="bg-[#6cbe45] hover:bg-[#5aaa3c] transition px-3 rounded-xl" aria-label="Asignar">
+                  <button onClick={asignarColaborador} className="bg-[#6cbe45] hover:bg-[#5aaa3c] transition px-3 rounded-xl" aria-label="Agregar colaborador">
                     <Plus size={14} />
                   </button>
                 </div>
@@ -787,6 +824,23 @@ export default function ClienteDetailClient({ id }: { id: string }) {
           )}
         </div>
       </div>
+
+      {/* Toast global de confirmación */}
+      {toast && (
+        <div
+          className={
+            "fixed top-6 left-1/2 -translate-x-1/2 z-[60] rounded-xl px-4 py-3 " +
+            "text-xs font-medium shadow-lg border max-w-sm text-center " +
+            "transition-all duration-300 ease-out " +
+            (toastVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-6 pointer-events-none") + " " +
+            (toast.ok
+              ? "bg-[var(--ss-surface)] text-[#6cbe45] border-[#6cbe45]/40"
+              : "bg-[var(--ss-surface)] text-[#ee2346] border-[#ee2346]/40")
+          }
+        >
+          {toast.text}
+        </div>
+      )}
     </div>
   );
 }
