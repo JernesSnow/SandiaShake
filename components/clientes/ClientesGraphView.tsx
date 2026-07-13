@@ -164,6 +164,22 @@ export function ClientesGraphView() {
     Record<string, Array<{ id_asignacion: number; id_organizacion: number; nombre?: string }>>
   >({});
 
+  const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
+
+  function showToast(ok: boolean, text: string) {
+    setToast({ ok, text });
+  }
+
+  useEffect(() => {
+    if (!toast) return;
+    setToastVisible(false);
+    const enter = requestAnimationFrame(() => setToastVisible(true));
+    const hideTimer = setTimeout(() => setToastVisible(false), 4000);
+    const removeTimer = setTimeout(() => setToast(null), 4300);
+    return () => { cancelAnimationFrame(enter); clearTimeout(hideTimer); clearTimeout(removeTimer); };
+  }, [toast]);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
@@ -508,9 +524,10 @@ export function ClientesGraphView() {
 
       setAssigningClient(null);
       setDraftAssignedIds([]);
+      showToast(true, "Colaboradores actualizados correctamente.");
     } catch (e: any) {
       console.error(e);
-      alert(e?.message ?? "Error guardando asignaciones");
+      showToast(false, e?.message ?? "Error guardando asignaciones");
     }
   }
 
@@ -543,7 +560,7 @@ export function ClientesGraphView() {
           </h1>
           <p className="text-xs text-[var(--ss-text2)]">
             {isAdmin
-              ? "Asigna colaboradores a clientes desde aquí y revisa detalles por tarjeta."
+              ? "Edita los colaboradores de cada cliente desde aquí y revisa detalles por tarjeta."
               : isColab
               ? "Visualiza los clientes y sus colaboradores asignados."
               : "Visualiza las organizaciones con las que estás trabajando."}
@@ -627,10 +644,10 @@ export function ClientesGraphView() {
                           openAssignModal(client);
                         }}
                         className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-[11px] font-semibold bg-[#ee2346] hover:bg-[#d8203f] text-white transition shrink-0"
-                        title="Asignar colaboradores"
+                        title="Editar colaboradores"
                       >
                         <Users size={14} />
-                        <span className="hidden sm:inline">Asignar</span>
+                        <span className="hidden sm:inline">Editar</span>
                       </button>
                     )}
                   </div>
@@ -862,9 +879,9 @@ export function ClientesGraphView() {
                 >
                   <Users size={16} className="shrink-0" />
                   <span className="hidden sm:inline">
-                    Asignar colaboradores
+                    Editar colaboradores
                   </span>
-                  <span className="sm:hidden">Asignar</span>
+                  <span className="sm:hidden">Editar</span>
                 </button>
               )}
             </>
@@ -1069,7 +1086,7 @@ export function ClientesGraphView() {
       {/* Asignación de colaboradores */}
       {isAdmin && assigningClient && (
         <Modal
-          title={`Asignar colaboradores`}
+          title={`Editar colaboradores`}
           subtitle={`Cliente: ${assigningClient.nombre}`}
           onClose={() => {
             setAssigningClient(null);
@@ -1160,6 +1177,23 @@ export function ClientesGraphView() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* Toast global de confirmación */}
+      {toast && (
+        <div
+          className={cx(
+            "fixed top-6 left-1/2 -translate-x-1/2 z-[60] rounded-xl px-4 py-3",
+            "text-xs font-medium shadow-lg border max-w-sm text-center",
+            "transition-all duration-300 ease-out",
+            toastVisible ? "opacity-100 translate-y-0" : "opacity-0 -translate-y-6 pointer-events-none",
+            toast.ok
+              ? "bg-[var(--ss-surface)] text-[#6cbe45] border-[#6cbe45]/40"
+              : "bg-[var(--ss-surface)] text-[#ee2346] border-[#ee2346]/40"
+          )}
+        >
+          {toast.text}
+        </div>
       )}
     </div>
   );
