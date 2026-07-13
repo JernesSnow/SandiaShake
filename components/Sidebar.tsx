@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
-import Image from "next/image";
 import { useEffect, useState, useMemo } from "react";
 import { useTheme } from "next-themes";
 import { createSupabaseClient } from "@/lib/supabase/client";
@@ -116,14 +115,11 @@ export function Sidebar({ mobileOpen, onClose, collapsed, onToggleCollapse }: Si
             🍉
           </div>
         ) : (
-          <Image
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img
             src="/mock-logo-sandia-con-chole.png"
             alt="SandiaShake"
-            width={120}
-            height={32}
-            style={{ width: 120, height: 32 }}
-            priority
-            unoptimized
+            style={{ height: 56, width: "auto" }}
           />
         )}
       </div>
