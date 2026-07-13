@@ -31,6 +31,16 @@ export async function POST(
   const admin = createSupabaseAdmin();
   const actorId = await getActorId(admin);
 
+  const { data: target } = await admin
+    .from("usuarios")
+    .select("estado")
+    .eq("id_usuario", Number(id))
+    .maybeSingle();
+
+  if (target?.estado && target.estado !== "ACTIVO") {
+    return NextResponse.json({ error: "El usuario ya está desactivado" }, { status: 400 });
+  }
+
   const { error } = await admin.rpc("rpc_desactivar_usuario", {
     p_actor_id:  actorId,
     p_target_id: Number(id),

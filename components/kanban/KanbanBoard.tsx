@@ -1101,6 +1101,9 @@ export function KanbanBoard() {
             setConversationTask(t);
             setUnreadByTaskId((prev) => ({ ...prev, [t.id]: 0 }));
           }}
+          onTaskUpdated={async () => {
+            await refreshBoard();
+          }}
           onClientDecision={async (t, accion, comentario) => {
             try {
               setSaveOkMsg("");
@@ -1198,6 +1201,7 @@ type TaskModalProps = {
     accion: "APROBAR" | "RECHAZAR",
     comentario: string
   ) => void;
+  onTaskUpdated?: (task: any) => void;
 };
 
 function TaskModal({
@@ -1215,6 +1219,7 @@ function TaskModal({
   onRestore,
   onOpenChat,
   onClientDecision,
+  onTaskUpdated,
 }: TaskModalProps) {
   const [form, setForm] = useState<Task>(task);
   const [decisionComment, setDecisionComment] = useState("");
@@ -1530,6 +1535,7 @@ function handleSubmit(e: React.FormEvent) {
                   taskId={form.id}
                   taskTitle={form.titulo}
                   embedded
+                  onTaskUpdated={onTaskUpdated}
                 />
               </div>
             </div>

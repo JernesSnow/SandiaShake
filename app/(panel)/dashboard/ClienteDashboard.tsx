@@ -136,24 +136,34 @@ export default function ClienteDashboard({ data }: { data: any }) {
 
       {/* ── NEEDS YOUR ACTION (tasks in revision) + UNREAD MESSAGES ── */}
       <div className="grid md:grid-cols-2 gap-6">
-          {revision > 0 && (
-            <div className="rounded-2xl border border-amber-400/30 bg-[var(--ss-surface)] overflow-hidden">
-              <div className="px-5 py-4 bg-amber-400/10 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/20 text-amber-500">
-                    <Clock size={15} />
-                  </span>
-                  <div>
-                    <p className="font-semibold text-sm text-amber-600 dark:text-amber-300">
-                      {revision === 1 ? "1 tarea espera tu revisión" : `${revision} tareas esperan tu revisión`}
-                    </p>
-                    <p className="text-xs text-[var(--ss-text3)]">Tu respuesta mantiene al equipo en movimiento</p>
-                  </div>
+          <div className="rounded-2xl border border-amber-400/30 bg-[var(--ss-surface)] overflow-hidden">
+            <div className="px-5 py-4 bg-amber-400/10 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-400/20 text-amber-500">
+                  {revision > 0 ? <Clock size={15} /> : <CheckCircle size={15} />}
+                </span>
+                <div>
+                  <p className="font-semibold text-sm text-amber-600 dark:text-amber-300">
+                    {revision === 0
+                      ? "Sin revisiones pendientes"
+                      : revision === 1
+                      ? "1 tarea espera tu revisión"
+                      : `${revision} tareas esperan tu revisión`}
+                  </p>
+                  <p className="text-xs text-[var(--ss-text3)]">
+                    {revision > 0 ? "Tu respuesta mantiene al equipo en movimiento" : "No tienes tareas esperando tu aprobación"}
+                  </p>
                 </div>
+              </div>
+              {revision > 0 && (
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-400 text-white text-xs font-bold">
                   {revision}
                 </span>
-              </div>
+              )}
+            </div>
+            {(t?.paraTuAprobacion ?? []).length === 0 ? (
+              <p className="px-5 py-8 text-center text-xs text-[var(--ss-text3)]">Estás al día — no hay tareas esperando tu revisión.</p>
+            ) : (
               <div className="divide-y divide-[var(--ss-border)] max-h-[280px] overflow-y-auto">
                 {(t?.paraTuAprobacion ?? []).map((tarea: any) => (
                   <div key={tarea.id_tarea} className="px-5 py-3 flex items-center justify-between gap-4">
@@ -167,8 +177,8 @@ export default function ClienteDashboard({ data }: { data: any }) {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </div>
 
           <div className={"rounded-2xl border bg-[var(--ss-surface)] overflow-hidden " + (totalMensajesSinLeer > 0 ? "border-sky-400/30" : "border-[var(--ss-border)]")}>
             <div className={"px-5 py-4 flex items-center justify-between " + (totalMensajesSinLeer > 0 ? "bg-sky-400/10" : "")}>

@@ -64,7 +64,7 @@ export async function GET() {
 
     const { data: usuarios, error: qErr } = await admin
       .from("usuarios")
-      .select("id_usuario, nombre, correo, rol, estado, created_at")
+      .select("id_usuario, nombre, correo, rol, admin_nivel, estado, created_at")
       .in("rol", ["ADMIN", "COLABORADOR"])
       .eq("estado", "ACTIVO")
       .order("id_usuario", { ascending: false });

@@ -60,6 +60,35 @@ export async function GET() {
     const { data: usuarios, error } = await query;
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+    // Organización(es) vinculada(s) a cada cuenta CLIENTE.
+    const clienteIds = (usuarios ?? [])
+      .filter((u) => String(u.rol ?? "").toUpperCase() === "CLIENTE")
+      .map((u) => u.id_usuario);
+
+    const orgByUsuario = new Map<number, string>();
+
+    if (clienteIds.length > 0) {
+      const { data: links } = await admin
+        .from("organizacion_usuario")
+        .select("id_usuario_cliente, organizaciones(nombre)")
+        .in("id_usuario_cliente", clienteIds)
+        .eq("estado", "ACTIVO");
+
+      for (const l of links ?? []) {
+        const orgObj: any = Array.isArray(l.organizaciones) ? l.organizaciones[0] : l.organizaciones;
+        const nombre = orgObj?.nombre;
+        if (!nombre) continue;
+        const uid = l.id_usuario_cliente as number;
+        const prev = orgByUsuario.get(uid);
+        orgByUsuario.set(uid, prev ? `${prev}, ${nombre}` : nombre);
+      }
+    }
+
+    const usuariosConOrg = (usuarios ?? []).map((u) => ({
+      ...u,
+      organizacion: orgByUsuario.get(u.id_usuario) ?? null,
+    }));
+
     return NextResponse.json(
       {
         ok: true,
@@ -70,7 +99,7 @@ export async function GET() {
           rol: perfil.rol,
           admin_nivel: perfil.admin_nivel ?? null,
         },
-        usuarios: usuarios ?? [],
+        usuarios: usuariosConOrg,
       },
       { status: 200 }
     );

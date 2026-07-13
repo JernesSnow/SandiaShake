@@ -23,7 +23,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         if (!res.ok) return;
         const data = await res.json();
         if (data.rol === "CLIENTE" && !data.organizacion) {
-          setUserEmail(undefined);
+          setUserEmail(data.correo ?? undefined);
           setShowOrgModal(true);
         }
       } catch {}

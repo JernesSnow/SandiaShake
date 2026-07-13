@@ -89,6 +89,18 @@ export async function POST(req: Request) {
       );
     }
 
+    // Supabase responde 200 sin error para un correo que ya existe en auth.users
+    // (protección anti-enumeración), pero el user.id devuelto en ese caso es un
+    // objeto "señuelo" que no corresponde a ninguna fila real — insertarlo en
+    // usuarios.auth_user_id viola la FK. La señal documentada para detectar
+    // esto es un array `identities` vacío.
+    if (!authData.user?.identities || authData.user.identities.length === 0) {
+      return NextResponse.json(
+        { error: "Este correo ya está registrado" },
+        { status: 409 }
+      );
+    }
+
     // Crear perfil en usuarios inmediatamente (usando admin para bypass RLS)
     const { error: insertErr } = await admin.from("usuarios").insert({
       nombre,

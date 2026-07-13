@@ -41,6 +41,7 @@ type DbFactura = {
 id_factura: number;
 id_organizacion: number;
 organizacion_nombre: string;
+organizacion_actividad_economica: string | null;
 periodo: string;
 total: number;
 saldo: number;
@@ -55,6 +56,7 @@ status_kanban: string;
 prioridad: string;
 tipo_entregable: string;
 drive_url?: string | null;
+precio_unitario?: number | null;
 };
 
 
@@ -101,6 +103,10 @@ function badgeEstado(estado: FacturaEstado) {
 
 function cx(...classes: Array<string | false | undefined | null>) {
   return classes.filter(Boolean).join(" ");
+}
+
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 function Modal({
@@ -174,7 +180,6 @@ export function FacturacionPage() {
 
   const [planes, setPlanes] = useState<PlanContenido[]>([]);
   const [createPlanId, setCreatePlanId] = useState<number | "">("");
-  const [createFechaEntrega, setCreateFechaEntrega] = useState("");
 
   const [createItems, setCreateItems] = useState<
   Array<{
@@ -190,7 +195,7 @@ export function FacturacionPage() {
       concepto: "",
       cantidad: 1,
       precio: 0,
-      fecha_entrega: createFechaEntrega
+      fecha_entrega: ""
     }]);
 
   const [savingCreate, setSavingCreate] = useState(false);
@@ -379,6 +384,7 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
               prioridad: t.prioridad,
               tipo_entregable: t.tipo_entregable,
               drive_url: t.google_drive_task_folders?.folder_url ?? null,
+              precio_unitario: t.precio_unitario ?? null,
             }))
           );
         } else {
@@ -404,7 +410,7 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
         concepto: "",
         cantidad: 1,
         precio: 0,
-        fecha_entrega: createFechaEntrega
+        fecha_entrega: ""
       }
     ]);
     setCreateOpen(true);
@@ -419,6 +425,10 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
     }
     if (!createPeriodo.trim()) {
       setCreateError("Ingresa el periodo.");
+      return;
+    }
+    if (!createVencimiento) {
+      setCreateError("Ingresa la fecha de vencimiento.");
       return;
     }
     if (createItems.length === 0) {
@@ -448,7 +458,7 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
         concepto: item.concepto,
         cantidad: Number(item.cantidad),
         precio_unitario: Number(item.precio),
-        fecha_entrega: item.fecha_entrega || createFechaEntrega || null,
+        fecha_entrega: item.fecha_entrega || createVencimiento,
       }));
 
       // If a plan is selected, prepend a line item with the plan price
@@ -460,18 +470,16 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
             concepto: `Plan: ${selectedPlan.nombre}`,
             cantidad: 1,
             precio_unitario: Number(selectedPlan.precio),
-            fecha_entrega: createFechaEntrega || null,
+            fecha_entrega: createVencimiento,
           }]
         : [];
 
       const body: Record<string, unknown> = {
         id_organizacion: Number(createOrgId),
         periodo: createPeriodo.trim(),
+        fecha_vencimiento: createVencimiento,
         items: [...planItem, ...serviceItems],
       };
-      if (createVencimiento) {
-        body.fecha_vencimiento = createVencimiento;
-      }
 
       const res = await fetch("/api/admin/facturas", {
         method: "POST",
@@ -777,8 +785,13 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
                   )}
                 >
                   <div className="flex flex-col">
-                    <span className="font-semibold text-[var(--ss-text)]">
+                    <span className="font-semibold text-[var(--ss-text)] flex items-center gap-1.5 flex-wrap">
                       {inv.organizacion_nombre}
+                      {inv.organizacion_actividad_economica && (
+                        <span className="font-normal text-[10px] text-[var(--ss-text3)] bg-[var(--ss-raised)] border border-[var(--ss-border)] rounded-full px-2 py-0.5">
+                          {inv.organizacion_actividad_economica}
+                        </span>
+                      )}
                     </span>
                     <span className="text-[11px] text-[var(--ss-text2)]">
                       Periodo: {inv.periodo}
@@ -830,8 +843,13 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
             <div className="flex flex-col gap-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="text-sm font-semibold text-[var(--ss-text)]">
+                  <h2 className="text-sm font-semibold text-[var(--ss-text)] flex items-center gap-1.5 flex-wrap">
                     {selectedInvoice.organizacion_nombre}
+                    {selectedInvoice.organizacion_actividad_economica && (
+                      <span className="font-normal text-[10px] text-[var(--ss-text3)] bg-[var(--ss-raised)] border border-[var(--ss-border)] rounded-full px-2 py-0.5">
+                        {selectedInvoice.organizacion_actividad_economica}
+                      </span>
+                    )}
                   </h2>
                   <p className="text-[11px] text-[var(--ss-text2)]">
                     Periodo {selectedInvoice.periodo} · Factura #{selectedInvoice.id_factura}
@@ -963,6 +981,11 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
                           <p className="text-[10px] text-[var(--ss-text3)]">
                             {t.tipo_entregable}
                           </p>
+                          {t.precio_unitario != null && (
+                            <p className="text-[10px] font-semibold text-[var(--ss-text2)] mt-0.5">
+                              {formatCRC(t.precio_unitario)}
+                            </p>
+                          )}
                           {t.drive_url && (
                           <a
                             href={t.drive_url}
@@ -985,7 +1008,7 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
                               t.status_kanban === "archivada" && "bg-[var(--ss-raised)] text-[var(--ss-text2)] border border-[var(--ss-border)]"
                             )}
                           >
-                            {t.status_kanban.replace("_", " ")}
+                            {capitalize(t.status_kanban.replace("_", " "))}
                           </span>
                           <span
                             className={cx(
@@ -1174,7 +1197,7 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
     concepto: s.nombre,
     cantidad: s.cantidad,
     precio: 0,   // always zero
-    fecha_entrega: createFechaEntrega
+    fecha_entrega: createVencimiento
   }))
 
   setCreateItems(serviciosItems)
@@ -1210,43 +1233,29 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
             {/* FECHA VENCIMIENTO */}
             <div className="flex flex-col gap-1">
               <label className="text-[11px] text-[var(--ss-text2)]">
-                Fecha vencimiento (opcional)
+                Fecha vencimiento
               </label>
 
               <input
                 type="date"
+                required
                 value={createVencimiento}
-                onChange={(e) => setCreateVencimiento(e.target.value)}
-                className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-xs border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/20"
-              />
-            </div>
-
-
-            {/* GLOBAL FECHA ENTREGA */}
-            <div className="flex flex-col gap-1">
-              <label className="text-[11px] text-[var(--ss-text2)]">
-                Fecha entrega (tareas)
-              </label>
-
-              <input
-                type="date"
-                value={createFechaEntrega}
                 onChange={(e) => {
-                  const newDate = e.target.value
-                  setCreateFechaEntrega(newDate)
+                  const newDate = e.target.value;
+                  setCreateVencimiento(newDate);
 
                   setCreateItems((items) =>
                     items.map((it) => ({
                       ...it,
                       fecha_entrega: it.fecha_entrega || newDate
                     }))
-                  )
+                  );
                 }}
                 className="rounded-xl bg-[var(--ss-input)] px-3 py-2 text-xs border border-[var(--ss-border)] outline-none focus:ring-2 focus:ring-[#6cbe45]/20"
               />
 
               <span className="text-[10px] text-[var(--ss-text3)]">
-                Se usará como la fecha de vencimiento predeterminada para las tareas creadas.
+                Se usará como la fecha de entrega predeterminada de las tareas que no tengan una propia.
               </span>
             </div>
 
@@ -1269,7 +1278,7 @@ async function enviarNotificacion(tipo: "recordatorio" | "pago") {
                         concepto: "",
                         cantidad: 1,
                         precio: 0,
-                        fecha_entrega: createFechaEntrega
+                        fecha_entrega: createVencimiento
                       }
                     ])
                   }

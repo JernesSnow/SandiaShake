@@ -8,21 +8,29 @@ type Props = {
 
 export default function OrganizacionSetupModal({ userEmail }: Props) {
   const [nombre, setNombre] = useState("");
-  const [correo, setCorreo] = useState(userEmail ?? "");
   const [telefono, setTelefono] = useState("");
   const [pais, setPais] = useState("");
   const [ciudad, setCiudad] = useState("");
   const [canton, setCanton] = useState("");
   const [descripcion, setDescripcion] = useState("");
+  const [actividadEconomica, setActividadEconomica] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!nombre.trim()) {
-      setError("El nombre de la organización es obligatorio");
+
+    if (!userEmail) {
+      setError("No se pudo determinar tu correo. Recarga la página e intenta de nuevo.");
       return;
     }
+    if (!nombre.trim()) { setError("El nombre de la organización es obligatorio"); return; }
+    if (!telefono.trim()) { setError("El teléfono es obligatorio"); return; }
+    if (!pais.trim()) { setError("El país es obligatorio"); return; }
+    if (!ciudad.trim()) { setError("La ciudad es obligatoria"); return; }
+    if (!canton.trim()) { setError("El cantón es obligatorio"); return; }
+    if (!descripcion.trim()) { setError("La descripción es obligatoria"); return; }
+    if (!actividadEconomica.trim()) { setError("La actividad económica (TRIBU-CR) es obligatoria"); return; }
 
     setLoading(true);
     setError("");
@@ -33,12 +41,12 @@ export default function OrganizacionSetupModal({ userEmail }: Props) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           nombre: nombre.trim(),
-          correo: correo.trim() || undefined,
-          telefono: telefono.trim() || undefined,
-          pais: pais.trim() || undefined,
-          ciudad: ciudad.trim() || undefined,
-          canton: canton.trim() || undefined,
-          descripcion: descripcion.trim() || undefined,
+          telefono: telefono.trim(),
+          pais: pais.trim(),
+          ciudad: ciudad.trim(),
+          canton: canton.trim(),
+          descripcion: descripcion.trim(),
+          actividad_economica: actividadEconomica.trim(),
         }),
       });
 
@@ -90,74 +98,89 @@ export default function OrganizacionSetupModal({ userEmail }: Props) {
             />
           </div>
 
-          {/* Correo + Teléfono */}
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <label className="text-sm font-medium text-gray-400 mb-1 block">
-                Correo
-              </label>
-              <input
-                type="email"
-                value={correo}
-                onChange={(e) => setCorreo(e.target.value)}
-                placeholder="org@ejemplo.com"
-                className={inputClass}
-              />
+          {/* Correo (solo lectura) */}
+          <div>
+            <label className="text-sm font-medium text-gray-400 mb-1 block">
+              Correo
+            </label>
+            <div className="flex items-center gap-2 rounded-md border border-[#3a3a40] bg-[#232326] text-gray-300 px-3 py-2 text-sm">
+              <span className="flex-1 min-w-0 break-all">{userEmail || "—"}</span>
+              <span className="shrink-0 text-[10px] text-gray-500 bg-[#1a1a1d] px-2 py-0.5 rounded-full">Solo lectura</span>
             </div>
-            <div>
-              <label className="text-sm font-medium text-gray-400 mb-1 block">
-                Teléfono
-              </label>
-              <input
-                value={telefono}
-                onChange={(e) => setTelefono(e.target.value)}
-                placeholder="+506 8888-8888"
-                className={inputClass}
-              />
-            </div>
+          </div>
+
+          {/* Teléfono */}
+          <div>
+            <label className="text-sm font-medium text-gray-400 mb-1 block">
+              Teléfono <span className="text-[#ee2346]">*</span>
+            </label>
+            <input
+              value={telefono}
+              onChange={(e) => setTelefono(e.target.value)}
+              placeholder="+506 8888-8888"
+              className={inputClass}
+              required
+            />
           </div>
 
           {/* País + Ciudad + Cantón */}
           <div className="grid gap-4 md:grid-cols-3">
             <div>
               <label className="text-sm font-medium text-gray-400 mb-1 block">
-                País
+                País <span className="text-[#ee2346]">*</span>
               </label>
               <input
                 value={pais}
                 onChange={(e) => setPais(e.target.value)}
                 placeholder="Costa Rica"
                 className={inputClass}
+                required
               />
             </div>
             <div>
               <label className="text-sm font-medium text-gray-400 mb-1 block">
-                Ciudad
+                Ciudad <span className="text-[#ee2346]">*</span>
               </label>
               <input
                 value={ciudad}
                 onChange={(e) => setCiudad(e.target.value)}
                 placeholder="San José"
                 className={inputClass}
+                required
               />
             </div>
             <div>
               <label className="text-sm font-medium text-gray-400 mb-1 block">
-                Cantón
+                Cantón <span className="text-[#ee2346]">*</span>
               </label>
               <input
                 value={canton}
                 onChange={(e) => setCanton(e.target.value)}
                 placeholder="Escazú"
                 className={inputClass}
+                required
               />
             </div>
+          </div>
+
+          {/* Actividad Económica (TRIBU-CR) */}
+          <div>
+            <label className="text-sm font-medium text-gray-400 mb-1 block">
+              Actividad Económica (TRIBU-CR) <span className="text-[#ee2346]">*</span>
+            </label>
+            <input
+              value={actividadEconomica}
+              onChange={(e) => setActividadEconomica(e.target.value)}
+              placeholder="Ej: 620100 - Actividades de programación informática"
+              className={inputClass}
+              required
+            />
           </div>
 
           {/* Descripción */}
           <div>
             <label className="text-sm font-medium text-gray-400 mb-1 block">
-              Descripción
+              Descripción <span className="text-[#ee2346]">*</span>
             </label>
             <textarea
               value={descripcion}
@@ -165,6 +188,7 @@ export default function OrganizacionSetupModal({ userEmail }: Props) {
               placeholder="Breve descripción de tu organización..."
               rows={3}
               className={inputClass + " resize-none"}
+              required
             />
           </div>
 

@@ -89,7 +89,8 @@ export async function GET(req: Request) {
         fecha_vencimiento,
         created_at,
         organizaciones:organizaciones (
-          nombre
+          nombre,
+          actividad_economica
         )
       `,
         { count: "exact" }
@@ -127,6 +128,7 @@ export async function GET(req: Request) {
       id_factura: f.id_factura,
       id_organizacion: f.id_organizacion,
       organizacion_nombre: f.organizaciones?.nombre ?? "—",
+      organizacion_actividad_economica: f.organizaciones?.actividad_economica ?? null,
       periodo: f.periodo,
       total: f.total,
       saldo: f.saldo,
@@ -161,6 +163,13 @@ export async function POST(req: Request) {
     if (!id_organizacion || !periodo) {
       return NextResponse.json(
         { error: "Campos requeridos: id_organizacion, periodo" },
+        { status: 400 }
+      );
+    }
+
+    if (!fecha_vencimiento) {
+      return NextResponse.json(
+        { error: "La fecha de vencimiento es obligatoria" },
         { status: 400 }
       );
     }
@@ -239,14 +248,7 @@ export async function POST(req: Request) {
       updated_by: perfil!.id_usuario,
     };
 
-    // Si no se especifica fecha de vencimiento, se usa la fecha de entrega
-    // de las tareas (los premios por puntualidad dependen de esta fecha).
-    const fechaVencimientoFinal =
-      fecha_vencimiento || items.find((item: any) => item.fecha_entrega)?.fecha_entrega || null;
-
-    if (fechaVencimientoFinal) {
-      insertData.fecha_vencimiento = fechaVencimientoFinal;
-    }
+    insertData.fecha_vencimiento = fecha_vencimiento;
 
     const { data: factura, error: insertErr } = await admin
       .from("facturas")
@@ -316,7 +318,7 @@ export async function POST(req: Request) {
           status_kanban: "pendiente",
           tipo_entregable: "Otro",
           prioridad: "Media",
-          fecha_entrega: item.fecha_entrega ?? null,
+          fecha_entrega: item.fecha_entrega || fecha_vencimiento,
           estado: "ACTIVO",
           created_by: perfil!.id_usuario,
           updated_by: perfil!.id_usuario,

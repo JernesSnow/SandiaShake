@@ -7,12 +7,12 @@ import { createOrgDriveFolder } from "@/lib/google-drive/folders";
 
 type Body = {
   nombre: string;
-  correo?: string;
   telefono?: string;
   pais?: string;
   ciudad?: string;
   canton?: string;
   descripcion?: string;
+  actividad_economica?: string;
 };
 
 /* =========================================================
@@ -131,15 +131,36 @@ export async function POST(req: Request) {
 
     const body = (await req.json()) as Body;
     const nombre = (body.nombre ?? "").trim();
+    const telefono = (body.telefono ?? "").trim();
+    const pais = (body.pais ?? "").trim();
+    const ciudad = (body.ciudad ?? "").trim();
+    const canton = (body.canton ?? "").trim();
+    const descripcion = (body.descripcion ?? "").trim();
+    const actividadEconomica = (body.actividad_economica ?? "").trim();
 
-    if (!nombre) {
+    if (!nombre || !telefono || !pais || !ciudad || !canton || !descripcion || !actividadEconomica) {
       return NextResponse.json(
-        { error: "El nombre de la organización es obligatorio" },
+        { error: "Todos los campos son obligatorios" },
         { status: 400 }
       );
     }
 
     const admin = createSupabaseAdmin();
+
+    // El correo de la organización siempre es el del usuario que la crea —
+    // no se acepta desde el body para evitar que se registre uno distinto.
+    const { data: creador } = await admin
+      .from("usuarios")
+      .select("correo")
+      .eq("id_usuario", perfil.id_usuario)
+      .maybeSingle();
+
+    if (!creador?.correo) {
+      return NextResponse.json(
+        { error: "No se pudo determinar tu correo" },
+        { status: 400 }
+      );
+    }
 
     /* Prevent multiple orgs */
     const { data: existing } = await admin
@@ -161,12 +182,13 @@ export async function POST(req: Request) {
       .from("organizaciones")
       .insert({
         nombre,
-        pais: body.pais?.trim() || null,
-        ciudad: body.ciudad?.trim() || null,
-        canton: body.canton?.trim() || null,
-        telefono: body.telefono?.trim() || null,
-        correo: body.correo?.trim() || null,
-        descripcion: body.descripcion?.trim() || null,
+        pais,
+        ciudad,
+        canton,
+        telefono,
+        correo: creador.correo,
+        descripcion,
+        actividad_economica: actividadEconomica,
       })
       .select("id_organizacion, nombre")
       .single();

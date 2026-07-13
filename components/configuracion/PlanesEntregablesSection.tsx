@@ -49,6 +49,7 @@ export default function PlanesEntregablesSection() {
   const [editingPlan, setEditingPlan] = useState<PlanContenido | null>(null);
   const [isNew, setIsNew]         = useState(false);
   const [modalError, setModalError] = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   async function cargarPlanes() {
     setLoading(true);
@@ -107,7 +108,6 @@ export default function PlanesEntregablesSection() {
   }
 
   async function deletePlan(id: number) {
-    if (!confirm("¿Desactivar este plan?")) return;
     await fetch(`/api/admin/planes-contenido?id=${id}`, { method: "DELETE" });
     cargarPlanes();
   }
@@ -165,7 +165,7 @@ export default function PlanesEntregablesSection() {
                   <button onClick={() => openEdit(p)} className="text-[#7dd3fc] hover:text-[var(--ss-text)] transition p-1 rounded-lg hover:bg-[var(--ss-overlay)]">
                     <Edit2 size={15} />
                   </button>
-                  <button onClick={() => deletePlan(p.id_plan)} className="text-[#ee2346] hover:text-[var(--ss-text)] transition p-1 rounded-lg hover:bg-[var(--ss-overlay)]">
+                  <button onClick={() => setConfirmDeleteId(p.id_plan)} className="text-[#ee2346] hover:text-[var(--ss-text)] transition p-1 rounded-lg hover:bg-[var(--ss-overlay)]">
                     <Trash2 size={15} />
                   </button>
                 </div>
@@ -301,6 +301,40 @@ export default function PlanesEntregablesSection() {
                 className="rounded-xl bg-[#6cbe45] hover:bg-[#5aa63d] px-5 py-2 text-sm font-semibold text-white transition"
               >
                 Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm delete */}
+      {confirmDeleteId !== null && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-[var(--ss-surface)] border border-[var(--ss-border)] shadow-2xl p-6">
+            <h3 className="text-base font-semibold text-[var(--ss-text)]">
+              ¿Desactivar este plan?
+            </h3>
+            <p className="mt-2 text-sm text-[var(--ss-text2)]">
+              El plan dejará de estar disponible para nuevas facturas.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(null)}
+                className="rounded-xl border border-[var(--ss-border)] px-4 py-2 text-sm text-[var(--ss-text2)] hover:bg-[var(--ss-overlay)] transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const id = confirmDeleteId;
+                  setConfirmDeleteId(null);
+                  if (id !== null) await deletePlan(id);
+                }}
+                className="rounded-xl bg-[#ee2346] hover:bg-[#d8203f] px-4 py-2 text-sm font-semibold text-white transition"
+              >
+                Sí, desactivar
               </button>
             </div>
           </div>

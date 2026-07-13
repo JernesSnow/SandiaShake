@@ -23,7 +23,7 @@ export async function GET() {
 
     const { data: perfil, error } = await admin
       .from("usuarios")
-      .select("id_usuario, rol, estado, admin_nivel")
+      .select("id_usuario, nombre, correo, rol, estado, admin_nivel")
       .eq("auth_user_id", user.id)
       .maybeSingle();
 
@@ -66,6 +66,8 @@ export async function GET() {
 
     return NextResponse.json({
       id_usuario: perfil.id_usuario,
+      nombre: perfil.nombre,
+      correo: perfil.correo,
       rol: perfil.rol,
       estado: perfil.estado,
       admin_nivel: perfil.admin_nivel,

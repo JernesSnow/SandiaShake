@@ -28,6 +28,7 @@ export type UsuarioSistema = {
   rol: RolUsuario;
   estado: EstadoUsuario;
   adminNivel?: AdminNivel;
+  organizacion?: string | null;
 };
 
 type Tab = "perfil" | "usuarios" | "planes" | "integraciones" | "sistema" | "bitacora";
@@ -131,6 +132,7 @@ function ConfiguracionPage() {
       setUsuarios((json?.usuarios ?? []).map((u: any) => ({
         id: String(u.id_usuario), nombre: u.nombre ?? "", correo: u.correo ?? "",
         rol: rolDbToUi(u.rol), estado: estadoDbToUi(u.estado), adminNivel: u.admin_nivel ?? null,
+        organizacion: u.organizacion ?? null,
       })));
     } catch { setUsersErr("Error cargando usuarios."); }
     finally { setLoadingUsers(false); }
@@ -261,19 +263,23 @@ function ConfiguracionPage() {
                   <th className="text-left px-4 py-3 font-medium">Nombre</th>
                   <th className="text-left px-4 py-3 font-medium">Correo</th>
                   <th className="text-left px-4 py-3 font-medium">Rol</th>
+                  <th className="text-left px-4 py-3 font-medium">Organización</th>
                   <th className="text-left px-4 py-3 font-medium">Estado</th>
                   <th className="text-right px-4 py-3 font-medium">Acciones</th>
                 </tr>
               </thead>
               <tbody>
                 {loadingUsers && (
-                  <tr><td colSpan={5} className="px-4 py-6 text-center text-xs text-[var(--ss-text3)]">Cargando…</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-6 text-center text-xs text-[var(--ss-text3)]">Cargando…</td></tr>
                 )}
                 {!loadingUsers && filteredUsuarios.map(u => (
                   <tr key={u.id} className="border-t border-[var(--ss-border)] hover:bg-[var(--ss-overlay)] transition">
                     <td className="px-4 py-3 text-[var(--ss-text)] font-medium whitespace-nowrap">{u.nombre}</td>
                     <td className="px-4 py-3 text-[var(--ss-text2)] whitespace-nowrap">{u.correo}</td>
                     <td className="px-4 py-3 whitespace-nowrap"><RolBadge rol={u.rol} /></td>
+                    <td className="px-4 py-3 text-[var(--ss-text2)] whitespace-nowrap">
+                      {u.rol === "Cliente" ? (u.organizacion ?? <span className="text-[var(--ss-text3)]">Sin organización</span>) : <span className="text-[var(--ss-text3)]">—</span>}
+                    </td>
                     <td className="px-4 py-3 whitespace-nowrap">
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium border ${u.estado === "Activo" ? "bg-[#6cbe45]/15 text-[#6cbe45] border-[#6cbe45]/30" : "bg-[#ee2346]/15 text-[#ee2346] border-[#ee2346]/30"}`}>
                         {u.estado}
@@ -284,7 +290,12 @@ function ConfiguracionPage() {
                         <button type="button" onClick={() => { setIsNewUser(false); setEditingUser({ ...u }); }} className="inline-flex items-center gap-1 rounded-lg border border-[var(--ss-border)] px-2.5 py-1.5 text-xs text-[var(--ss-text2)] hover:bg-[var(--ss-overlay)] transition">
                           <Edit2 size={12} /> Editar
                         </button>
-                        <button type="button" onClick={() => softDeleteUser(u.id)} className="inline-flex items-center gap-1 rounded-lg border border-[#ee2346]/30 bg-[#ee2346]/10 px-2.5 py-1.5 text-xs text-[#ee2346] hover:bg-[#ee2346]/20 transition">
+                        <button
+                          type="button"
+                          onClick={() => softDeleteUser(u.id)}
+                          disabled={u.estado !== "Activo"}
+                          className="inline-flex items-center gap-1 rounded-lg border border-[#ee2346]/30 bg-[#ee2346]/10 px-2.5 py-1.5 text-xs text-[#ee2346] hover:bg-[#ee2346]/20 transition disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-[#ee2346]/10"
+                        >
                           <Trash2 size={12} /> Desactivar
                         </button>
                       </div>
@@ -292,7 +303,7 @@ function ConfiguracionPage() {
                   </tr>
                 ))}
                 {!loadingUsers && filteredUsuarios.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-[var(--ss-text3)]">No hay usuarios que coincidan con los filtros.</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-[var(--ss-text3)]">No hay usuarios que coincidan con los filtros.</td></tr>
                 )}
               </tbody>
             </table>

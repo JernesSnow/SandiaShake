@@ -22,6 +22,19 @@ type PagoInfo = {
   emailComprobante?: string;
 };
 
+type TareaFactura = {
+  id_tarea: number;
+  titulo: string;
+  status_kanban: string;
+  prioridad: string;
+  tipo_entregable: string | null;
+  precio_unitario: number | null;
+};
+
+function capitalize(s: string) {
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
 function formatCRC(n: number) {
   return `₡ ${Number(n || 0).toLocaleString("es-CR")}`;
 }
@@ -90,6 +103,9 @@ export default function MisFacturasPage() {
   const [pagoLoading, setPagoLoading] = useState(false);
   const [pagoInfo, setPagoInfo] = useState<PagoInfo | null>(null);
 
+  const [facturaTareas, setFacturaTareas] = useState<TareaFactura[]>([]);
+  const [loadingTareas, setLoadingTareas] = useState(false);
+
   async function fetchFacturas(nextFiltro: Filtro) {
     setLoading(true);
     try {
@@ -115,6 +131,33 @@ export default function MisFacturasPage() {
   useEffect(() => {
     fetchFacturas(filtro);
   }, [filtro]);
+
+  useEffect(() => {
+    if (!selectedId) {
+      setFacturaTareas([]);
+      return;
+    }
+
+    let alive = true;
+    async function fetchTareas() {
+      setLoadingTareas(true);
+      try {
+        const res = await fetch(`/api/admin/tareas/by-factura?id_factura=${selectedId}`, {
+          credentials: "include",
+          cache: "no-store",
+        });
+        const json = await res.json();
+        if (!alive) return;
+        setFacturaTareas(res.ok ? (json?.data ?? []) : []);
+      } catch {
+        if (alive) setFacturaTareas([]);
+      } finally {
+        if (alive) setLoadingTareas(false);
+      }
+    }
+    fetchTareas();
+    return () => { alive = false; };
+  }, [selectedId]);
 
   const selected = useMemo(
     () => facturas.find((f) => f.id_factura === selectedId) ?? null,
@@ -288,6 +331,72 @@ export default function MisFacturasPage() {
 
                 <div className="text-[11px] text-[var(--ss-text2)]">
                   Si tu factura está pendiente, podés pagar usando SINPE o transferencia y enviar el comprobante.
+                </div>
+
+                {/* Tareas asociadas a esta factura */}
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wide text-[var(--ss-text2)] mb-2">
+                    Tareas ({facturaTareas.length})
+                  </h3>
+
+                  {loadingTareas && (
+                    <p className="text-[11px] text-[var(--ss-text3)]">Cargando tareas...</p>
+                  )}
+
+                  {!loadingTareas && facturaTareas.length === 0 && (
+                    <p className="text-[11px] text-[var(--ss-text3)]">
+                      No hay tareas asociadas a esta factura.
+                    </p>
+                  )}
+
+                  {!loadingTareas && facturaTareas.length > 0 && (
+                    <div className="space-y-2 max-h-[30vh] overflow-y-auto dark-scroll">
+                      {facturaTareas.map((t) => (
+                        <div
+                          key={t.id_tarea}
+                          className="flex items-center justify-between gap-2 rounded-xl bg-[var(--ss-raised)] border border-[var(--ss-border)] px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-[var(--ss-text)] truncate">
+                              {t.titulo}
+                            </p>
+                            <p className="text-[10px] text-[var(--ss-text3)]">
+                              {t.tipo_entregable}
+                            </p>
+                            {t.precio_unitario !== null && (
+                              <p className="text-[10px] font-semibold text-[var(--ss-text2)] mt-0.5">
+                                {formatCRC(t.precio_unitario)}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span
+                              className={cx(
+                                "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+                                t.status_kanban === "pendiente" && "bg-[var(--ss-raised)] text-[var(--ss-text2)] border border-[var(--ss-border)]",
+                                t.status_kanban === "en_progreso" && "bg-sky-500/15 text-sky-600 dark:text-sky-300 border border-sky-500/40 dark:border-sky-400/40",
+                                t.status_kanban === "en_revision" && "bg-amber-500/15 text-amber-300 border border-amber-400/40",
+                                t.status_kanban === "aprobada" && "bg-emerald-500/15 text-emerald-300 border border-emerald-400/40",
+                                t.status_kanban === "archivada" && "bg-[var(--ss-raised)] text-[var(--ss-text2)] border border-[var(--ss-border)]"
+                              )}
+                            >
+                              {capitalize(t.status_kanban.replace("_", " "))}
+                            </span>
+                            <span
+                              className={cx(
+                                "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+                                t.prioridad === "Alta" && "bg-[#ee2346]/20 text-[#ffb3c2] border border-[#ee2346]/60",
+                                t.prioridad === "Media" && "bg-[#6cbe45]/15 text-[#b9f7a6] border border-[#6cbe45]/50",
+                                t.prioridad === "Baja" && "bg-[#4b5563]/40 text-[#e5e7eb] border border-[#9ca3af]/40"
+                              )}
+                            >
+                              {t.prioridad}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}

@@ -24,7 +24,7 @@ export async function GET(req: Request) {
 
   const { data: ou } = await admin
     .from("organizacion_usuario")
-    .select("id_organizacion, organizaciones(nombre)")
+    .select("id_organizacion, organizaciones(nombre, actividad_economica)")
     .eq("id_usuario_cliente", u.id_usuario)
     .eq("estado", "ACTIVO")
     .maybeSingle();
@@ -58,6 +58,7 @@ export async function GET(req: Request) {
     organizacion: {
       id_organizacion: ou.id_organizacion,
       nombre: (ou as any).organizaciones?.nombre ?? null,
+      actividad_economica: (ou as any).organizaciones?.actividad_economica ?? null,
     },
     facturas: facturas ?? [],
   });

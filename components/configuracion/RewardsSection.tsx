@@ -23,6 +23,7 @@ export default function RewardsSection() {
   const [isNew, setIsNew]     = useState(false);
   const [form, setForm]       = useState({ nombre: "", descripcion: "", puntos_costo: 0 });
   const [error, setError]     = useState("");
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   async function loadPremios() {
     setLoading(true);
@@ -65,9 +66,8 @@ export default function RewardsSection() {
   }
 
   async function deletePremio(id: number) {
-    if (!confirm("¿Eliminar premio?")) return;
     const res = await fetch(`/api/admin/premios?id_premio=${id}`, { method: "DELETE", credentials: "include" });
-    if (!res.ok) { const j = await res.json(); alert(j.error); return; }
+    if (!res.ok) { const j = await res.json(); setError(j.error); return; }
     loadPremios();
   }
 
@@ -106,6 +106,12 @@ export default function RewardsSection() {
           <Plus size={15} /> Nuevo premio
         </button>
       </div>
+
+      {error && !editing && !isNew && (
+        <p className="mb-4 text-sm text-[#ee2346] bg-[#ee2346]/10 border border-[#ee2346]/30 rounded-md px-3 py-2">
+          {error}
+        </p>
+      )}
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-[var(--ss-border)]">
@@ -158,7 +164,7 @@ export default function RewardsSection() {
                       <Edit2 size={12} /> Editar
                     </button>
                     <button
-                      onClick={() => deletePremio(p.id_premio)}
+                      onClick={() => setConfirmDeleteId(p.id_premio)}
                       className="rounded-lg border border-[#ee2346]/30 bg-[#ee2346]/10 px-2.5 py-1 text-[12px] text-[#ee2346] hover:bg-[#ee2346]/20 transition flex items-center gap-1"
                     >
                       <Trash2 size={12} /> Eliminar
@@ -245,6 +251,40 @@ export default function RewardsSection() {
                 className="rounded-xl bg-[#6cbe45] hover:bg-[#5aa63d] px-5 py-2 text-sm font-semibold text-white transition"
               >
                 Guardar premio
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Confirm delete */}
+      {confirmDeleteId !== null && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-[var(--ss-surface)] border border-[var(--ss-border)] shadow-2xl p-6">
+            <h3 className="text-base font-semibold text-[var(--ss-text)]">
+              ¿Eliminar premio?
+            </h3>
+            <p className="mt-2 text-sm text-[var(--ss-text2)]">
+              Esta acción no se puede deshacer.
+            </p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteId(null)}
+                className="rounded-xl border border-[var(--ss-border)] px-4 py-2 text-sm text-[var(--ss-text2)] hover:bg-[var(--ss-overlay)] transition"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  const id = confirmDeleteId;
+                  setConfirmDeleteId(null);
+                  if (id !== null) await deletePremio(id);
+                }}
+                className="rounded-xl bg-[#ee2346] hover:bg-[#d8203f] px-4 py-2 text-sm font-semibold text-white transition"
+              >
+                Sí, eliminar
               </button>
             </div>
           </div>
