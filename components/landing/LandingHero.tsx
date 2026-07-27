@@ -41,6 +41,96 @@ const GAME_ASSETS = [
   "/assets/prop_exit_door.png",
 ];
 
+/* ───────────────────────────────────────────────────────────
+   Contenido de la landing (placeholder editable).
+   Presenta a la agencia: marketing en redes, construcción de
+   marca y diseño gráfico. Nada de esto toca la demo interactiva
+   ni la animación de jugo — el cliente puede personalizar
+   textos, íconos y colores libremente desde aquí.
+   Íconos: paths de línea (outline) — sin emojis.
+   ─────────────────────────────────────────────────────────── */
+const AGENCY_SERVICES = [
+  {
+    iconPath:
+      "M2.25 18 9 11.25l4.306 4.307a11.95 11.95 0 0 1 5.814-5.518l2.74-1.22m0 0-5.94-2.281m5.94 2.28-2.28 5.941",
+    title: "Marketing en redes",
+    desc: "Estrategia, calendario y gestión de contenido para que tu marca esté presente donde está tu audiencia.",
+    accent: "from-rose-500 to-red-600",
+  },
+  {
+    iconPath:
+      "M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z",
+    title: "Construcción de marca",
+    desc: "Definimos identidad, tono y propósito para que tu marca se sienta única y memorable.",
+    accent: "from-emerald-500 to-green-600",
+  },
+  {
+    iconPath:
+      "M9.53 16.122a3 3 0 0 0-5.78 1.128 2.25 2.25 0 0 1-2.4 2.245 4.5 4.5 0 0 0 8.4-2.245c0-.399-.078-.78-.22-1.128Zm0 0a15.998 15.998 0 0 0 3.388-1.62m-5.043-.025a15.994 15.994 0 0 1 1.622-3.395m3.42 3.42a15.995 15.995 0 0 0 4.764-4.648l3.876-5.814a1.151 1.151 0 0 0-1.597-1.597L14.146 6.32a15.996 15.996 0 0 0-4.649 4.763m3.42 3.42a6.776 6.776 0 0 0-3.42-3.42",
+    title: "Diseño gráfico",
+    desc: "Piezas visuales frescas y coherentes: logos, feeds, campañas y todo lo que tu marca necesita.",
+    accent: "from-pink-500 to-rose-600",
+  },
+  {
+    iconPath:
+      "M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316ZM16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0ZM18.75 10.5h.008v.008h-.008V10.5Z",
+    title: "Contenido & fotografía",
+    desc: "Producción de fotos, video y reels que capturan la esencia de tu marca y detienen el scroll.",
+    accent: "from-lime-500 to-emerald-600",
+  },
+  {
+    iconPath:
+      "M15.59 14.37a6 6 0 0 1-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 0 0 6.16-12.12A14.98 14.98 0 0 0 9.631 8.41m5.96 5.96a14.926 14.926 0 0 1-5.841 2.58m-.119-8.54a6 6 0 0 0-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 0 0-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 0 1-2.448-2.448 14.9 14.9 0 0 1 .06-.312m-2.24 2.39a4.493 4.493 0 0 0-1.757 4.306 4.493 4.493 0 0 0 4.306-1.758M16.5 9a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z",
+    title: "Campañas & pauta",
+    desc: "Publicidad pensada para crecer: segmentación, creatividades y optimización de resultados.",
+    accent: "from-amber-500 to-orange-600",
+  },
+  {
+    iconPath:
+      "M12 18v-5.25m0 0a6.01 6.01 0 0 0 1.5-.189m-1.5.189a6.01 6.01 0 0 1-1.5-.189m3.75 7.478a12.06 12.06 0 0 1-4.5 0m3.75 2.383a14.406 14.406 0 0 1-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 1 0-7.517 0c.85.493 1.509 1.333 1.509 2.316V18",
+    title: "Estrategia digital",
+    desc: "Un plan claro y medible que conecta cada acción con los objetivos reales de tu negocio.",
+    accent: "from-teal-500 to-cyan-600",
+  },
+];
+
+const AGENCY_STEPS = [
+  {
+    n: "01",
+    title: "Descubrimiento",
+    desc: "Entendemos tu marca, tu mercado y hacia dónde quieres llegar.",
+  },
+  {
+    n: "02",
+    title: "Estrategia",
+    desc: "Diseñamos un plan a la medida, con objetivos y métricas claras.",
+  },
+  {
+    n: "03",
+    title: "Creación",
+    desc: "Producimos diseño y contenido que refleja la personalidad de tu marca.",
+  },
+  {
+    n: "04",
+    title: "Resultados",
+    desc: "Publicamos, medimos y optimizamos para seguir creciendo.",
+  },
+];
+
+const AGENCY_STATS = [
+  { value: "+50", label: "Marcas potenciadas" },
+  { value: "+1M", label: "Alcance generado" },
+  { value: "98%", label: "Clientes satisfechos" },
+  { value: "24/7", label: "Acompañamiento" },
+];
+
+const AGENCY_WORK = [
+  { label: "Branding", tag: "Identidad", accent: "from-emerald-400 to-green-600" },
+  { label: "Redes sociales", tag: "Contenido", accent: "from-rose-400 to-red-600" },
+  { label: "Diseño de campaña", tag: "Publicidad", accent: "from-pink-400 to-rose-600" },
+  { label: "Feed & reels", tag: "Producción", accent: "from-lime-400 to-emerald-600" },
+];
+
 function preloadImage(src: string) {
   return new Promise<void>((resolve) => {
     const img = new Image();
@@ -749,7 +839,7 @@ export default function LandingHero() {
   };
 
   return (
-    <main className="min-h-screen bg-neutral-50 relative overflow-hidden">
+    <main className="min-h-screen bg-neutral-50 relative overflow-x-hidden">
       {mapMounted && (
         <div
           ref={sceneRef}
@@ -862,6 +952,257 @@ export default function LandingHero() {
             </div>
           </div>
         </section>
+
+        {/* ─── Servicios ─────────────────────────────────────── */}
+        <section id="servicios" className="bg-[#eaf6ec] px-5 py-20">
+          <div className="mx-auto max-w-6xl">
+          <div className="max-w-2xl">
+            <span className="inline-block text-xs font-semibold tracking-widest uppercase text-red-600">
+              Lo que hacemos
+            </span>
+            <h2 className="mt-3 text-3xl md:text-4xl font-semibold leading-tight text-black">
+              Marketing, marca y diseño que{" "}
+              <span className="bg-linear-to-r from-green-600 to-red-500 bg-clip-text text-transparent">
+                se sienten frescos
+              </span>
+              .
+            </h2>
+            <p className="mt-4 text-neutral-600">
+              Ayudamos a marcas a destacar en redes con estrategia, contenido y
+              diseño hechos a la medida.
+            </p>
+          </div>
+
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {AGENCY_SERVICES.map((s) => (
+              <div
+                key={s.title}
+                className="group relative rounded-3xl border border-black/5 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+              >
+                <div
+                  className={`inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-linear-to-br ${s.accent} text-white shadow-md`}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.6}
+                    stroke="currentColor"
+                    className="h-6 w-6"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d={s.iconPath}
+                    />
+                  </svg>
+                </div>
+                <h3 className="mt-5 text-lg font-semibold text-black">
+                  {s.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-neutral-600">
+                  {s.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+          </div>
+        </section>
+
+        {/* ─── Proceso ───────────────────────────────────────── */}
+        <section id="proceso" className="bg-[#fcecec]">
+          <div className="mx-auto max-w-6xl px-5 py-20">
+            <div className="max-w-2xl">
+              <span className="inline-block text-xs font-semibold tracking-widest uppercase text-green-600">
+                Cómo trabajamos
+              </span>
+              <h2 className="mt-3 text-3xl md:text-4xl font-semibold leading-tight text-black">
+                Un proceso simple, resultados que se notan.
+              </h2>
+            </div>
+
+            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {AGENCY_STEPS.map((step) => (
+                <div
+                  key={step.n}
+                  className="relative rounded-3xl border border-black/5 bg-white p-6"
+                >
+                  <span className="text-4xl font-bold bg-linear-to-br from-green-600 to-red-500 bg-clip-text text-transparent">
+                    {step.n}
+                  </span>
+                  <h3 className="mt-3 text-lg font-semibold text-black">
+                    {step.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-neutral-600">
+                    {step.desc}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* ─── Métricas ──────────────────────────────────────── */}
+        <section className="bg-[#eaf6ec] px-5 py-16">
+          <div className="mx-auto max-w-6xl">
+          <div className="rounded-4xl bg-linear-to-r from-green-600 via-emerald-500 to-red-500 p-px shadow-lg">
+            <div className="rounded-[calc(2rem-1px)] bg-white/95 px-6 py-10 backdrop-blur">
+              <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+                {AGENCY_STATS.map((stat) => (
+                  <div key={stat.label} className="text-center">
+                    <div className="text-4xl md:text-5xl font-bold bg-linear-to-br from-green-600 to-red-500 bg-clip-text text-transparent">
+                      {stat.value}
+                    </div>
+                    <div className="mt-2 text-sm text-neutral-600">
+                      {stat.label}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+          </div>
+        </section>
+
+        {/* ─── Trabajo / portafolio (placeholder) ────────────── */}
+        <section id="trabajo" className="bg-[#fcecec] px-5 py-16">
+          <div className="mx-auto max-w-6xl">
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div className="max-w-2xl">
+              <span className="inline-block text-xs font-semibold tracking-widest uppercase text-red-600">
+                Nuestro trabajo
+              </span>
+              <h2 className="mt-3 text-3xl md:text-4xl font-semibold leading-tight text-black">
+                Marcas que ya dieron el salto.
+              </h2>
+            </div>
+            <span className="text-sm text-neutral-500">
+              Galería de ejemplo — personalizable, trabajo en progreso
+            </span>
+          </div>
+
+          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {AGENCY_WORK.map((w) => (
+              <div
+                key={w.label}
+                className={`group relative flex aspect-4/5 flex-col justify-end overflow-hidden rounded-3xl bg-linear-to-br ${w.accent} p-5 text-white shadow-md transition-transform duration-300 hover:-translate-y-1`}
+              >
+                <div className="absolute inset-0 bg-black/0 transition-colors duration-300 group-hover:bg-black/10" />
+                <span className="relative text-xs font-medium uppercase tracking-wider text-white/80">
+                  {w.tag}
+                </span>
+                <span className="relative mt-1 text-lg font-semibold">
+                  {w.label}
+                </span>
+              </div>
+            ))}
+          </div>
+          </div>
+        </section>
+
+        {/* ─── Testimonio ────────────────────────────────────── */}
+        <section className="bg-[#eaf6ec]">
+          <div className="mx-auto max-w-4xl px-5 py-20 text-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="mx-auto h-10 w-10 text-red-500/30"
+            >
+              <path d="M9.983 3v7.391c0 5.704-3.731 9.57-8.983 10.609l-.995-2.151c2.432-.917 3.995-3.638 3.995-5.849h-4v-10h9.983zm14.017 0v7.391c0 5.704-3.748 9.57-9 10.609l-.996-2.151c2.433-.917 3.996-3.638 3.996-5.849h-3.983v-10h9.983z" />
+            </svg>
+            <p className="mt-6 text-2xl md:text-3xl font-medium leading-snug text-black">
+              “Le dieron a nuestra marca una personalidad que la gente reconoce
+              al instante. El antes y el después es día y noche.”
+            </p>
+            <div className="mt-6 text-sm text-neutral-500">
+              Cliente satisfecho — Testimonio de ejemplo
+            </div>
+          </div>
+        </section>
+
+        {/* ─── CTA final ─────────────────────────────────────── */}
+        <section className="bg-[#fcecec] px-5 py-16">
+          <div className="mx-auto max-w-6xl">
+          <div className="relative overflow-hidden rounded-[2.5rem] bg-linear-to-br from-green-700 via-emerald-600 to-red-600 px-8 py-16 text-center shadow-xl">
+            <div className="pointer-events-none absolute -left-16 -top-16 h-64 w-64 rounded-full bg-white/10 blur-2xl" />
+            <div className="pointer-events-none absolute -bottom-20 -right-10 h-72 w-72 rounded-full bg-black/10 blur-2xl" />
+            <h2 className="relative text-3xl md:text-4xl font-semibold text-white">
+              ¿Lista tu marca para reventar?
+            </h2>
+            <p className="relative mx-auto mt-4 max-w-xl text-white/85">
+              Cuéntanos qué tienes en mente y armamos juntos la estrategia
+              perfecta para tu negocio.
+            </p>
+            <div className="relative mt-8 flex flex-wrap justify-center gap-3">
+              <button className="rounded-2xl bg-white px-6 py-3 font-semibold text-green-700 shadow-md transition-transform hover:scale-105">
+                Contactar
+              </button>
+              <button className="rounded-2xl border border-white/40 px-6 py-3 font-semibold text-white transition-colors hover:bg-white/10">
+                Ver servicios
+              </button>
+            </div>
+          </div>
+          </div>
+        </section>
+
+        {/* ─── Footer ────────────────────────────────────────── */}
+        <footer className="border-t border-black/5 bg-white">
+          <div className="mx-auto max-w-6xl px-5 py-12">
+            <div className="flex flex-col gap-8 md:flex-row md:items-start md:justify-between">
+              <div className="max-w-xs">
+                <div className="flex items-center gap-2 font-bold text-black">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-linear-to-br from-green-600 to-red-500 text-xs text-white">
+                    S
+                  </span>
+                  Sandía con Chile
+                </div>
+                <p className="mt-3 text-sm text-neutral-500">
+                  Agencia de marketing en redes, construcción de marca y diseño
+                  gráfico. Dulce, con su toque de picante.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-8 sm:grid-cols-3">
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                    Servicios
+                  </div>
+                  <ul className="mt-3 space-y-2 text-sm text-neutral-600">
+                    <li>Marketing en redes</li>
+                    <li>Construcción de marca</li>
+                    <li>Diseño gráfico</li>
+                  </ul>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                    Agencia
+                  </div>
+                  <ul className="mt-3 space-y-2 text-sm text-neutral-600">
+                    <li>Nosotros</li>
+                    <li>Trabajo</li>
+                    <li>Contacto</li>
+                  </ul>
+                </div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                    Redes
+                  </div>
+                  <ul className="mt-3 space-y-2 text-sm text-neutral-600">
+                    <li>Instagram</li>
+                    <li>TikTok</li>
+                    <li>LinkedIn</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-10 flex flex-col gap-2 border-t border-black/5 pt-6 text-xs text-neutral-400 sm:flex-row sm:items-center sm:justify-between">
+              <span>© {new Date().getFullYear()} Sandía con Chile. Todos los derechos reservados.</span>
+              <span>Sitio de ejemplo — personalizable, trabajo en progreso.</span>
+            </div>
+          </div>
+        </footer>
       </div>
 
       <FeatureModal
