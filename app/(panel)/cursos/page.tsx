@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useDropzone } from "react-dropzone";
 import {
   Search, Plus, Edit2, Trash2, X, Star,
-  ShoppingCart, ExternalLink, BookOpen, Clock, BarChart2, Tag,
+  ShoppingCart, ExternalLink, BookOpen, Clock, BarChart2, Tag, UploadCloud,
 } from "react-feather";
 import clsx from "clsx";
 
@@ -17,6 +18,7 @@ type Course = {
   descripcion:    string | null;
   precio:         number;
   image_id:       string;
+  image_url:      string | null;
   chat_url:       string;
   duracion_label: string | null;
   nivel:          CourseLevel | null;
@@ -27,8 +29,9 @@ type Course = {
 
 type UserRole = "ADMIN" | "COLABORADOR" | "CLIENTE" | null;
 
-const COURSE_IMG = (id: string) => `/${id}.png`;
 const FALLBACK_IMG = "/mock-logo-sandia-con-chole.png";
+const courseImage = (course: Pick<Course, "image_url" | "image_id">) =>
+  course.image_url || (course.image_id ? `/${course.image_id}.png` : FALLBACK_IMG);
 
 function formatPrice(precio: number) {
   if (!precio) return null;
@@ -83,6 +86,85 @@ function Modal({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+/* ───────────────────────────────────────────────
+   COURSE IMAGE UPLOADER
+─────────────────────────────────────────────── */
+function CourseImageUploader({
+  imageUrl, fallback, onChange,
+}: {
+  imageUrl: string | null; fallback: string; onChange: (url: string | null) => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const onDrop = useCallback(async (accepted: File[]) => {
+    const file = accepted[0];
+    if (!file) return;
+    setUploading(true);
+    setError(null);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      if (imageUrl) body.append("oldUrl", imageUrl);
+      const res = await fetch("/api/admin/cursos/upload-image", { method: "POST", body });
+      const data = await res.json();
+      if (!res.ok) { setError(data.error ?? "Error al subir la imagen"); return; }
+      onChange(data.url);
+    } catch {
+      setError("Error al subir la imagen");
+    } finally {
+      setUploading(false);
+    }
+  }, [imageUrl, onChange]);
+
+  const { getRootProps, getInputProps, isDragActive, open } = useDropzone({
+    onDrop,
+    noClick: true,
+    noKeyboard: true,
+    disabled: uploading,
+    multiple: false,
+    accept: { "image/png": [".png"], "image/jpeg": [".jpg", ".jpeg"], "image/webp": [".webp"] },
+    maxSize: 5 * 1024 * 1024,
+  });
+
+  return (
+    <div>
+      <label className={labelCls}>Imagen del curso</label>
+      <div
+        {...getRootProps()}
+        onClick={open}
+        className={clsx(
+          "group relative aspect-video rounded-xl overflow-hidden border border-dashed cursor-pointer transition",
+          isDragActive ? "border-[#6cbe45] bg-[#6cbe45]/5" : "border-[var(--ss-border-md)] bg-[var(--ss-raised)]"
+        )}
+      >
+        <input {...getInputProps()} />
+        <img src={imageUrl || fallback} alt="Vista previa del curso" className="w-full h-full object-cover" />
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/0 group-hover:bg-black/50 opacity-0 group-hover:opacity-100 transition text-white text-xs font-medium">
+          <UploadCloud size={20} />
+          Cambiar imagen
+        </div>
+        {uploading && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 bg-black/60 text-white text-xs font-medium">
+            <UploadCloud size={20} className="animate-pulse" />
+            Subiendo…
+          </div>
+        )}
+      </div>
+      <div className="flex items-center justify-between mt-1.5">
+        <p className="text-[11px] text-[var(--ss-text3)]">PNG, JPG o WEBP · máx. 5MB</p>
+        {imageUrl && (
+          <button type="button" onClick={() => onChange(null)}
+            className="text-[11px] text-[#ee2346] hover:underline">
+            Quitar imagen
+          </button>
+        )}
+      </div>
+      {error && <p className="text-[11px] text-[#ee2346] mt-1">{error}</p>}
     </div>
   );
 }
@@ -151,6 +233,13 @@ function handleSubmit(e: React.FormEvent) {
       <form id="course-form" onSubmit={handleSubmit} className="space-y-4 text-sm">
         <div className="grid gap-3 md:grid-cols-2">
           <div className="md:col-span-2">
+            <CourseImageUploader
+              imageUrl={form.image_url}
+              fallback={courseImage(form)}
+              onChange={(url) => set("image_url", url)}
+            />
+          </div>
+          <div className="md:col-span-2">
             <label className={labelCls}>Título *</label>
             <input type="text" className={inputCls} value={form.titulo} onChange={(e) => set("titulo", e.target.value)} />
           </div>
@@ -192,14 +281,6 @@ function handleSubmit(e: React.FormEvent) {
               <option value="Ads">Ads</option>
               <option value="Estrategia">Estrategia</option>
               <option value="Otro">Otro</option>
-            </select>
-          </div>
-          <div>
-            <label className={labelCls}>Imagen (1, 2 o 3)</label>
-            <select className={inputCls} value={form.image_id} onChange={(e) => set("image_id", e.target.value)}>
-              <option value="1">1</option>
-              <option value="2">2</option>
-              <option value="3">3</option>
             </select>
           </div>
           <div className="flex flex-col gap-3 justify-end">
@@ -244,7 +325,7 @@ function PurchaseModal({ course, onClose, onNext, loading = false }: {
     >
       <div className="space-y-4">
         <div className="rounded-xl overflow-hidden border border-[var(--ss-border)] aspect-video bg-[var(--ss-raised)]">
-          <img src={COURSE_IMG(course.image_id)} alt={course.titulo} className="w-full h-full object-cover"
+          <img src={courseImage(course)} alt={course.titulo} className="w-full h-full object-cover"
             onError={(e) => { (e.currentTarget as HTMLImageElement).src = FALLBACK_IMG; }} />
         </div>
         {course.descripcion && (
@@ -423,7 +504,7 @@ function CourseCard({ course, isAdmin, onEdit, onBuy }: {
       {/* Image */}
       <div className="relative aspect-video overflow-hidden bg-[var(--ss-raised)]">
         <img
-          src={COURSE_IMG(course.image_id)} alt={course.titulo}
+          src={courseImage(course)} alt={course.titulo}
           className="h-full w-full object-cover group-hover:scale-[1.02] transition-transform duration-300"
           onError={(e) => { (e.currentTarget as HTMLImageElement).src = FALLBACK_IMG; }}
         />
@@ -625,7 +706,7 @@ export default function CursosPage() {
 
   function openNewCourse() {
     setIsNew(true);
-    setEditingCourse({ titulo: "", subtitulo: "", descripcion: "", image_id: "1", chat_url: "", precio: 0, duracion_label: "", nivel: null, categoria: null, featured: false, visible: true });
+    setEditingCourse({ titulo: "", subtitulo: "", descripcion: "", image_id: "1", image_url: null, chat_url: "", precio: 0, duracion_label: "", nivel: null, categoria: null, featured: false, visible: true });
   }
 
   return (
@@ -699,7 +780,7 @@ export default function CursosPage() {
               </div>
               {/* Image */}
               <div className="relative min-h-[200px] md:min-h-0 bg-[var(--ss-raised)]">
-                <img src={COURSE_IMG(featured.image_id)} alt={featured.titulo}
+                <img src={courseImage(featured)} alt={featured.titulo}
                   className="absolute inset-0 w-full h-full object-cover"
                   onError={(e) => { (e.currentTarget as HTMLImageElement).src = FALLBACK_IMG; }} />
               </div>
