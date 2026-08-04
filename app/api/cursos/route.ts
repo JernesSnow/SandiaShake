@@ -11,7 +11,7 @@ export async function GET() {
 
     const { data, error } = await supabase
       .from("cursos")
-      .select("id_curso, titulo, subtitulo, descripcion, precio, image_id, chat_url, duracion_label, nivel, categoria, featured, visible")
+      .select("id_curso, titulo, subtitulo, descripcion, precio, image_id, image_url, chat_url, duracion_label, nivel, categoria, featured, visible")
       .eq("estado", "ACTIVO")
       .eq("visible", true)
       .order("featured", { ascending: false })
